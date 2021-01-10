@@ -3,6 +3,7 @@ mod lowlevel;
 use crate::errors::Error;
 
 pub async fn run() -> Result<(), Error> {
-    lowlevel::connect()?;
+    let mut cluster = lowlevel::connect()?;
+    lowlevel::list_pools(cluster)?;
     Ok(())
 }
