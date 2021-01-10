@@ -1,17 +1,24 @@
 mod errors;
-mod deployer;
+mod cluster;
 mod host;
 
 use std::env;
-
+use kube::Client;
 use crate::errors::Error;
 
-fn main() -> Result<(), Error>{
+const NAMESPACE: &str = "cluster-manager";
+
+#[tokio::main]
+async fn main() -> Result<(), Error>{
+    let client = Client::try_default().await?;
+
     let args: Vec<String> = env::args().collect();
     if args.contains(&String::from("--host")) {
-        host::run()?;
+        println!("Starting host-mode");
+        host::run(client)?;
     } else {
-        deployer::run()?;
+        println!("Starting cluster-mode");
+        cluster::run(client, NAMESPACE).await?;
     }
     Ok(())
 }
