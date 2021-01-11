@@ -4,8 +4,13 @@ use crate::errors::Error;
 
 pub async fn run() -> Result<(), Error> {
     let mut cluster = lowlevel::connect()?;
-    lowlevel::list_pools(cluster)?;
+
+    let pools = lowlevel::get_pools(cluster)?;
+    println!("Pools: {:?}", pools);
+
     let mut pool = lowlevel::get_pool(cluster, "volumes".into())?;
-    lowlevel::list_images(pool)?;
+
+    let images = lowlevel::get_images(pool)?;
+    println!("Images: {:?}", images);
     Ok(())
 }
