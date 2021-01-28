@@ -1,6 +1,6 @@
 use kube::{Client};
 use crate::errors::Error;
 
-pub fn run(client: Client) -> Result<(), Error> {
+pub fn run(_client: Client) -> Result<(), Error> {
     Ok(())
 }

@@ -21,7 +21,7 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     println!("daemonset/libvirt-host-controller: OK");
 
     // Create ceph cluster controller
-    ceph::run().await?;
+    ceph::run(client).await?;
     println!("ceph cluster controller: OK");
     Ok(())
 }
