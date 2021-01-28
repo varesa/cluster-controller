@@ -1,7 +1,14 @@
 mod daemonset;
 mod ceph;
 
-use kube::{Client, Api, api::PatchParams};
+use kube::{
+    api::{
+        Patch,
+        PatchParams,
+    },
+    Api,
+    Client,
+};
 use k8s_openapi::api::apps::v1::{DaemonSet};
 use crate::errors::Error;
 
@@ -10,7 +17,7 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
 
     // Create libvirt host controllers
     let libvirt_ds = daemonset::make_daemonset("hello:world4".into())?;
-    daemonsets.patch("libvirt-host-controller", &PatchParams::apply("libvirt-controller-cluster"), serde_yaml::to_vec(&libvirt_ds)?).await?;
+    daemonsets.patch("libvirt-host-controller", &PatchParams::apply("libvirt-controller-cluster"), &Patch::Apply(&libvirt_ds)).await?;
     println!("daemonset/libvirt-host-controller: OK");
 
     // Create ceph cluster controller
