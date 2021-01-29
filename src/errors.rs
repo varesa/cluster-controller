@@ -41,6 +41,8 @@ pub enum Error {
     WatcherError(#[from] kube_runtime::watcher::Error),
     #[error("librados error {0}")]
     RadosError(#[from] RadosError),
+    #[error("Timed out waiting for operation: {0}")]
+    Timeout(String),
 
     /*#[error("data store disconnected")]
     Disconnect(#[from] io::Error),
