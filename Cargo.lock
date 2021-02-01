@@ -150,7 +150,6 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "humanize-rs",
- "json-patch",
  "k8s-openapi",
  "kube",
  "kube-runtime",

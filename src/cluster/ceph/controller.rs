@@ -1,17 +1,13 @@
-use kube::{Client, api::{Api, ListParams, Meta, Patch}};
+use kube::{Client, api::{Api, ListParams, Meta, PostParams}};
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 use tokio::time::Duration;
 use futures::StreamExt;
 use humanize_rs::bytes::Bytes;
-use serde_json::json;
-use serde_json::Value as JsonValue;
 
 use crate::GROUP_NAME;
 use crate::errors::Error;
 use super::crd::Volume;
 use super::lowlevel;
-use kube::api::PatchParams;
-use json_patch::{AddOperation, PatchOperation, patch};
 
 const POOL: &str = "volumes";
 
@@ -44,46 +40,31 @@ fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
     Ok(())
 }
 
-macro_rules! patch_add {
-    ($path:expr, $value:expr) => {
-        json_patch::Patch(vec![PatchOperation::Add(AddOperation {
-            path: $path,
-            value: $value,
-        })])
-    }
-}
-
 async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error> {
     let volume_name = Meta::name(volume);
     let finalizer_name = format!("{}/ceph", GROUP_NAME);
     let namespace = Meta::namespace(volume).expect("Unable to get namespace");
     let volumes: Api<Volume> = Api::namespaced(client.clone(), &namespace);
 
-    let finalizers = &volume.meta().finalizers;
-    if let Some(finalizers) = finalizers {
-        for f in finalizers {
-            if f == &finalizer_name {
-                return Ok(());
-            }
-        }
-    } else {
-        volumes.patch(
-            &volume_name,
-            &PatchParams::default(),
-            &Patch::<()>::Json(patch_add!(
-                String::from("/metadata/finalizers"),
-                JsonValue::Array(vec![JsonValue::String(finalizer_name)])))
-        ).await?;
-
+    if let Some(_) = &volume.metadata.finalizers.as_ref().and_then(
+        |finalizers| finalizers.iter().find(|&finalizer| finalizer == &finalizer_name)
+    ) {
         return Ok(())
     }
 
-    volumes.patch(
+    println!("Going to modify");
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
+    let mut new_vol = volume.to_owned();
+    if let Some(finalizers) = new_vol.metadata.finalizers.as_mut() {
+        finalizers.push(finalizer_name);
+    } else {
+        new_vol.metadata.finalizers = Some(vec![finalizer_name]);
+    }
+    volumes.replace(
         &volume_name,
-        &PatchParams::default(),
-        &Patch::<()>::Json(patch_add!(
-            String::from("/metadata/finalizers/-"),
-            JsonValue::String(finalizer_name)))
+        &PostParams::default(),
+        &new_vol,
     ).await?;
     Ok(())
 }
