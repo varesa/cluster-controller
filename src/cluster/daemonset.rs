@@ -1,7 +1,5 @@
-use std::collections::BTreeMap;
-use k8s_openapi::api::apps::v1::{DaemonSet, DaemonSetSpec};
+use k8s_openapi::api::apps::v1::DaemonSet;
 use serde_json::json;
-//use serde_yaml::yaml;
 use crate::errors::Error;
 
 pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {

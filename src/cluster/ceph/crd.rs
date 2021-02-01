@@ -1,6 +1,5 @@
 use k8s_openapi::{
     apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
-    Resource
 };
 use kube::{
     api::{
@@ -14,7 +13,6 @@ use kube::{
     CustomResource,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use schemars::JsonSchema;
 use crate::errors::Error;
 use futures::{StreamExt, TryStreamExt};
@@ -59,6 +57,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
 
 async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) -> Result<(), Error> {
     if crds.get(name).await.is_ok() {
+        println!("CRD ok");
         return Ok(());
     }
 
