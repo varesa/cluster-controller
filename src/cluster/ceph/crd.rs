@@ -18,7 +18,7 @@ use crate::errors::Error;
 use futures::{StreamExt, TryStreamExt};
 
 #[derive(Debug, PartialEq, Clone, JsonSchema, Serialize, Deserialize, Default)]
-struct Quantity(String);
+pub struct Quantity(String);
 
 const CRD_NAME: &str = "volumes.cluster-virt.acl.fi";
 
@@ -35,8 +35,8 @@ const CRD_NAME: &str = "volumes.cluster-virt.acl.fi";
     namespaced,
 )]
 pub struct VolumeSpec {
-    //name: String,
-    size: Quantity,
+    // String to allow suffixes like '1 Gi'
+    pub size: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]

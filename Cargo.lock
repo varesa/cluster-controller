@@ -149,6 +149,7 @@ name = "cluster-controller"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "humanize-rs",
  "k8s-openapi",
  "kube",
  "kube-runtime",
@@ -506,6 +507,12 @@ name = "httpdate"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "494b4d60369511e7dea41cf646832512a94e542f68bb9c49e54518e0f468eb47"
+
+[[package]]
+name = "humanize-rs"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "016b02deb8b0c415d8d56a6f0ab265e50c22df61194e37f9be75ed3a722de8a6"
 
 [[package]]
 name = "humantime"

@@ -6,11 +6,14 @@ use librados_sys::{
     rados_conf_read_file,
     rados_connect,
     rados_ioctx_create,
-    rados_pool_list
+    rados_ioctx_destroy,
+    rados_pool_list,
+    rados_shutdown,
 };
 
 use librbd_sys::{
     rbd_list,
+    rbd_create,
 };
 
 use crate::errors::{RadosError, Error};
@@ -25,7 +28,7 @@ macro_rules! call {
     }
 }
 
-pub fn connect() -> Result<rados_t, Error>{
+pub fn connect() -> Result<rados_t, Error> {
     unsafe {
         let mut cluster: rados_t = 0 as rados_t;
 
@@ -53,6 +56,12 @@ pub fn connect() -> Result<rados_t, Error>{
     }
 }
 
+pub fn disconnect(cluster: rados_t) -> () {
+    unsafe {
+        rados_shutdown(cluster);
+    }
+}
+
 fn null_separeted_to_vec(null_separated_list: Vec<u8>) -> Vec<String> {
     let mut result = Vec::new();
     for item in null_separated_list.split(|c| { *c == 0 }) {
@@ -63,11 +72,12 @@ fn null_separeted_to_vec(null_separated_list: Vec<u8>) -> Vec<String> {
     result
 }
 
+#[allow(dead_code)]
 pub fn get_pools(cluster: rados_t) -> Result<Vec<String>, Error> {
     let mut buffer = vec![0 as u8; 1024];
     let buffer_len = buffer.len();
     unsafe {
-        let code = rados_pool_list(cluster, buffer.as_mut_ptr() as *mut i8, buffer_len);
+        call!("rados_pool_list", rados_pool_list(cluster, buffer.as_mut_ptr() as *mut i8, buffer_len));
     }
     let pools = null_separeted_to_vec(buffer);
     Ok(pools)
@@ -89,6 +99,12 @@ pub fn get_pool(cluster: rados_t, pool_name: String) -> Result<rados_ioctx_t, Er
     Ok(pool)
 }
 
+pub fn close_pool(pool: rados_ioctx_t) -> () {
+    unsafe {
+        rados_ioctx_destroy(pool);
+    }
+}
+
 pub fn get_images(pool: rados_ioctx_t) -> Result<Vec<String>, Error> {
     let mut buffer = vec![0 as u8; 1024];
     let mut buffer_len: libc::size_t = buffer.len();
@@ -99,4 +115,17 @@ pub fn get_images(pool: rados_ioctx_t) -> Result<Vec<String>, Error> {
 
     let images = null_separeted_to_vec(buffer);
     Ok(images)
+}
+
+pub fn create_image(pool: rados_ioctx_t, name: String, size: u64) -> Result<(), Error> {
+    unsafe {
+        let name_c = CString::new(name)
+            .expect("failed to convert to cstring")
+            .into_raw();
+        call!("rbd_create", rbd_create(pool, name_c, size, &mut 0));
+
+        // Take back control and release memory
+        CString::from_raw(name_c);
+    }
+    Ok(())
 }

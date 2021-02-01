@@ -43,6 +43,8 @@ pub enum Error {
     RadosError(#[from] RadosError),
     #[error("Timed out waiting for operation: {0}")]
     Timeout(String),
+    #[error("Error parsing value: {0}")]
+    ParseError(#[from] humanize_rs::ParseError),
 
     /*#[error("data store disconnected")]
     Disconnect(#[from] io::Error),
