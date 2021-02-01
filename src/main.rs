@@ -7,6 +7,7 @@ use kube::Client;
 use crate::errors::Error;
 
 const NAMESPACE: &str = "cluster-manager";
+const GROUP_NAME: &str = "cluster-virt.acl.fi";
 
 #[tokio::main]
 async fn main() -> Result<(), Error>{
