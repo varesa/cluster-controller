@@ -17,9 +17,9 @@ struct State {
     client: Client,
 }
 
+/// Check if an volume already exists in the cluster and
+/// create if it doesn't.
 fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
-    /// Check if an volume already exists in the cluster and
-    /// create if it doesn't.
     let cluster = lowlevel::connect()?;
     let pool = lowlevel::get_pool(cluster, POOL.into())?;
 
@@ -41,9 +41,9 @@ fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
     Ok(())
 }
 
+/// Ensure that all the volumes have finalizers so that we will be
+/// notified in case a volume is marked for deletion from the API
 async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error> {
-    /// Ensure that all the volumes have finalizers so that we will be
-    /// notified in case a volume is marked for deletion from the API
     let volume_name = Meta::name(volume);
     let finalizer_name = format!("{}/ceph", GROUP_NAME);
     let namespace = Meta::namespace(volume).expect("Unable to get namespace");
@@ -69,8 +69,8 @@ async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error>
     Ok(())
 }
 
+/// Handle updates to volumes in the cluster
 async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    /// Handle updates to volumes in the cluster
     let name = format!(
         "{}-{}",
         Meta::namespace(&volume).expect("get namespace"),
