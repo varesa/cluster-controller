@@ -11,18 +11,19 @@ use super::lowlevel;
 
 const POOL: &str = "volumes";
 
+/// State available for the reconcile and error_policy functions
+/// called by the Controller
 struct State {
     client: Client,
 }
 
 fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
+    /// Check if an volume already exists in the cluster and
+    /// create if it doesn't.
     let cluster = lowlevel::connect()?;
     let pool = lowlevel::get_pool(cluster, POOL.into())?;
 
-    let images = lowlevel::get_images(pool)?;
-    //println!("Images: {:?}", images);
-
-    images
+    lowlevel::get_images(pool)?
         .iter()
         .find(|&existing| existing == &name)
         .and_then(|existing| {
@@ -41,6 +42,8 @@ fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
 }
 
 async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error> {
+    /// Ensure that all the volumes have finalizers so that we will be
+    /// notified in case a volume is marked for deletion from the API
     let volume_name = Meta::name(volume);
     let finalizer_name = format!("{}/ceph", GROUP_NAME);
     let namespace = Meta::namespace(volume).expect("Unable to get namespace");
@@ -67,9 +70,7 @@ async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error>
 }
 
 async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let client = ctx.get_ref().client.clone();
-    //println!("{:?}", volume);
-
+    /// Handle updates to volumes in the cluster
     let name = format!(
         "{}-{}",
         Meta::namespace(&volume).expect("get namespace"),
@@ -77,7 +78,7 @@ async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerActi
     );
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
 
-    ensure_finalizers(client.clone(), &volume).await?;
+    ensure_finalizers(ctx.get_ref().client.clone(), &volume).await?;
     ensure_exists(name, bytes)?;
 
     Ok(ReconcilerAction {
