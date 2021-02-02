@@ -1,5 +1,6 @@
 mod daemonset;
 mod ceph;
+mod libvirt;
 
 use kube::{
     api::{
@@ -18,10 +19,20 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     // Create libvirt host controllers
     let libvirt_ds = daemonset::make_daemonset("hello:world4".into())?;
     daemonsets.patch("libvirt-host-controller", &PatchParams::apply("libvirt-controller-cluster"), &Patch::Apply(&libvirt_ds)).await?;
-    println!("daemonset/libvirt-host-controller: OK");
 
     // Create ceph cluster controller
-    ceph::run(client).await?;
-    println!("ceph cluster controller: OK");
-    Ok(())
+    let client_clone = client.clone();
+    tokio::task::spawn(async  {
+        ceph::run(client_clone).await?;
+        Ok::<(),Error>(())
+    });
+
+    // Create libvirt cluster controller
+    let client_clone = client.clone();
+    tokio::task::spawn(async {
+        libvirt::run(client_clone).await?;
+        Ok::<(),Error>(())
+    });
+
+    loop {}
 }
