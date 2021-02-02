@@ -26,8 +26,8 @@ fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
     lowlevel::get_images(pool)?
         .iter()
         .find(|&existing| existing == &name)
-        .and_then(|existing| {
-            println!("Found existing volume: {}", existing);
+        .and_then(|_existing| {
+            //println!("Found existing volume: {}", existing);
             Some(Ok(()))
         })
         .or_else(|| {

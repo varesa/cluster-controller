@@ -3,10 +3,8 @@ use k8s_openapi::{
 };
 use kube::{
     api::{
-        ListParams,
         Patch,
         PatchParams,
-        WatchEvent,
     },
     Api,
     Client,
@@ -14,8 +12,9 @@ use kube::{
 };
 use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
+
 use crate::errors::Error;
-use futures::{StreamExt, TryStreamExt};
+use crate::utils::wait_crd_ready;
 
 #[derive(Debug, PartialEq, Clone, JsonSchema, Serialize, Deserialize, Default)]
 pub struct Quantity(String);
@@ -53,33 +52,4 @@ pub async fn create(client: Client) -> Result<(), Error> {
     crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&crd)).await?;
     wait_crd_ready(&crds, CRD_NAME).await?;
     Ok(())
-}
-
-async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) -> Result<(), Error> {
-    if crds.get(name).await.is_ok() {
-        println!("CRD ok");
-        return Ok(());
-    }
-
-    let list_params = ListParams::default()
-        .fields(&format!("metdata.name={}", name))
-        .timeout(5);
-    let mut stream = crds.watch(&list_params, "0").await?.boxed();
-
-    while let Some(status) = stream.try_next().await? {
-        if let WatchEvent::Modified(crd) = status {
-            println!("Modify event for {}", name);
-            if let Some(status) = crd.status {
-                if let Some(conditions) = status.conditions {
-                    if let Some(pcond) = conditions.iter().find(|c| c.type_ == "NamesAccepted") {
-                        if pcond.status == "True" {
-                            println!("CRD accepted: {}", name);
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return Err(Error::Timeout(format!("Apply CRD {}", name)));
 }
