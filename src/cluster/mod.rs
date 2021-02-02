@@ -12,6 +12,7 @@ use kube::{
 };
 use k8s_openapi::api::apps::v1::{DaemonSet};
 use crate::errors::Error;
+use tokio::time::Duration;
 
 pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     let daemonsets: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
@@ -34,5 +35,7 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
         Ok::<(),Error>(())
     });
 
-    loop {}
+    loop {
+        tokio::time::sleep(Duration::from_secs(10)).await;
+    }
 }
