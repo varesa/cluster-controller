@@ -52,9 +52,6 @@ async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error>
         return Ok(())
     }
 
-    println!("Going to modify");
-    tokio::time::sleep(Duration::from_secs(10)).await;
-
     let mut new_vol = volume.to_owned();
     if let Some(finalizers) = new_vol.metadata.finalizers.as_mut() {
         finalizers.push(finalizer_name);
