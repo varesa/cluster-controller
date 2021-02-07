@@ -43,7 +43,9 @@ pub struct VirtualMachineSpec {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct VirtualMachineStatus {
-    is_created: bool,
+    pub scheduled: bool,
+    pub running: bool,
+    pub node: Option<String>,
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
