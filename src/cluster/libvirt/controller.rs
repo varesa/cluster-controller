@@ -50,12 +50,13 @@ async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconciler
         Meta::name(&vm)
     );
 
-    let _node = schedule(&vm, client.clone()).await?;
+    let node = schedule(&vm, client.clone()).await?;
 
     let status = VirtualMachineStatus {
         scheduled: false,
         running: false,
-        node: None,
+        node: Some(node.metadata.name.expect("Unknown node name")),
+        domain_name: name.clone(),
     };
     set_status(&vm, status, client.clone()).await?;
 

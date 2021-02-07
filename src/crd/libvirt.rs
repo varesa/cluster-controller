@@ -46,6 +46,7 @@ pub struct VirtualMachineStatus {
     pub scheduled: bool,
     pub running: bool,
     pub node: Option<String>,
+    pub domain_name: String,
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
