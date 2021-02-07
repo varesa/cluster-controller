@@ -8,8 +8,7 @@ use serde_json::json;
 
 //use crate::GROUP_NAME;
 use crate::errors::Error;
-use super::crd::VirtualMachine;
-use crate::cluster::libvirt::crd::VirtualMachineStatus;
+use crate::crd::libvirt::{VirtualMachine,VirtualMachineStatus};
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller

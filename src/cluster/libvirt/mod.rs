@@ -1,11 +1,12 @@
-mod crd;
-mod controller;
-
 use kube::Client;
+
+use crate::crd::libvirt;
 use crate::errors::Error;
 
+mod controller;
+
 pub async fn run(client: Client) -> Result<(), Error> {
-    crd::create(client.clone()).await?;
+    libvirt::create(client.clone()).await?;
     controller::create(client.clone()).await?;
     Ok(())
 }

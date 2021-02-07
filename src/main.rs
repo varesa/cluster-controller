@@ -2,6 +2,7 @@ mod errors;
 mod cluster;
 mod host;
 mod utils;
+mod crd;
 
 use std::env;
 use kube::Client;

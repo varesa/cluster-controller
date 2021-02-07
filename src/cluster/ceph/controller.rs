@@ -6,7 +6,7 @@ use humanize_rs::bytes::Bytes;
 
 use crate::GROUP_NAME;
 use crate::errors::Error;
-use super::crd::Volume;
+use crate::crd::ceph::Volume;
 use super::lowlevel;
 
 const POOL: &str = "volumes";
