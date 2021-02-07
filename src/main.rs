@@ -18,7 +18,7 @@ async fn main() -> Result<(), Error>{
     let args: Vec<String> = env::args().collect();
     if args.contains(&String::from("--host")) {
         println!("Starting host-mode");
-        host::run(client)?;
+        host::libvirt::run(client)?;
     } else {
         println!("Starting cluster-mode");
         cluster::run(client, NAMESPACE).await?;

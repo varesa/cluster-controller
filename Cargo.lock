@@ -164,6 +164,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "virt",
 ]
 
 [[package]]
@@ -1774,6 +1775,15 @@ name = "version_check"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
+
+[[package]]
+name = "virt"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06ce5cd536aa559d1088ddc531bbf3e55edc5db8ec0a5329dfb17f83a5b469ca"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "want"

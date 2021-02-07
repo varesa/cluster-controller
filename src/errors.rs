@@ -31,30 +31,27 @@ impl std::fmt::Display for RadosError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    // Kubernetes
     #[error("Kubernetes error {0}")]
     KubeError(#[from] kube::Error),
-    #[error("JSON error {0}")]
-    JsonError(#[from] serde_json::Error),
-    #[error("YAML error {0}")]
-    YamlError(#[from] serde_yaml::Error),
     #[error("Resource watcher error {0}")]
     WatcherError(#[from] kube_runtime::watcher::Error),
+
+    // Ceph
     #[error("librados error {0}")]
     RadosError(#[from] RadosError),
-    #[error("Timed out waiting for operation: {0}")]
-    Timeout(String),
+
+    // Libvirt
+    #[error("libvirt error {0}")]
+    LibvirtError(#[from] virt::error::Error),
+
+    // Misc libs
+    #[error("JSON error {0}")]
+    JsonError(#[from] serde_json::Error),
     #[error("Error parsing value: {0}")]
     ParseError(#[from] humanize_rs::ParseError),
 
-    /*#[error("data store disconnected")]
-    Disconnect(#[from] io::Error),
-    #[error("the data for key `{0}` is not available")]
-    Redaction(String),
-    #[error("invalid header (expected {expected:?}, found {found:?})")]
-    InvalidHeader {
-        expected: String,
-        found: String,
-    },
-    #[error("unknown data store error")]
-    Unknown,*/
+    // Custom/generic
+    #[error("Timed out waiting for operation: {0}")]
+    Timeout(String),
 }

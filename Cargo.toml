@@ -27,3 +27,6 @@ humanize-rs = "0.1.5"
 libc = "0.2.82"
 librados-sys = "0.1.0"
 librbd-sys = "0.1.0"
+
+# libvirt
+virt = "0.2.11"
