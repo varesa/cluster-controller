@@ -32,7 +32,7 @@ async fn set_status(vm: &VirtualMachine, status: VirtualMachineStatus, client: C
     Ok(())
 }
 
-async fn schedule(vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
+async fn schedule(_vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
     let node_api: Api<Node> = Api::all(client.clone());
     let nodes = node_api.list(&ListParams::default()).await?;
     /*for node in nodes {
@@ -51,7 +51,7 @@ async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconciler
         Meta::name(&vm)
     );
 
-    let node = schedule(&vm, client.clone()).await?;
+    let _node = schedule(&vm, client.clone()).await?;
 
     let status = VirtualMachineStatus {
         scheduled: false,
