@@ -14,7 +14,8 @@ use askama::Template;
 use crate::errors::Error;
 use crate::crd::libvirt::{VirtualMachine/*,VirtualMachineStatus*/};
 use super::lowlevel::Libvirt;
-use super::domain::DomainTemplate;
+use super::templates::DomainTemplate;
+use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
 
 const LIBVIRT_URI: &str = "qemu:///system";
 
@@ -49,6 +50,8 @@ fn create_domain(vm: &VirtualMachine) -> Result<(), Error> {
         cpus: 2,
         memory: 128,
         memory_unit: String::from("MiB"),
+        network_interfaces: vec![NetworkInterfaceTemplate {}, NetworkInterfaceTemplate {}],
+        storage_devices: vec![StorageTemplate {}, StorageTemplate {}],
     };
     println!("{}", xml.render().expect("render domain xml template"));
     Ok(())

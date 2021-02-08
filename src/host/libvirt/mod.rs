@@ -1,6 +1,6 @@
 mod controller;
 mod lowlevel;
-mod domain;
+mod templates;
 
 use kube::Client;
 
