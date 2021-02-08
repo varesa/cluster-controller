@@ -46,6 +46,10 @@ fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
 fn create_domain(vm: &VirtualMachine) -> Result<(), Error> {
     let xml = DomainTemplate {
         name: get_domain_name(&vm).expect("no domain name specified"),
+        uuid: String::from("aa-bb-cc"),
+        cpus: 2,
+        memory: 128,
+        memory_unit: String::from("MiB"),
     };
     println!("{}", xml.render().expect("render domain xml template"));
     Ok(())
