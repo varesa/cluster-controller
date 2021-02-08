@@ -1,5 +1,6 @@
 mod controller;
 mod lowlevel;
+mod domain;
 
 use kube::Client;
 

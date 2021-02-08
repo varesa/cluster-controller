@@ -9,11 +9,13 @@ use virt::{
     connect::Connect,
     domain::Domain,
 };
+use askama::Template;
 
 //use crate::GROUP_NAME;
 use crate::errors::Error;
 use crate::crd::libvirt::{VirtualMachine,VirtualMachineStatus};
 use super::lowlevel::Libvirt;
+use super::domain::DomainTemplate;
 
 const LIBVIRT_URI: &str = "qemu:///system";
 
@@ -25,6 +27,7 @@ struct State {
     libvirt: Libvirt,
 }
 
+/// Construct the expected
 fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
     let domain_name: Option<&str> = vm.status.as_ref().and_then(|status| Some(status.domain_name.as_ref()));
     match domain_name {
@@ -38,7 +41,18 @@ fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
             None
         }
     }
+}
 
+fn create_domain(vm: &VirtualMachine) -> Result<(), Error> {
+    let xml = DomainTemplate {
+        name: get_domain_name(&vm).expect("no domain name specified"),
+    };
+    println!("{}", xml.render().expect("render domain xml template"));
+    Ok(())
+}
+
+fn refresh_domain(vm: &VirtualMachine, domain: &Domain) -> Result<(), Error> {
+    Ok(())
 }
 
 /// Handle updates to volumes in the cluster
@@ -66,6 +80,11 @@ async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconciler
     println!("Update for VM {} that has been scheduled to us", vm_name);
     let libvirt_domain = Domain::lookup_by_name(&ctx.get_ref().libvirt.connection, &vm_name);
     println!("Domain: {:?}", libvirt_domain);
+
+    match libvirt_domain {
+        Ok(domain) => refresh_domain(&vm, &domain),
+        Err(_) => create_domain(&vm),
+    };
 
     /*let client = ctx.get_ref().client.clone();
 
