@@ -1,9 +1,6 @@
-use virt::connect::{
-    Connect,
-    VIR_CONNECT_LIST_DOMAINS_ACTIVE,
-    VIR_CONNECT_LIST_DOMAINS_INACTIVE,
+use virt::{
+    connect::Connect,
 };
-use virt::domain::Domain;
 
 use crate::errors::Error;
 
@@ -21,7 +18,7 @@ unsafe impl Sync for Libvirt {}
 
 impl Drop for Libvirt {
     fn drop(&mut self) {
-        self.connection.close();
+        self.connection.close().expect("close libvirt connection");
     }
 }
 

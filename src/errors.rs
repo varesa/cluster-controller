@@ -44,8 +44,6 @@ pub enum Error {
     // Libvirt
     #[error("libvirt error {0}")]
     LibvirtError(#[from] virt::error::Error),
-    #[error("no such domain: {0}")]
-    LibvirtDomainNotFound(String),
 
     // Misc libs
     #[error("JSON error {0}")]

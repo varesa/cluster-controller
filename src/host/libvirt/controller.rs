@@ -1,19 +1,18 @@
-use kube::{Client, api::{Api, ListParams, Meta, PostParams}};
+use kube::{Client, api::{Api, ListParams, Meta, /*PostParams*/}};
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
-use k8s_openapi::api::core::v1::Node;
+//use k8s_openapi::api::core::v1::Node;
 use tokio::time::Duration;
 use futures::StreamExt;
 //use humanize_rs::bytes::Bytes;
-use serde_json::json;
+//use serde_json::json;
 use virt::{
-    connect::Connect,
     domain::Domain,
 };
 use askama::Template;
 
 //use crate::GROUP_NAME;
 use crate::errors::Error;
-use crate::crd::libvirt::{VirtualMachine,VirtualMachineStatus};
+use crate::crd::libvirt::{VirtualMachine/*,VirtualMachineStatus*/};
 use super::lowlevel::Libvirt;
 use super::domain::DomainTemplate;
 
@@ -55,7 +54,7 @@ fn create_domain(vm: &VirtualMachine) -> Result<(), Error> {
     Ok(())
 }
 
-fn refresh_domain(vm: &VirtualMachine, domain: &Domain) -> Result<(), Error> {
+fn refresh_domain(_vm: &VirtualMachine, _domain: &Domain) -> Result<(), Error> {
     Ok(())
 }
 
@@ -88,7 +87,7 @@ async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconciler
     match libvirt_domain {
         Ok(domain) => refresh_domain(&vm, &domain),
         Err(_) => create_domain(&vm),
-    };
+    }?;
 
     /*let client = ctx.get_ref().client.clone();
 
