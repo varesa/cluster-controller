@@ -50,6 +50,8 @@ pub enum Error {
     JsonError(#[from] serde_json::Error),
     #[error("Error parsing value: {0}")]
     ParseError(#[from] humanize_rs::ParseError),
+    #[error("Error rendering template: {0}")]
+    TemplateError(#[from] askama::Error),
 
     // Custom/generic
     #[error("Timed out waiting for operation: {0}")]

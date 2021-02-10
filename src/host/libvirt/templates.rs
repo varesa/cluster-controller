@@ -22,5 +22,9 @@ pub struct NetworkInterfaceTemplate {
 #[derive(Template)]
 #[template(path = "storage.xml", escape = "none")]
 pub struct StorageTemplate {
-
+    pub pool: String,
+    pub image: String,
+    pub device: String,
+    pub bootdevice: bool,
+    pub bus_slot: u8,
 }

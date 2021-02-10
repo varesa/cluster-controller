@@ -4,7 +4,12 @@
         <vmport state='off'/>
     </features>
 
-    <cpu mode='custom' match='exact' check='full'>
+    <os>
+        <!--<type arch='x86_64' machine='pc-q35-rhel8.3.0'>hvm</type>-->
+        <type arch='x86_64' machine='pc-q35-4.2'>hvm</type>
+    </os>
+
+    <!--<cpu mode='custom' match='exact' check='full'>
         <model fallback='forbid'>IvyBridge-IBRS</model>
         <vendor>Intel</vendor>
         <feature policy='require' name='ss'/>
@@ -24,7 +29,11 @@
         <feature policy='require' name='amd-ssbd'/>
         <feature policy='require' name='skip-l1dfl-vmentry'/>
         <feature policy='require' name='pschange-mc-no'/>
+    </cpu>-->
+    <cpu mode='host-model' check='none'>
+    <topology sockets='1' cores='1' threads='1'/>
     </cpu>
+
 
     <clock offset='utc'>
         <timer name='rtc' tickpolicy='catchup'/>

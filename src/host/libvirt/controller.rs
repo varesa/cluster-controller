@@ -15,6 +15,7 @@ use crate::errors::Error;
 use crate::crd::libvirt::{VirtualMachine/*,VirtualMachineStatus*/};
 use super::lowlevel::Libvirt;
 use super::templates::DomainTemplate;
+#[allow(dead_code)]
 use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
 
 const LIBVIRT_URI: &str = "qemu:///system";
@@ -23,6 +24,7 @@ const LIBVIRT_URI: &str = "qemu:///system";
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
 struct State {
+    #[allow(dead_code)]
     kube: Client,
     libvirt: Libvirt,
 }
@@ -43,21 +45,38 @@ fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
     }
 }
 
-fn create_domain(vm: &VirtualMachine) -> Result<(), Error> {
+fn create_domain(vm: &VirtualMachine, ctx: &Context<State>) -> Result<(), Error> {
+    let namespace = Meta::namespace(vm).expect("VM without namespace?");
+    let mut volumes = Vec::new();
+    let mut drive_index = 0u8;
+    for volume in &vm.spec.volumes {
+        volumes.push(StorageTemplate {
+            pool: String::from("volumes"),
+            image: format!("{}-{}", namespace, volume),
+            device: format!("vd{}", (b'a' + drive_index) as char),
+            bus_slot: drive_index,
+            bootdevice: if volumes.len() == 0 { true } else { false },
+        });
+        drive_index += 1;
+    }
+    println!("{:?}", &vm);
     let xml = DomainTemplate {
         name: get_domain_name(&vm).expect("no domain name specified"),
-        uuid: String::from("aa-bb-cc"),
-        cpus: 2,
+        uuid: String::from("4ac86930-90c8-4884-9d57-3da26d0773ec"),
+        cpus: 1,
         memory: 128,
         memory_unit: String::from("MiB"),
-        network_interfaces: vec![NetworkInterfaceTemplate {}, NetworkInterfaceTemplate {}],
-        storage_devices: vec![StorageTemplate {}, StorageTemplate {}],
-    };
-    println!("{}", xml.render().expect("render domain xml template"));
+        //network_interfaces: vec![NetworkInterfaceTemplate {}, NetworkInterfaceTemplate {}],
+        network_interfaces: vec![],
+        storage_devices: volumes,
+    }.render()?;
+
+    println!("{}", xml);
+    Domain::create_xml(&ctx.get_ref().libvirt.connection, &xml, 0)?;
     Ok(())
 }
 
-fn refresh_domain(_vm: &VirtualMachine, _domain: &Domain) -> Result<(), Error> {
+fn refresh_domain(_vm: &VirtualMachine, _domain: &Domain, _ctx: &Context<State>) -> Result<(), Error> {
     Ok(())
 }
 
@@ -88,8 +107,8 @@ async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconciler
     println!("Domain: {:?}", libvirt_domain);
 
     match libvirt_domain {
-        Ok(domain) => refresh_domain(&vm, &domain),
-        Err(_) => create_domain(&vm),
+        Ok(domain) => refresh_domain(&vm, &domain, &ctx),
+        Err(_) => create_domain(&vm, &ctx),
     }?;
 
     /*let client = ctx.get_ref().client.clone();
