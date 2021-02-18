@@ -1,4 +1,3 @@
-        <!--<emulator>/usr/libexec/qemu-kvm</emulator>-->
 
         <!-- Controllers -->
         <controller type='pci' index='0' model='pcie-root'>
