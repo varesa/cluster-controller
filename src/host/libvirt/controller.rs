@@ -17,6 +17,7 @@ use super::lowlevel::Libvirt;
 use super::templates::DomainTemplate;
 #[allow(dead_code)]
 use crate::host::libvirt::templates::{/*NetworkInterfaceTemplate,*/ StorageTemplate};
+use crate::create_controller;
 
 const LIBVIRT_URI: &str = "qemu:///system";
 
@@ -136,16 +137,8 @@ fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
 pub async fn create(client: Client) -> Result<(), Error> {
     let context = Context::new(
         State { kube: client.clone(), libvirt: Libvirt::new(LIBVIRT_URI)? });
-    let volumes: Api<VirtualMachine> = Api::all(client.clone());
+    let vms: Api<VirtualMachine> = Api::all(client.clone());
     println!("Starting libvirt host controller");
-    Controller::new(volumes, ListParams::default())
-        .run(reconcile, error_policy, context)
-        .for_each(|res| async move {
-            match res {
-                Ok(_o) => { /*println!("reconciled {:?}", o)*/ },
-                Err(e) => println!("reconcile failed: {:?}", e),
-            }
-        })
-        .await;
+    create_controller!(vms, reconcile, error_policy, context);
     Ok(())
 }

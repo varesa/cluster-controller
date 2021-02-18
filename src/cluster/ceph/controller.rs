@@ -9,6 +9,7 @@ use crate::errors::Error;
 use crate::crd::ceph::Volume;
 use super::lowlevel;
 use crate::utils::name_namespaced;
+use crate::create_controller;
 
 const POOL: &str = "volumes";
 
@@ -93,14 +94,6 @@ pub async fn create(client: Client) -> Result<(), Error> {
     let context = Context::new(State { client: client.clone() });
     let volumes: Api<Volume> = Api::all(client.clone());
     println!("Starting ceph controller");
-    Controller::new(volumes, ListParams::default())
-        .run(reconcile, error_policy, context)
-        .for_each(|res| async move {
-            match res {
-                Ok(_o) => { /*println!("reconciled {:?}", o)*/ },
-                Err(e) => println!("reconcile failed: {:?}", e),
-            }
-        })
-        .await;
+    create_controller!(volumes, reconcile, error_policy, context);
     Ok(())
 }

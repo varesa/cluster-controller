@@ -49,3 +49,18 @@ pub fn name_namespaced<T>(resource: &T) -> String where T: Meta {
         Meta::name(resource)
     )
 }
+
+#[macro_export]
+macro_rules! create_controller {
+    ($resource_type:ident, $reconciler:ident, $error_policy:ident, $context:ident) => {
+        Controller::new($resource_type, ListParams::default())
+            .run($reconciler, $error_policy, $context)
+            .for_each(|res| async move {
+                match res {
+                    Ok(_o) => { /*println!("reconciled {:?}", o)*/ },
+                    Err(e) => println!("reconcile failed: {:?}", e),
+                }
+            })
+            .await;
+    }
+}

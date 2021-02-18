@@ -1,6 +1,7 @@
 mod errors;
 mod cluster;
 mod host;
+#[macro_use]
 mod utils;
 mod crd;
 

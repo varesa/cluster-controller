@@ -11,6 +11,7 @@ use crate::errors::Error;
 use crate::crd::libvirt::{VirtualMachine,VirtualMachineStatus};
 use crate::cluster::libvirt::utils::generate_mac_address;
 use crate::utils::name_namespaced;
+use crate::create_controller;
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -87,16 +88,8 @@ fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
 
 pub async fn create(client: Client) -> Result<(), Error> {
     let context = Context::new(State { client: client.clone() });
-    let volumes: Api<VirtualMachine> = Api::all(client.clone());
+    let vms: Api<VirtualMachine> = Api::all(client.clone());
     println!("Starting libvirt controller");
-    Controller::new(volumes, ListParams::default())
-        .run(reconcile, error_policy, context)
-        .for_each(|res| async move {
-            match res {
-                Ok(_o) => { /*println!("reconciled {:?}", o)*/ },
-                Err(e) => println!("reconcile failed: {:?}", e),
-            }
-        })
-        .await;
+    create_controller!(vms, reconcile, error_policy, context);
     Ok(())
 }
