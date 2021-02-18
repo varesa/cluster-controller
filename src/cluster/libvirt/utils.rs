@@ -1,10 +1,15 @@
 use sha2::{Sha256, Digest};
+use crate::crd::libvirt::NetworkAttachment;
 
 const PREFIX: &str = "52:54:00";
 
-pub fn generate_mac_address(seed: String) -> String {
+/// Takes a VM name and a network interface specification and generates
+/// a MAC address based on a hash of the information
+pub fn generate_mac_address(vm_name: &str, nic: &NetworkAttachment, index: usize) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(seed);
+    hasher.update(&vm_name);
+    hasher.update(&nic.name);
+    hasher.update(vec![index as u8]);
     let hash = hasher.finalize();
     return format!("{}:{:x}:{:x}:{:x}", PREFIX, hash[29], hash[30], hash[31]);
 }
