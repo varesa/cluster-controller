@@ -21,6 +21,17 @@ pub struct Quantity(String);
 
 const CRD_NAME: &str = "virtualmachines.cluster-virt.acl.fi";
 
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+pub struct VolumeAttachment {
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+pub struct NetworkAttachment {
+    pub name: String,
+    pub mac_address: Option<String>,
+}
+
 #[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
 #[kube(
     apiextensions = "v1",
@@ -37,8 +48,8 @@ pub struct VirtualMachineSpec {
     pub cpus: usize,
     // String to allow suffixes like '1 Gi'
     pub memory: String,
-    pub volumes: Vec<String>,
-    pub networks: Vec<String>,
+    pub volumes: Vec<VolumeAttachment>,
+    pub networks: Vec<NetworkAttachment>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]

@@ -8,6 +8,7 @@ use crate::GROUP_NAME;
 use crate::errors::Error;
 use crate::crd::ceph::Volume;
 use super::lowlevel;
+use crate::utils::name_namespaced;
 
 const POOL: &str = "volumes";
 
@@ -71,11 +72,7 @@ async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error>
 
 /// Handle updates to volumes in the cluster
 async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let name = format!(
-        "{}-{}",
-        Meta::namespace(&volume).expect("get namespace"),
-        Meta::name(&volume)
-    );
+    let name = name_namespaced(&volume);
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
 
     ensure_finalizers(ctx.get_ref().client.clone(), &volume).await?;

@@ -7,22 +7,27 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+# k8s
 k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_19"] }
 kube = { git = "https://github.com/clux/kube-rs", rev = "cca8bd3710ebbf8c27f127e3841adf4035dfa1db", features = ["derive", "jsonpatch"] }
 kube-runtime = { git = "https://github.com/clux/kube-rs", rev = "cca8bd3710ebbf8c27f127e3841adf4035dfa1db" }
 
+# serialization
 serde = "1.0.117"
 serde_json = "1.0.61"
 serde_yaml = "0.8.14"
 serde_derive = "1.0.117"
 schemars = "0.8.0"
 
+# misc
 tokio = { version = "1.0.1", features = ["full"] }
 tempfile = "3.1.0"
 futures = "0.3.5"
 thiserror = "1.0.22"
 humanize-rs = "0.1.5"
 askama = "0.8"
+sha2 = "0.9.3"
 
 # ceph
 libc = "0.2.82"

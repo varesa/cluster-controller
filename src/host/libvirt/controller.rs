@@ -16,7 +16,7 @@ use crate::crd::libvirt::{VirtualMachine/*,VirtualMachineStatus*/};
 use super::lowlevel::Libvirt;
 use super::templates::DomainTemplate;
 #[allow(dead_code)]
-use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
+use crate::host::libvirt::templates::{/*NetworkInterfaceTemplate,*/ StorageTemplate};
 
 const LIBVIRT_URI: &str = "qemu:///system";
 
@@ -52,7 +52,7 @@ fn create_domain(vm: &VirtualMachine, ctx: &Context<State>) -> Result<(), Error>
     for volume in &vm.spec.volumes {
         volumes.push(StorageTemplate {
             pool: String::from("volumes"),
-            image: format!("{}-{}", namespace, volume),
+            image: format!("{}-{}", namespace, volume.name),
             device: format!("vd{}", (b'a' + drive_index) as char),
             bus_slot: drive_index,
             bootdevice: if volumes.len() == 0 { true } else { false },

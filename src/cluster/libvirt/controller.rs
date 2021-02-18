@@ -9,6 +9,8 @@ use serde_json::json;
 //use crate::GROUP_NAME;
 use crate::errors::Error;
 use crate::crd::libvirt::{VirtualMachine,VirtualMachineStatus};
+use crate::cluster::libvirt::utils::generate_mac_address;
+use crate::utils::name_namespaced;
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -42,13 +44,19 @@ async fn schedule(_vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
 }
 
 /// Handle updates to volumes in the cluster
-async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let client = ctx.get_ref().client.clone();
-    let name = format!(
-        "{}-{}",
-        Meta::namespace(&vm).expect("get namespace"),
-        Meta::name(&vm)
-    );
+    let vms: Api<VirtualMachine> = Api::namespaced(client.clone(), &Meta::namespace(&vm).expect("get VM namespace"));
+
+    let name = name_namespaced(&vm);
+
+    for (index, nic) in vm.spec.networks.iter_mut().enumerate() {
+        if let None = nic.mac_address {
+            let new_mac = generate_mac_address(format!("{} {} {}", name, nic.name, index));
+            nic.mac_address = Some(new_mac.clone());
+        }
+    }
+    vms.replace(&Meta::name(&vm), &PostParams::default(), &vm).await?;
 
     let node = schedule(&vm, client.clone()).await?;
 
