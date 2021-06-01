@@ -16,7 +16,7 @@ fn main() {
     if let Ok(head) = fs::read_to_string(".git/HEAD") {
         let re = Regex::new(r"ref: (.*)").unwrap();
         if let Some(captures) = re.captures(&head) {
-            println!("cargo:rustc-rerun-if-changed={}",
+            println!("cargo:rustc-rerun-if-changed=.git/{}",
                      captures.get(1).map_or("", |m| m.as_str()));
         }
     }
