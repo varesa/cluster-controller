@@ -63,8 +63,8 @@ fn create_domain(vm: &VirtualMachine, ctx: &Context<State>) -> Result<(), Error>
     let mut nics = Vec::new();
     for nic in &vm.spec.networks {
         nics.push(NetworkInterfaceTemplate {
-            bridge: nic.bridge,
-            mac: nic.mac,
+            bridge: nic.bridge.clone().expect("bridge to be set"),
+            mac: nic.mac_address.clone().expect("MAC to be set"),
         })
     }
     println!("{:?}", &vm);
