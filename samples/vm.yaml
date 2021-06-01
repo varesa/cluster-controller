@@ -7,6 +7,6 @@ spec:
   cpus: 3
   memory: 2G
   volumes:
-    - name: test-vm-1-root
+    - name: vm-1-root
   networks:
     - bridge: managementx

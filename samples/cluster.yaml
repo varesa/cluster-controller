@@ -1,0 +1,6 @@
+apiVersion: cluster-virt.acl.fi/v1beta
+kind: Cluster
+metadata:
+  name: default
+spec:
+  machine_type: pc-q35-rhel8.3.0
