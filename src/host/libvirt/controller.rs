@@ -16,7 +16,7 @@ use crate::crd::libvirt::{VirtualMachine/*,VirtualMachineStatus*/};
 use super::lowlevel::Libvirt;
 use super::templates::DomainTemplate;
 #[allow(dead_code)]
-use crate::host::libvirt::templates::{/*NetworkInterfaceTemplate,*/ StorageTemplate};
+use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
 use crate::create_controller;
 
 const LIBVIRT_URI: &str = "qemu:///system";
@@ -60,6 +60,13 @@ fn create_domain(vm: &VirtualMachine, ctx: &Context<State>) -> Result<(), Error>
         });
         drive_index += 1;
     }
+    let mut nics = Vec::new();
+    for nic in &vm.spec.networks {
+        nics.push(NetworkInterfaceTemplate {
+            bridge: nic.bridge,
+            mac: nic.mac,
+        })
+    }
     println!("{:?}", &vm);
     let xml = DomainTemplate {
         name: get_domain_name(&vm).expect("no domain name specified"),
@@ -67,8 +74,7 @@ fn create_domain(vm: &VirtualMachine, ctx: &Context<State>) -> Result<(), Error>
         cpus: 1,
         memory: 128,
         memory_unit: String::from("MiB"),
-        //network_interfaces: vec![NetworkInterfaceTemplate {}, NetworkInterfaceTemplate {}],
-        network_interfaces: vec![],
+        network_interfaces: nics,
         storage_devices: volumes,
     }.render()?;
 

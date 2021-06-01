@@ -16,7 +16,8 @@ pub struct DomainTemplate {
 #[derive(Template)]
 #[template(path = "network_interface.xml", escape = "none")]
 pub struct NetworkInterfaceTemplate {
-
+    pub bridge: String,
+    pub mac: String,
 }
 
 #[derive(Template)]

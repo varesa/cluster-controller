@@ -28,8 +28,12 @@ pub struct VolumeAttachment {
 
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
 pub struct NetworkAttachment {
-    pub name: String,
+    // Allow specification of a managed Network instance
+    pub name: Option<String>,
+    // Or an externally created host bridge device
+    pub bridge: Option<String>,
     pub mac_address: Option<String>,
+
 }
 
 #[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]

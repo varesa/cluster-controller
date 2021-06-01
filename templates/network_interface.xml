@@ -1,12 +1,4 @@
 <interface type='bridge'>
-            <mac address='52:54:00:44:ae:05'/>
-            <source network='br-ex' portgroup='vlan-50-internet' portid='df4d127a-0caf-41de-aca3-a8a5e0451a00' bridge='br-ex'/>
-            <vlan>
-                <tag id='50'/>
-            </vlan>
-            <virtualport type='openvswitch'>
-                <parameters interfaceid='9a312c08-f07e-4aa4-bb15-c90d210f9b90'/>
-            </virtualport>
-            <target dev='vnet0'/>
-            <model type='virtio'/>
-        </interface>
+    <source bridge='{{bridge}}'/>
+    <mac address="{{mac}}"/>
+</interface>
