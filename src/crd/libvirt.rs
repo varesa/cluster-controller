@@ -54,6 +54,7 @@ pub struct VirtualMachineSpec {
     pub memory: String,
     pub volumes: Vec<VolumeAttachment>,
     pub networks: Vec<NetworkAttachment>,
+    pub uuid: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]

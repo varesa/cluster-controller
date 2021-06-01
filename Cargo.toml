@@ -32,6 +32,7 @@ thiserror = "1.0.22"
 humanize-rs = "0.1.5"
 askama = "0.8"
 sha2 = "0.9.3"
+uuid = { version = "0.8", features = ["v4"] }
 
 # ceph
 libc = "0.2.82"

@@ -12,6 +12,7 @@ use crate::crd::libvirt::{VirtualMachine,VirtualMachineStatus};
 use crate::cluster::libvirt::utils::generate_mac_address;
 use crate::utils::name_namespaced;
 use crate::create_controller;
+use uuid::Uuid;
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -57,12 +58,22 @@ async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
     Ok(())
 }
 
+async fn fill_uuid(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
+    if let None = vm.spec.uuid {
+        vm.spec.uuid = Some(Uuid::new_v4().to_hyphenated().encode_lower(&mut Uuid::encode_buffer()).into());
+        let vms: Api<VirtualMachine> = Api::namespaced(client, &Meta::namespace(vm).expect("get VM namespace"));
+        vms.replace(&Meta::name(vm), &PostParams::default(), vm).await?;
+    }
+    Ok(())
+}
+
 /// Handle updates to volumes in the cluster
 async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let client = ctx.get_ref().client.clone();
     let name = name_namespaced(&vm);
 
     fill_nics(&mut vm, client.clone()).await?;
+    fill_uuid(&mut vm, client.clone()).await?;
     let node = schedule(&vm, client.clone()).await?;
 
     let status = VirtualMachineStatus {

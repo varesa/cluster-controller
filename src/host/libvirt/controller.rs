@@ -85,7 +85,7 @@ fn create_domain(vm: &VirtualMachine, cluster: &Cluster, ctx: &Context<State>) -
     println!("{:?}", &vm);
     let xml = DomainTemplate {
         name: get_domain_name(&vm).expect("no domain name specified"),
-        uuid: String::from("4ac86930-90c8-4884-9d57-3da26d0773ec"),
+        uuid: vm.spec.uuid.clone().expect("VM has no UUID"),
         machine_type: cluster.spec.machine_type.clone(),
         cpu: cluster.spec.cpu.clone(),
         cpus: 1,
