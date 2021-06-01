@@ -7,6 +7,7 @@ pub struct DomainTemplate {
     pub uuid: String,
 
     pub machine_type: String,
+    pub cpu: String,
 
     pub cpus: u8,
     pub memory: u32,

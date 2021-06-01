@@ -34,6 +34,9 @@ derive = "Default",
 pub struct ClusterSpec {
     // e.g. pc-q35-rhel8.3.0
     pub machine_type: String,
+
+    // <cpu>...</cpu>
+    pub cpu: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
