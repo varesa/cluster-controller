@@ -15,16 +15,19 @@ const GROUP_NAME: &str = "cluster-virt.acl.fi";
 
 #[tokio::main]
 async fn main() -> Result<(), Error>{
-    let client = Client::try_default().await?;
-
     let args: Vec<String> = env::args().collect();
+
     if args.contains(&String::from("--version")) {
         println!("{}", get_version_string());
+
     } else if args.contains(&String::from("--host")) {
         println!("Starting host-mode");
+        let client = Client::try_default().await?;
         host::libvirt::run(client).await?;
+
     } else {
         println!("Starting cluster-mode");
+        let client = Client::try_default().await?;
         cluster::run(client, NAMESPACE).await?;
     }
     Ok(())
