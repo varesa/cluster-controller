@@ -1,10 +1,8 @@
 use kube::{Client, api::{Api, ListParams, Meta, /*PostParams*/}};
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
-//use k8s_openapi::api::core::v1::Node;
 use tokio::time::Duration;
 use futures::StreamExt;
-//use humanize_rs::bytes::Bytes;
-//use serde_json::json;
+use std::env;
 use virt::{
     domain::Domain,
 };
@@ -89,7 +87,7 @@ fn refresh_domain(_vm: &VirtualMachine, _domain: &Domain, _ctx: &Context<State>)
 
 /// Handle updates to volumes in the cluster
 async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let my_node_name = "kvm01.p4.esav.fi";
+    let my_node_name = env::var("NODE_NAME").expect("failed to read $NODE_NAME");
 
     let vm_name = match get_domain_name(&vm) {
         Some(name) => name,
@@ -100,7 +98,7 @@ async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconciler
 
     let target_node = vm.status.as_ref().and_then(|status| status.node.as_ref());
     if let Some(target_node_name) = target_node {
-        if target_node_name != my_node_name {
+        if target_node_name != &my_node_name {
             println!("Ignored VM {} for another host", vm_name);
             return Ok(ReconcilerAction { requeue_after: None });
         }
