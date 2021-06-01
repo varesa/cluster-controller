@@ -28,6 +28,20 @@ pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                 "name": "libvirt-host-controller",
                 "image": image,
                 "command": ["cluster-controller", "--host"],
+                "volumeMounts": [
+                  {
+                    "name": "libvirt-sock",
+                    "mountPath": "/var/run/libvirt/libvirt-sock"
+                  }
+                ]
+              }
+            ],
+            "volumes": [
+              {
+                "name": "libvirt-sock",
+                "hostPath": {
+                  "path": "/var/run/libvirt/libvirt-sock"
+                }
               }
             ],
           }
