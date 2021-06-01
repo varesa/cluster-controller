@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: cluster-controller
+  name: cluster-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cluster-controller
+  template:
+    metadata:
+      labels:
+        app: cluster-controller
+    spec:
+      hostNetwork: true
+      containers:
+      - image: registry.acl.fi/public/virt-controller:latest
+        name: cluster-controller
+        command: ["cluster-controller"]
+        volumeMounts:
+        - name: ceph-config
+          mountPath: /etc/ceph
+      volumes:
+      - name: ceph-config
+        hostPath:
+          path: /etc/ceph

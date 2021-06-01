@@ -33,13 +33,13 @@ pub fn connect() -> Result<rados_t, Error> {
         let mut cluster: rados_t = 0 as rados_t;
 
         // Must be returned and freed at the end
-        let user_c = CString::new("clusteradmin-dev")
+        let user_c = CString::new("admin")
             .expect("Failed to create CString").into_raw();
         let opt_keyring_c = CString::new("keyring")
             .expect("Failed to create CString").into_raw();
-        let keyring_c = CString::new("ceph/clusteradmin-dev.key")
+        let keyring_c = CString::new("/etc/ceph/ceph.client.admin.keyring")
             .expect("Failed to create CString").into_raw();
-        let conf_c = CString::new("ceph/ceph.conf")
+        let conf_c = CString::new("/etc/ceph/ceph.conf")
             .expect("Failed to create CString").into_raw();
 
         call!("rados_create", rados_create(&mut cluster, user_c));
