@@ -1,0 +1,11 @@
+apiVersion: cluster-virt.acl.fi/v1beta
+kind: VirtualMachine
+metadata:
+  name: test-vm-2.mydomain.com
+spec:
+  cpus: 3
+  memory: 2G
+  volumes:
+    - test-vm-1-root
+  networks:
+    - sandbox-test-net

@@ -1,0 +1,6 @@
+apiVersion: cluster-virt.acl.fi/v1beta
+kind: Volume
+metadata:
+  name: test-volume3
+spec:
+  size: 100G
