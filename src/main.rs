@@ -10,7 +10,7 @@ use kube::Client;
 use crate::errors::Error;
 use crate::utils::get_version_string;
 
-const NAMESPACE: &str = "cluster-manager";
+const NAMESPACE: &str = "virt-controller";
 const GROUP_NAME: &str = "cluster-virt.acl.fi";
 
 #[tokio::main]
