@@ -2,7 +2,7 @@ use kube;
 
 use libc::{c_int, strerror};
 use std::ffi::CStr;
-use serde::export::Formatter;
+use std::fmt::Formatter;
 
 fn c_error_name(n: c_int) -> String {
     unsafe {
