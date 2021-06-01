@@ -108,6 +108,8 @@ fn refresh_domain(_vm: &VirtualMachine, _domain: &Domain, _ctx: &Context<State>)
 async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let my_node_name = env::var("NODE_NAME").expect("failed to read $NODE_NAME");
 
+    println!("Received update to {} on {}", &vm.metadata.name.clone().expect("VM has no name"), my_node_name);
+
     let vm_name = match get_domain_name(&vm) {
         Some(name) => name,
         None => {
