@@ -145,9 +145,9 @@ async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconciler
         running: false,
         node: None,
     };
-    set_status(&vm, status, client.clone()).await?;
+    set_status(&vm, status, client.clone()).await?;*/
 
-    println!("Updated: {}", name);*/
+    println!("Updated: {}", vm_name);
 
     Ok(ReconcilerAction {
         requeue_after: Some(Duration::from_secs(600)),
