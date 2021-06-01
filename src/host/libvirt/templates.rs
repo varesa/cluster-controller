@@ -5,6 +5,9 @@ use askama::Template;
 pub struct DomainTemplate {
     pub name: String,
     pub uuid: String,
+
+    pub machine_type: String,
+
     pub cpus: u8,
     pub memory: u32,
     pub memory_unit: String,

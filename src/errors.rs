@@ -29,6 +29,23 @@ impl std::fmt::Display for RadosError {
     }
 }
 
+#[derive(Debug)]
+pub struct ClusterNotFound {
+    pub(crate) name: String,
+    pub(crate) inner_error: kube::Error,
+}
+
+impl std::error::Error for ClusterNotFound {}
+impl std::fmt::Display for ClusterNotFound {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "Cluster {} not found - inner error: {}",
+            self.name,
+            self.inner_error,
+        ))
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     // Kubernetes
@@ -56,4 +73,6 @@ pub enum Error {
     // Custom/generic
     #[error("Timed out waiting for operation: {0}")]
     Timeout(String),
+    #[error("{0}")]
+    ClusterNotFound(#[from] ClusterNotFound),
 }

@@ -16,6 +16,8 @@ use super::templates::DomainTemplate;
 #[allow(dead_code)]
 use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
 use crate::create_controller;
+use crate::crd::cluster::Cluster;
+use crate::errors::ClusterNotFound;
 
 const LIBVIRT_URI: &str = "qemu:///system";
 
@@ -44,7 +46,22 @@ fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
     }
 }
 
-fn create_domain(vm: &VirtualMachine, ctx: &Context<State>) -> Result<(), Error> {
+async fn get_cluster(ctx: &Context<State>) -> Result<Cluster, ClusterNotFound> {
+    let name: &str = "default";
+    let client = ctx.get_ref().kube.clone();
+    let clusters: Api<Cluster> = Api::all(client.clone());
+    let default = clusters.get(name).await;
+
+    match default {
+        Ok(cluster) => Ok(cluster),
+        Err(error) => Err(ClusterNotFound {
+            name: name.into(),
+            inner_error: error,
+        })
+    }
+}
+
+fn create_domain(vm: &VirtualMachine, cluster: &Cluster, ctx: &Context<State>) -> Result<(), Error> {
     let namespace = Meta::namespace(vm).expect("VM without namespace?");
     let mut volumes = Vec::new();
     let mut drive_index = 0u8;
@@ -69,6 +86,7 @@ fn create_domain(vm: &VirtualMachine, ctx: &Context<State>) -> Result<(), Error>
     let xml = DomainTemplate {
         name: get_domain_name(&vm).expect("no domain name specified"),
         uuid: String::from("4ac86930-90c8-4884-9d57-3da26d0773ec"),
+        machine_type: cluster.spec.machine_type.clone(),
         cpus: 1,
         memory: 128,
         memory_unit: String::from("MiB"),
@@ -107,13 +125,17 @@ async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconciler
         return Ok(ReconcilerAction { requeue_after: None });
     }
 
+    // Get cluster capabilities / definition
+    let cluster = get_cluster(&ctx).await?;
+
     println!("Update for VM {} that has been scheduled to us", vm_name);
     let libvirt_domain = Domain::lookup_by_name(&ctx.get_ref().libvirt.connection, &vm_name);
     println!("Domain: {:?}", libvirt_domain);
 
+
     match libvirt_domain {
         Ok(domain) => refresh_domain(&vm, &domain, &ctx),
-        Err(_) => create_domain(&vm, &ctx),
+        Err(_) => create_domain(&vm, &cluster, &ctx),
     }?;
 
     /*let client = ctx.get_ref().client.clone();
