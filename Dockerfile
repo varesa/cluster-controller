@@ -20,6 +20,10 @@ RUN cargo install --path .
 # Run
 
 FROM centos:8
-RUN dnf install -y libvirt-libs librbd1 librados2
+
+RUN dnf update -y && \
+    dnf install -y centos-release-ceph-pacific && \
+    libvirt-libs librbd1 librados2
+
 COPY --from=builder /usr/local/cargo/bin/cluster-controller /usr/local/bin/cluster-controller
 
