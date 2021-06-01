@@ -16,3 +16,8 @@ podman tag "$TMP" "$REMOTE:latest"
 podman push "$REMOTE:$version"
 podman push "$REMOTE:$DATE"
 podman push "$REMOTE:latest"
+
+kubectl set image \
+    -n virt-controller \
+    deployment/cluster-controller \
+    cluster-controller="$REMOTE:$version"
