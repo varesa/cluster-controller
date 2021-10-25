@@ -22,6 +22,7 @@ pub struct DomainTemplate {
 pub struct NetworkInterfaceTemplate {
     pub bridge: String,
     pub mac: String,
+    pub ovn_id: Option<String>,
 }
 
 #[derive(Template)]

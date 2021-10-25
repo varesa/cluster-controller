@@ -77,9 +77,14 @@ fn create_domain(vm: &VirtualMachine, cluster: &Cluster, ctx: &Context<State>) -
     }
     let mut nics = Vec::new();
     for nic in &vm.spec.networks {
+        let bridge = match nic.ovn_id.clone() {
+            Some(_) => String::from("br-int"),
+            None => nic.bridge.clone().expect("bridge to be set"),
+        };
         nics.push(NetworkInterfaceTemplate {
-            bridge: nic.bridge.clone().expect("bridge to be set"),
+            bridge: bridge,
             mac: nic.mac_address.clone().expect("MAC to be set"),
+            ovn_id: nic.ovn_id.clone(),
         })
     }
     println!("{:?}", &vm);

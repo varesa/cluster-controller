@@ -1,4 +1,12 @@
 <interface type='bridge'>
-    <source bridge='{{bridge}}'/>
+    {% match ovn_id %}
+        {% when Some with (id) %}
+            <source bridge='{{bridge}}' network='ovs' />
+            <virtualport type='openvswitch'>
+              <parameters interfaceid='{{id}}'/>
+            </virtualport>
+        {% when None %}
+            <source bridge='{{bridge}}'/>
+    {% endmatch %}
     <mac address="{{mac}}"/>
 </interface>

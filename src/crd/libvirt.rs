@@ -32,7 +32,9 @@ pub struct NetworkAttachment {
     pub name: Option<String>,
     // Or an externally created host bridge device
     pub bridge: Option<String>,
+
     pub mac_address: Option<String>,
+    pub ovn_id: Option<String>,
 
 }
 
