@@ -18,6 +18,7 @@ use librbd_sys::{
 
 use crate::errors::{RadosError, Error};
 use std::ffi::CString;
+use serde_json::json;
 
 macro_rules! call {
     ($operation:literal, $rados_call:expr) => {
@@ -25,6 +26,12 @@ macro_rules! call {
         if code < 0 {
             return Err(RadosError { operation: String::from($operation), code}.into());
         }
+    }
+}
+
+macro_rules! expect_cstring {
+    ($source:expr) => {
+        CString::new($source).expect("Failed to create CString")
     }
 }
 
@@ -128,4 +135,13 @@ pub fn create_image(pool: rados_ioctx_t, name: String, size: u64) -> Result<(), 
         CString::from_raw(name_c);
     }
     Ok(())
+}
+
+pub fn auth_get_key(cluster: rados_t, key_name: String) -> Result<(), Error> {
+    let cmd = vec!["auth", "get-key"];
+    let cmd_c = cmd
+        .into_iter()
+        .map(|word| expect_cstring!(word).into_raw())
+        .collect::<Vec<_>>();
+    Ok(())    
 }
