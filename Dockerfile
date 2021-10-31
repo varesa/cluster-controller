@@ -2,7 +2,7 @@
 
 FROM docker.io/library/rust:latest as builder
 
-WORKDIR /usr/src/cluster-deployer
+WORKDIR /usr/src/cluster-controller
 COPY Cargo.toml build.rs .
 
 RUN apt-get update && \
