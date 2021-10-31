@@ -76,8 +76,12 @@ async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerActi
     let name = name_namespaced(&volume);
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
 
-    ensure_finalizers(ctx.get_ref().client.clone(), &volume).await?;
-    ensure_exists(name, bytes)?;
+    if let Some(_) = volume.metadata.deletion_timestamp {
+        println!("Volume {} waiting for deletion", &volume.metadata.name.expect("Volume has no name"));
+    } else {
+        ensure_finalizers(ctx.get_ref().client.clone(), &volume).await?;
+        ensure_exists(name, bytes)?;
+    }
 
     Ok(ReconcilerAction {
         requeue_after: Some(Duration::from_secs(600)),
