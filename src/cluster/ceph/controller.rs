@@ -1,10 +1,11 @@
-use kube::{Client, api::{Api, ListParams, Meta, PostParams}};
+use k8s_openapi::api::core::v1::Secret;
+use kube::{Client, api::{Api, ListParams, Meta, PostParams}, error::ErrorResponse};
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 use tokio::time::Duration;
 use futures::StreamExt;
 use humanize_rs::bytes::Bytes;
 
-use crate::GROUP_NAME;
+use crate::{GROUP_NAME, NAMESPACE};
 use crate::errors::Error;
 use crate::crd::ceph::Volume;
 use super::lowlevel;
@@ -12,6 +13,7 @@ use crate::utils::name_namespaced;
 use crate::create_controller;
 
 const POOL: &str = "volumes";
+const KEYRING: &str = "client.libvirt";
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -71,6 +73,26 @@ async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error>
     Ok(())
 }
 
+/// Ensure that we have a ceph key for libvirt
+async fn ensure_keyring(client: Client) -> Result<(), Error> {
+    println!("Ceph: checking {} keyring in cluster", KEYRING);
+    let secrets: Api<Secret> = Api::namespaced(client.clone(), NAMESPACE);
+    let keyring = secrets.get(KEYRING).await;
+    match keyring {
+        Ok(_) => {
+            println!("Ceph: Keyring secret exists");
+            Ok(())
+        },
+        Err(kube::Error::Api(ErrorResponse { code: 404, .. })) => {
+            println!("Ceph: Keyring missing");
+            Ok(())
+        },
+        Err(e) => {
+            Err(e.into())
+        },
+    }
+}
+
 /// Handle updates to volumes in the cluster
 async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let name = name_namespaced(&volume);
@@ -95,6 +117,7 @@ fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
+    ensure_keyring(client.clone()).await?;
     let context = Context::new(State { client: client.clone() });
     let volumes: Api<Volume> = Api::all(client.clone());
     println!("Starting ceph controller");
