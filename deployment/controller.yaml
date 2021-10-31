@@ -4,6 +4,7 @@ metadata:
   labels:
     app: cluster-controller
   name: cluster-controller
+  namespace: virt-controller
 spec:
   replicas: 1
   selector:
