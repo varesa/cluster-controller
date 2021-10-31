@@ -99,7 +99,7 @@ async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerActi
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
 
     if let Some(_) = volume.metadata.deletion_timestamp {
-        println!("Volume {} waiting for deletion", &volume.metadata.name.expect("Volume has no name"));
+        println!("Ceph: Volume {} waiting for deletion", &volume.metadata.name.expect("Volume has no name"));
     } else {
         ensure_finalizers(ctx.get_ref().client.clone(), &volume).await?;
         ensure_exists(name, bytes)?;
@@ -120,7 +120,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
     ensure_keyring(client.clone()).await?;
     let context = Context::new(State { client: client.clone() });
     let volumes: Api<Volume> = Api::all(client.clone());
-    println!("Starting ceph controller");
+    println!("Ceph: Starting controller");
     create_controller!(volumes, reconcile, error_policy, context);
     Ok(())
 }

@@ -84,7 +84,7 @@ async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<Reconc
     };
     set_status(&vm, status, client.clone()).await?;
 
-    println!("Updated: {}", name);
+    println!("libvirt: updated: {}", name);
 
     Ok(ReconcilerAction {
         requeue_after: Some(Duration::from_secs(600)),
@@ -100,7 +100,7 @@ fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
 pub async fn create(client: Client) -> Result<(), Error> {
     let context = Context::new(State { client: client.clone() });
     let vms: Api<VirtualMachine> = Api::all(client.clone());
-    println!("Starting libvirt controller");
+    println!("libvirt: Starting controller");
     create_controller!(vms, reconcile, error_policy, context);
     Ok(())
 }

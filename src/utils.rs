@@ -15,7 +15,7 @@ use crate::errors::Error;
 
 pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) -> Result<(), Error> {
     if crds.get(name).await.is_ok() {
-        println!("CRD ok");
+        println!("CRD ok: {}", &name);
         return Ok(());
     }
 
