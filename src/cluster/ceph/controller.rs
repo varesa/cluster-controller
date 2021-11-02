@@ -76,6 +76,14 @@ async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error>
 /// Ensure that we have a ceph key for libvirt
 async fn ensure_keyring(client: Client) -> Result<(), Error> {
     println!("Ceph: checking {} keyring in cluster", KEYRING);
+    {
+        let cluster = lowlevel::connect()?;
+        let key = lowlevel::auth_get_key(cluster, "client.libvirt".into())?;
+        lowlevel::disconnect(cluster);
+
+        println!("Ceph: libvirt client key: {}", key);
+    }
+
     let secrets: Api<Secret> = Api::namespaced(client.clone(), NAMESPACE);
     let keyring = secrets.get(KEYRING).await;
     match keyring {
@@ -91,6 +99,7 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
             Err(e.into())
         },
     }
+
 }
 
 /// Handle updates to volumes in the cluster

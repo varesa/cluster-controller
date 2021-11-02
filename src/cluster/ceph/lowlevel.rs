@@ -1,3 +1,11 @@
+use std::{
+    ffi::{CString, CStr},
+    ptr,
+    str,
+};
+use libc::c_char;
+use serde_json::json;
+
 use librados_sys::{
     rados_t,
     rados_ioctx_t,
@@ -9,6 +17,8 @@ use librados_sys::{
     rados_ioctx_destroy,
     rados_pool_list,
     rados_shutdown,
+    rados_mon_command,
+    rados_buffer_free,
 };
 
 use librbd_sys::{
@@ -17,8 +27,6 @@ use librbd_sys::{
 };
 
 use crate::errors::{RadosError, Error};
-use std::ffi::CString;
-use serde_json::json;
 
 macro_rules! call {
     ($operation:literal, $rados_call:expr) => {
@@ -137,11 +145,57 @@ pub fn create_image(pool: rados_ioctx_t, name: String, size: u64) -> Result<(), 
     Ok(())
 }
 
-pub fn auth_get_key(cluster: rados_t, key_name: String) -> Result<(), Error> {
-    let cmd = vec!["auth", "get-key"];
-    let cmd_c = cmd
-        .into_iter()
-        .map(|word| expect_cstring!(word).into_raw())
-        .collect::<Vec<_>>();
-    Ok(())    
+pub fn auth_get_key(cluster: rados_t, key_name: String) -> Result<String, Error> {
+    let cmd = json!({
+        "prefix": "auth get-key",
+        "entity": key_name
+    }).to_string();
+
+    // Important! The .as[_mut]_ptr() must not be combined with the previous line,
+    // or the "intermediate" product will be dropped and the pointer will become
+    // invalid
+    let cmd_cstr = CString::new(cmd).unwrap();
+    let cmd_ptr = cmd_cstr.as_ptr();
+    let mut cmd_array = vec![cmd_ptr];
+    let cmd_array_ptr = cmd_array.as_mut_ptr();
+
+    let mut outbuf = ptr::null_mut();
+    let mut outs = ptr::null_mut();
+    let mut outbuf_len = 0;
+    let mut outs_len = 0;
+
+    let mut key: Option<String> = None;
+    unsafe {
+
+        call!(
+            "rados_mon_command (auth get-key)",
+            rados_mon_command(
+                cluster,
+                /* command */
+                cmd_array_ptr, 1,
+                /* input data */
+                0 as *mut c_char, 0,
+                /* output data */
+                &mut outbuf, &mut outbuf_len,
+                /* other outputs */
+                &mut outs, &mut outs_len,
+        ));
+
+        if outbuf_len > 0 {
+            let key_bytes = CStr::from_ptr(outbuf).to_bytes();
+            key = Some(
+                str::from_utf8(key_bytes)
+                    .expect("Failed to decode key")
+                    .to_owned()
+            );
+            rados_buffer_free(outbuf);
+        }
+        if outs_len > 0 {
+            rados_buffer_free(outs);
+        }
+    }
+    match key {
+        Some(key) => Ok(key),
+        None => Err(RadosError { operation: String::from("auth get-key"), code: 1 }.into())
+    }
 }
