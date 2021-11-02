@@ -1,0 +1,30 @@
+# Build
+
+FROM docker.io/library/rust:latest as builder
+
+WORKDIR /usr/src/cluster-controller
+COPY Cargo.toml build.rs .
+
+RUN apt-get update && \
+    apt-get install -y librados-dev librbd-dev libvirt-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Only install dependencies
+RUN mkdir src && \
+    echo "fn main() {}" >> src/main.rs && \
+    cargo build
+
+COPY . .
+RUN cargo install --path . --debug
+
+# Run
+
+FROM centos:8
+
+RUN dnf update -y && \
+    dnf install -y centos-release-ceph-pacific && \
+    dnf install -y libvirt-libs librbd1 librados2 && \
+    dnf install -y --enablerepo="*-debuginfo" librados2-debuginfo gdb
+
+COPY --from=builder /usr/local/cargo/bin/cluster-controller /usr/local/bin/cluster-controller
+
