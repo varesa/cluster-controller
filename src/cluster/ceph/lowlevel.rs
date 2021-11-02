@@ -37,12 +37,6 @@ macro_rules! call {
     }
 }
 
-macro_rules! expect_cstring {
-    ($source:expr) => {
-        CString::new($source).expect("Failed to create CString")
-    }
-}
-
 pub fn connect() -> Result<rados_t, Error> {
     unsafe {
         let mut cluster: rados_t = 0 as rados_t;
@@ -165,8 +159,8 @@ pub fn auth_get_key(cluster: rados_t, key_name: String) -> Result<String, Error>
     let mut outs_len = 0;
 
     let mut key: Option<String> = None;
-    unsafe {
 
+    unsafe {
         call!(
             "rados_mon_command (auth get-key)",
             rados_mon_command(
