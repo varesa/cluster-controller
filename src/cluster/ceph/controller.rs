@@ -30,10 +30,7 @@ fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
     lowlevel::get_images(pool)?
         .iter()
         .find(|&existing| existing == &name)
-        .and_then(|_existing| {
-            //println!("Found existing volume: {}", existing);
-            Some(Ok(()))
-        })
+        .map(|_| Ok(()))
         .or_else(|| {
             println!("Volume {} does not exist", name);
             Some(lowlevel::create_image(pool, name, size))
@@ -53,9 +50,9 @@ async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error>
     let namespace = Meta::namespace(volume).expect("Unable to get namespace");
     let volumes: Api<Volume> = Api::namespaced(client.clone(), &namespace);
 
-    if let Some(_) = &volume.metadata.finalizers.as_ref().and_then(
+    if volume.metadata.finalizers.as_ref().and_then(
         |finalizers| finalizers.iter().find(|&finalizer| finalizer == &finalizer_name)
-    ) {
+    ).is_some() {
         return Ok(())
     }
 
@@ -107,7 +104,7 @@ async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerActi
     let name = name_namespaced(&volume);
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
 
-    if let Some(_) = volume.metadata.deletion_timestamp {
+    if volume.metadata.deletion_timestamp.is_some() {
         println!("Ceph: Volume {} waiting for deletion", &volume.metadata.name.expect("Volume has no name"));
     } else {
         ensure_finalizers(ctx.get_ref().client.clone(), &volume).await?;

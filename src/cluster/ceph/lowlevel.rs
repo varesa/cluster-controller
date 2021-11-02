@@ -65,7 +65,7 @@ pub fn connect() -> Result<rados_t, Error> {
     }
 }
 
-pub fn disconnect(cluster: rados_t) -> () {
+pub fn disconnect(cluster: rados_t) {
     unsafe {
         rados_shutdown(cluster);
     }
@@ -74,7 +74,7 @@ pub fn disconnect(cluster: rados_t) -> () {
 fn null_separeted_to_vec(null_separated_list: Vec<u8>) -> Vec<String> {
     let mut result = Vec::new();
     for item in null_separated_list.split(|c| { *c == 0 }) {
-        if item.len() == 0 { break; }
+        if item.is_empty() { break; }
         result.push(String::from_utf8(item.into())
             .expect("Failed to convert pool name to String"));
     }
@@ -83,7 +83,7 @@ fn null_separeted_to_vec(null_separated_list: Vec<u8>) -> Vec<String> {
 
 #[allow(dead_code)]
 pub fn get_pools(cluster: rados_t) -> Result<Vec<String>, Error> {
-    let mut buffer = vec![0 as u8; 1024];
+    let mut buffer = vec![0u8; 1024];
     let buffer_len = buffer.len();
     unsafe {
         call!("rados_pool_list", rados_pool_list(cluster, buffer.as_mut_ptr() as *mut i8, buffer_len));
@@ -108,14 +108,14 @@ pub fn get_pool(cluster: rados_t, pool_name: String) -> Result<rados_ioctx_t, Er
     Ok(pool)
 }
 
-pub fn close_pool(pool: rados_ioctx_t) -> () {
+pub fn close_pool(pool: rados_ioctx_t) {
     unsafe {
         rados_ioctx_destroy(pool);
     }
 }
 
 pub fn get_images(pool: rados_ioctx_t) -> Result<Vec<String>, Error> {
-    let mut buffer = vec![0 as u8; 1024];
+    let mut buffer = vec![0u8; 1024];
     let mut buffer_len: libc::size_t = buffer.len();
 
     unsafe {
@@ -168,7 +168,7 @@ pub fn auth_get_key(cluster: rados_t, key_name: String) -> Result<String, Error>
                 /* command */
                 cmd_array_ptr, 1,
                 /* input data */
-                0 as *mut c_char, 0,
+                ptr::null_mut::<c_char>(), 0,
                 /* output data */
                 &mut outbuf, &mut outbuf_len,
                 /* other outputs */

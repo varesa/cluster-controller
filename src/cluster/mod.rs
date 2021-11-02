@@ -23,7 +23,7 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     crd::cluster::create(client.clone()).await?;
 
     // Create libvirt host controllers
-    let libvirt_ds = daemonset::make_daemonset(format!("registry.acl.fi/public/virt-controller:{}", get_version_string()).into())?;
+    let libvirt_ds = daemonset::make_daemonset(format!("registry.acl.fi/public/virt-controller:{}", get_version_string()))?;
     daemonsets.patch("libvirt-host-controller", &PatchParams::apply("libvirt-controller-cluster"), &Patch::Apply(&libvirt_ds)).await?;
 
     // Create ceph cluster controller

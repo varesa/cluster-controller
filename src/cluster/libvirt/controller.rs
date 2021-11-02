@@ -48,7 +48,7 @@ async fn schedule(_vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
 async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
     let vm_name = name_namespaced(vm);
     for (index, nic) in vm.spec.networks.iter_mut().enumerate() {
-        if let None = nic.mac_address {
+        if nic.mac_address.is_none() {
             let new_mac = generate_mac_address(&vm_name, &nic, index);
             nic.mac_address = Some(new_mac.clone());
         }
@@ -59,7 +59,7 @@ async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
 }
 
 async fn fill_uuid(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
-    if let None = vm.spec.uuid {
+    if vm.spec.uuid.is_none() {
         vm.spec.uuid = Some(Uuid::new_v4().to_hyphenated().encode_lower(&mut Uuid::encode_buffer()).into());
         let vms: Api<VirtualMachine> = Api::namespaced(client, &Meta::namespace(vm).expect("get VM namespace"));
         vms.replace(&Meta::name(vm), &PostParams::default(), vm).await?;

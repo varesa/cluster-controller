@@ -1,5 +1,3 @@
-use kube;
-
 use libc::{c_int, strerror};
 use std::ffi::CStr;
 use std::fmt::Formatter;
