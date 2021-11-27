@@ -13,9 +13,8 @@ regex = "1.5"
 [dependencies]
 
 # k8s
-k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_19"] }
-kube = { git = "https://github.com/clux/kube-rs", rev = "cca8bd3710ebbf8c27f127e3841adf4035dfa1db", features = ["derive", "jsonpatch"] }
-kube-runtime = { git = "https://github.com/clux/kube-rs", rev = "cca8bd3710ebbf8c27f127e3841adf4035dfa1db" }
+kube = { version = "0.64.0", features = ["runtime","derive", "jsonpatch"] }
+k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_21"] }
 
 # serialization
 serde = "1.0.117"
