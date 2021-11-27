@@ -49,7 +49,7 @@ async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
     let vm_name = name_namespaced(vm);
     for (index, nic) in vm.spec.networks.iter_mut().enumerate() {
         if nic.mac_address.is_none() {
-            let new_mac = generate_mac_address(&vm_name, &nic, index);
+            let new_mac = generate_mac_address(&vm_name, nic, index);
             nic.mac_address = Some(new_mac.clone());
         }
     }
