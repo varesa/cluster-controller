@@ -73,6 +73,7 @@ async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error>
 }
 
 fn get_ceph_keyring() -> Result<String, Error> {
+    println!("Ceph: Getting keyring from cluster");
     let cluster = lowlevel::connect()?;
     let key = lowlevel::auth_get_key(cluster, "client.libvirt".into())?;
     lowlevel::disconnect(cluster);
@@ -81,6 +82,7 @@ fn get_ceph_keyring() -> Result<String, Error> {
 }
 
 async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error> {
+    println!("Ceph: Saving keyring in secret");
     let secrets: Api<Secret> = Api::namespaced(client, NAMESPACE);
     let secret: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
@@ -110,6 +112,7 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
             println!("Ceph: Keyring missing");
             let key = get_ceph_keyring()?;
             create_ceph_secret(client.clone(), key).await?;
+            println!("Ceph: Keyring saved");
             Ok(())
         },
         Err(e) => {
