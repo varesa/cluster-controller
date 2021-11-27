@@ -14,7 +14,7 @@ else
     CLEAN=false
 fi
 
-podman build -t "$TMP" .
+podman build ${PODMAN_BUILD_OPTS:-} -t "$TMP" .
 version="$(podman run --rm tmp-cluster-controller-build cluster-controller --version)"
 
 [ "$CLEAN" == "true" ] && podman tag "$TMP" "$REMOTE:$version"
