@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+cd "$(dirname "$0")"
+
 TMP="tmp-cluster-controller-build"
 REMOTE="registry.acl.fi/public/virt-controller"
 DATE="$(date +%Y%m%d-%H%M%S)"
