@@ -1,9 +1,10 @@
 use k8s_openapi::api::core::v1::Secret;
-use kube::{Client, api::{Api, ListParams, Meta, PostParams}, error::ErrorResponse};
+use kube::{Client, api::{Api, ListParams, Meta, Patch, PatchParams, PostParams}, error::ErrorResponse};
 use kube_runtime::controller::{Context, Controller, ReconcilerAction};
 use tokio::time::Duration;
 use futures::StreamExt;
 use humanize_rs::bytes::Bytes;
+use serde_json::json;
 
 use crate::{GROUP_NAME, NAMESPACE};
 use crate::errors::Error;
@@ -14,6 +15,7 @@ use crate::create_controller;
 
 const POOL: &str = "volumes";
 const KEYRING: &str = "client.libvirt";
+const KEYRING_SECRET: &str = "ceph-client.libvirt";
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -70,17 +72,33 @@ async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error>
     Ok(())
 }
 
+fn get_ceph_keyring() -> Result<String, Error> {
+    let cluster = lowlevel::connect()?;
+    let key = lowlevel::auth_get_key(cluster, "client.libvirt".into())?;
+    lowlevel::disconnect(cluster);
+
+    Ok(key)
+}
+
+async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error> {
+    let secrets: Api<Secret> = Api::namespaced(client, NAMESPACE);
+    let secret: Secret = serde_json::from_value(json!({
+        "apiVersion": "v1",
+        "kind": "secret",
+        "metadata": {
+            "name": KEYRING_SECRET,
+            "namespace": NAMESPACE
+        },
+        "data": {
+            "key": secret
+        }
+    }))?;
+    secrets.patch(KEYRING_SECRET, &PatchParams::apply("ceph-controller-cluster"), &Patch::Apply(&secret)).await?;
+    Ok(())
+}
+
 /// Ensure that we have a ceph key for libvirt
 async fn ensure_keyring(client: Client) -> Result<(), Error> {
-    println!("Ceph: checking {} keyring in cluster", KEYRING);
-    {
-        let cluster = lowlevel::connect()?;
-        let key = lowlevel::auth_get_key(cluster, "client.libvirt".into())?;
-        lowlevel::disconnect(cluster);
-
-        println!("Ceph: libvirt client key: {}", key);
-    }
-
     let secrets: Api<Secret> = Api::namespaced(client.clone(), NAMESPACE);
     let keyring = secrets.get(KEYRING).await;
     match keyring {
@@ -90,6 +108,8 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
         },
         Err(kube::Error::Api(ErrorResponse { code: 404, .. })) => {
             println!("Ceph: Keyring missing");
+            let key = get_ceph_keyring()?;
+            create_ceph_secret(client.clone(), key).await?;
             Ok(())
         },
         Err(e) => {
