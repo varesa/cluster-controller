@@ -76,7 +76,7 @@ async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error>
 fn get_ceph_keyring() -> Result<String, Error> {
     println!("Ceph: Getting keyring from cluster");
     let cluster = lowlevel::connect()?;
-    let key = lowlevel::auth_get_key(cluster, "client.libvirt".into())?;
+    let key = lowlevel::auth_get_key(cluster, KEYRING.into())?;
     lowlevel::disconnect(cluster);
 
     Ok(key)
