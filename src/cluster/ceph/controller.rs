@@ -103,7 +103,7 @@ async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error>
 /// Ensure that we have a ceph key for libvirt
 async fn ensure_keyring(client: Client) -> Result<(), Error> {
     let secrets: Api<Secret> = Api::namespaced(client.clone(), NAMESPACE);
-    let keyring = secrets.get(KEYRING).await;
+    let keyring = secrets.get(KEYRING_SECRET).await;
     match keyring {
         Ok(_) => {
             println!("Ceph: Keyring secret exists");
