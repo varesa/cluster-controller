@@ -29,15 +29,13 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     // Create ceph cluster controller
     let client_clone = client.clone();
     tokio::task::spawn(async  {
-        ceph::run(client_clone).await?;
-        Ok::<(),Error>(())
+        panic!("Ceph task exited: {:?}", ceph::run(client_clone).await);
     });
 
     // Create libvirt cluster controller
     let client_clone = client.clone();
     tokio::task::spawn(async {
-        libvirt::run(client_clone).await?;
-        Ok::<(),Error>(())
+        panic!("Libvirt task exited: {:?}", libvirt::run(client_clone).await);
     });
 
     loop {
