@@ -50,7 +50,7 @@ pub enum Error {
     #[error("Kubernetes error {0}")]
     KubeError(#[from] kube::Error),
     #[error("Resource watcher error {0}")]
-    WatcherError(#[from] kube_runtime::watcher::Error),
+    WatcherError(#[from] kube::runtime::watcher::Error),
 
     // Ceph
     #[error("librados error {0}")]

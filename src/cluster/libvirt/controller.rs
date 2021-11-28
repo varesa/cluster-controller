@@ -1,5 +1,5 @@
-use kube::{Client, api::{Api, ListParams, Meta, PostParams}};
-use kube_runtime::controller::{Context, Controller, ReconcilerAction};
+use kube::{Client, api::{Api, ListParams, ResourceExt, PostParams}};
+use kube::runtime::controller::{Context, Controller, ReconcilerAction};
 use k8s_openapi::api::core::v1::Node;
 use tokio::time::Duration;
 use futures::StreamExt;
@@ -21,17 +21,17 @@ struct State {
 }
 
 async fn set_status(vm: &VirtualMachine, status: VirtualMachineStatus, client: Client) -> Result<(), Error> {
-    let vms: Api<VirtualMachine> = Api::namespaced(client.clone(), &Meta::namespace(vm).expect("get VM namespace"));
+    let vms: Api<VirtualMachine> = Api::namespaced(client.clone(), &ResourceExt::namespace(vm).expect("get VM namespace"));
     let status_update = json!({
         "apiVersion": vm.api_version,
         "kind": vm.kind,
         "metadata": {
-            "name": Meta::name(vm),
-            "resourceVersion": Meta::resource_ver(vm),
+            "name": ResourceExt::name(vm),
+            "resourceVersion": ResourceExt::resource_version(vm),
         },
         "status": status,
     });
-    vms.replace_status(&Meta::name(vm), &PostParams::default(), serde_json::to_vec(&status_update).expect("serialize status")).await?;
+    vms.replace_status(&ResourceExt::name(vm), &PostParams::default(), serde_json::to_vec(&status_update).expect("serialize status")).await?;
     Ok(())
 }
 
@@ -39,7 +39,7 @@ async fn schedule(_vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
     let node_api: Api<Node> = Api::all(client.clone());
     let nodes = node_api.list(&ListParams::default()).await?;
     /*for node in nodes {
-        println!("Candidate: {}", Meta::name(&node));
+        println!("Candidate: {}", ResourceExt::name(&node));
     }*/
     Ok(nodes.items[0].clone())
     //Err(Error::Timeout(String::from("asd")))
@@ -53,16 +53,16 @@ async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
             nic.mac_address = Some(new_mac.clone());
         }
     }
-    let vms: Api<VirtualMachine> = Api::namespaced(client, &Meta::namespace(vm).expect("get VM namespace"));
-    vms.replace(&Meta::name(vm), &PostParams::default(), vm).await?;
+    let vms: Api<VirtualMachine> = Api::namespaced(client, &ResourceExt::namespace(vm).expect("get VM namespace"));
+    vms.replace(&ResourceExt::name(vm), &PostParams::default(), vm).await?;
     Ok(())
 }
 
 async fn fill_uuid(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
     if vm.spec.uuid.is_none() {
         vm.spec.uuid = Some(Uuid::new_v4().to_hyphenated().encode_lower(&mut Uuid::encode_buffer()).into());
-        let vms: Api<VirtualMachine> = Api::namespaced(client, &Meta::namespace(vm).expect("get VM namespace"));
-        vms.replace(&Meta::name(vm), &PostParams::default(), vm).await?;
+        let vms: Api<VirtualMachine> = Api::namespaced(client, &ResourceExt::namespace(vm).expect("get VM namespace"));
+        vms.replace(&ResourceExt::name(vm), &PostParams::default(), vm).await?;
     }
     Ok(())
 }

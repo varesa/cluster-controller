@@ -4,7 +4,8 @@ use k8s_openapi::{
 use kube::{
     api::{
         ListParams,
-        Meta,
+        Resource,
+        ResourceExt,
         WatchEvent,
     },
     Api,
@@ -42,11 +43,11 @@ pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) ->
     return Err(Error::Timeout(format!("Apply CRD {}", name)));
 }
 
-pub fn name_namespaced<T>(resource: &T) -> String where T: Meta {
+pub fn name_namespaced<T>(resource: &T) -> String where T: Resource {
     format!(
         "{}-{}",
-        Meta::namespace(resource).expect("get resource namespace"),
-        Meta::name(resource)
+        ResourceExt::namespace(resource).expect("get resource namespace"),
+        ResourceExt::name(resource)
     )
 }
 

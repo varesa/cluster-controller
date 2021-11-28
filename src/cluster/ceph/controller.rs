@@ -1,6 +1,6 @@
 use k8s_openapi::api::core::v1::Secret;
-use kube::{Client, api::{Api, ListParams, Meta, Patch, PatchParams, PostParams}, error::ErrorResponse};
-use kube_runtime::controller::{Context, Controller, ReconcilerAction};
+use kube::{Client, api::{Api, ListParams, ResourceExt, Patch, PatchParams, PostParams}, error::ErrorResponse};
+use kube::runtime::controller::{Context, Controller, ReconcilerAction};
 use tokio::time::Duration;
 use futures::StreamExt;
 use humanize_rs::bytes::Bytes;
@@ -28,6 +28,7 @@ struct State {
 fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
     let cluster = lowlevel::connect()?;
     let pool = lowlevel::get_pool(cluster, POOL.into())?;
+    
 
     lowlevel::get_images(pool)?
         .iter()
@@ -47,9 +48,9 @@ fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
 /// Ensure that all the volumes have finalizers so that we will be
 /// notified in case a volume is marked for deletion from the API
 async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error> {
-    let volume_name = Meta::name(volume);
+    let volume_name = ResourceExt::name(volume);
     let finalizer_name = format!("{}/ceph", GROUP_NAME);
-    let namespace = Meta::namespace(volume).expect("Unable to get namespace");
+    let namespace = ResourceExt::namespace(volume).expect("Unable to get namespace");
     let volumes: Api<Volume> = Api::namespaced(client.clone(), &namespace);
 
     if volume.metadata.finalizers.as_ref().and_then(
@@ -84,6 +85,7 @@ fn get_ceph_keyring() -> Result<String, Error> {
 async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error> {
     println!("Ceph: Saving keyring in secret");
     let secrets: Api<Secret> = Api::namespaced(client, NAMESPACE);
+    println!("?");
     let secret: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
         "kind": "secret",
@@ -95,6 +97,7 @@ async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error>
             "key": secret
         }
     }))?;
+    println!("??");
     secrets.patch(KEYRING_SECRET, &PatchParams::apply("ceph-controller-cluster"), &Patch::Apply(&secret)).await?;
     Ok(())
 }

@@ -9,6 +9,7 @@ use kube::{
     Api,
     Client,
     CustomResource,
+    CustomResourceExt,
 };
 use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;

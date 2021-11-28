@@ -1,5 +1,5 @@
-use kube::{Client, api::{Api, ListParams, Meta, /*PostParams*/}};
-use kube_runtime::controller::{Context, Controller, ReconcilerAction};
+use kube::{Client, api::{Api, ListParams, ResourceExt, /*PostParams*/}};
+use kube::runtime::controller::{Context, Controller, ReconcilerAction};
 use tokio::time::Duration;
 use futures::StreamExt;
 use std::{convert::TryInto, env};
@@ -34,11 +34,11 @@ fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
     match domain_name {
         Some(name) => Some(String::from(name)),
         _ => {
-            let namespace = Meta::namespace(vm)
+            let namespace = ResourceExt::namespace(vm)
                 .or_else(|| Some(String::from("<no namespace>")))
                 .unwrap();
             println!("Ignored VM {}/{} with no domain name defined",
-                     namespace, Meta::name(vm));
+                     namespace, ResourceExt::name(vm));
             None
         }
     }
@@ -60,7 +60,7 @@ async fn get_cluster(ctx: &Context<State>) -> Result<Cluster, ClusterNotFound> {
 }
 
 fn create_domain(vm: &VirtualMachine, cluster: &Cluster, ctx: &Context<State>) -> Result<(), Error> {
-    let namespace = Meta::namespace(vm).expect("VM without namespace?");
+    let namespace = ResourceExt::namespace(vm).expect("VM without namespace?");
     let mut volumes = Vec::new();
     for (index, volume) in vm.spec.volumes.iter().enumerate() {
         let drive_index: u8 = index.try_into().expect("Volume index overflows u8");
