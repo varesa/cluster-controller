@@ -1,5 +1,5 @@
 use std::{
-    ffi::{CString, CStr},
+    ffi::CString,
     ptr,
     str,
 };
@@ -176,7 +176,7 @@ pub fn auth_get_key(cluster: rados_t, key_name: String) -> Result<String, Error>
         ));
 
         if outbuf_len > 0 {
-            let key_bytes = CStr::from_ptr(outbuf).to_bytes();
+            let key_bytes = std::slice::from_raw_parts(outbuf as *const u8, outbuf_len);
             key = Some(
                 str::from_utf8(key_bytes)
                     .expect("Failed to decode key")
