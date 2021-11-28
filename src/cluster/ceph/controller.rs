@@ -88,7 +88,7 @@ async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error>
     println!("?");
     let secret: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
-        "kind": "secret",
+        "kind": "Secret",
         "metadata": {
             "name": KEYRING_SECRET,
             "namespace": NAMESPACE
