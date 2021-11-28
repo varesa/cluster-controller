@@ -85,7 +85,6 @@ fn get_ceph_keyring() -> Result<String, Error> {
 async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error> {
     println!("Ceph: Saving keyring in secret");
     let secrets: Api<Secret> = Api::namespaced(client, NAMESPACE);
-    println!("?");
     let secret: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
         "kind": "Secret",
@@ -97,7 +96,6 @@ async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error>
             "key": secret
         }
     }))?;
-    println!("??");
     secrets.patch(KEYRING_SECRET, &PatchParams::apply("ceph-controller-cluster"), &Patch::Apply(&secret)).await?;
     Ok(())
 }
