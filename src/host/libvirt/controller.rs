@@ -198,7 +198,7 @@ async fn ensure_ceph_secret(kube: Client, libvirt: &Libvirt) -> Result<(), Error
     let key = data.get("key").unwrap().0.clone();
     create_secret(key.as_ref(), libvirt)?;
     println!("Secret created");
-    return Ok(())
+    Ok(())
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
