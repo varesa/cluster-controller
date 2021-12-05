@@ -6,7 +6,7 @@ use futures::StreamExt;
 use humanize_rs::bytes::Bytes;
 use serde_json::json;
 
-use crate::{GROUP_NAME, NAMESPACE};
+use crate::{GROUP_NAME, NAMESPACE, KEYRING_SECRET};
 use crate::errors::Error;
 use crate::crd::ceph::Volume;
 use super::lowlevel;
@@ -15,7 +15,6 @@ use crate::create_controller;
 
 const POOL: &str = "volumes";
 const KEYRING: &str = "client.libvirt";
-const KEYRING_SECRET: &str = "ceph-client.libvirt";
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller

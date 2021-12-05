@@ -1,5 +1,6 @@
 use kube::{Client, api::{Api, ListParams, ResourceExt, /*PostParams*/}};
 use kube::runtime::controller::{Context, Controller, ReconcilerAction};
+use k8s_openapi::api::core::v1::Secret;
 use tokio::time::Duration;
 use futures::StreamExt;
 use std::{convert::TryInto, env};
@@ -8,17 +9,17 @@ use virt::{
 };
 use askama::Template;
 
-//use crate::GROUP_NAME;
 use crate::errors::Error;
 use crate::crd::libvirt::{VirtualMachine/*,VirtualMachineStatus*/};
 use super::lowlevel::Libvirt;
 use super::templates::DomainTemplate;
 use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
-use crate::create_controller;
+use crate::{create_controller, NAMESPACE, KEYRING_SECRET};
 use crate::crd::cluster::Cluster;
 use crate::errors::ClusterNotFound;
 
 const LIBVIRT_URI: &str = "qemu:///system";
+const CEPH_SECRET_UUID: &str = "8e22b0ac-b429-4ad1-8783-6d792db31349";
 
 
 /// State available for the reconcile and error_policy functions
@@ -165,9 +166,23 @@ fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
     }
 }
 
+async fn ensure_ceph_secret(kube: Client, _libvirt: &Libvirt) -> Result<(), Error> {
+    let secrets: Api<Secret> = Api::namespaced(kube.clone(), NAMESPACE);
+    let secret = match secrets.get(KEYRING_SECRET).await {
+        Err(e) => { return Err(e.into()) },
+        Ok(secret) => secret,
+    };
+
+    println!("s: {:?}", secret);
+
+    Ok(())
+}
+
 pub async fn create(client: Client) -> Result<(), Error> {
+    let libvirt = Libvirt::new(LIBVIRT_URI)?;
+    ensure_ceph_secret(client.clone(), &libvirt).await?;
     let context = Context::new(
-        State { kube: client.clone(), libvirt: Libvirt::new(LIBVIRT_URI)? });
+        State { kube: client.clone(), libvirt });
     let vms: Api<VirtualMachine> = Api::all(client.clone());
     println!("Starting libvirt host controller");
     create_controller!(vms, reconcile, error_policy, context);

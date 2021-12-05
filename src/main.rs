@@ -12,6 +12,7 @@ use crate::utils::get_version_string;
 
 const NAMESPACE: &str = "virt-controller";
 const GROUP_NAME: &str = "cluster-virt.acl.fi";
+const KEYRING_SECRET: &str = "ceph-client.libvirt";
 
 #[tokio::main]
 async fn main() -> Result<(), Error>{
