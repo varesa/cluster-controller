@@ -48,25 +48,25 @@ impl std::fmt::Display for ClusterNotFound {
 pub enum Error {
     // Kubernetes
     #[error("Kubernetes error {0}")]
-    KubeError(#[from] kube::Error),
+    Kube(#[from] kube::Error),
     #[error("Resource watcher error {0}")]
-    WatcherError(#[from] kube::runtime::watcher::Error),
+    KubeWatcher(#[from] kube::runtime::watcher::Error),
 
     // Ceph
     #[error("librados error {0}")]
-    RadosError(#[from] RadosError),
+    Rados(#[from] RadosError),
 
     // Libvirt
     #[error("libvirt error {0}")]
-    LibvirtError(#[from] virt::error::Error),
+    Libvirt(#[from] virt::error::Error),
 
     // Misc libs
     #[error("JSON error {0}")]
-    JsonError(#[from] serde_json::Error),
+    Json(#[from] serde_json::Error),
     #[error("Error parsing value: {0}")]
-    ParseError(#[from] humanize_rs::ParseError),
+    Parse(#[from] humanize_rs::ParseError),
     #[error("Error rendering template: {0}")]
-    TemplateError(#[from] askama::Error),
+    Template(#[from] askama::Error),
 
     // Custom/generic
     #[error("Timed out waiting for operation: {0}")]
