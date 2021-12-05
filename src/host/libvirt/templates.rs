@@ -34,3 +34,11 @@ pub struct StorageTemplate {
     pub bootdevice: bool,
     pub bus_slot: u8,
 }
+
+#[derive(Template)]
+#[template(path = "secret.xml", escape = "none")]
+pub struct SecretTemplate {
+    pub uuid: String,
+    pub name: String,
+    pub usage: String,
+}
