@@ -10,11 +10,22 @@ use kube::{
     Api,
     Client,
 };
-use k8s_openapi::api::apps::v1::{DaemonSet};
+use k8s_openapi::api::apps::v1::{DaemonSet, Deployment};
 use crate::errors::Error;
 use tokio::time::Duration;
-use crate::utils::get_version_string;
-use crate::crd;
+use crate::{crd, NAMESPACE};
+
+const DEPLOYMENT_NAME: &str = "cluster-controller";
+
+
+async fn get_running_image(kube: Client) -> Result<String, Error> {
+    let deployments: Api<Deployment> = Api::namespaced(kube, NAMESPACE);
+    let deployment = deployments.get(DEPLOYMENT_NAME).await?;
+    let image = deployment.spec.unwrap()
+        .template.spec.unwrap()
+        .containers[0].image.as_ref().unwrap().to_owned();
+    Ok(image)
+}
 
 pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     let daemonsets: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
@@ -23,7 +34,8 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     crd::cluster::create(client.clone()).await?;
 
     // Create libvirt host controllers
-    let libvirt_ds = daemonset::make_daemonset(format!("registry.acl.fi/public/virt-controller:{}", get_version_string()))?;
+    let image = get_running_image(client.clone()).await?;
+    let libvirt_ds = daemonset::make_daemonset(image)?;
     daemonsets.patch("libvirt-host-controller", &PatchParams::apply("libvirt-controller-cluster"), &Patch::Apply(&libvirt_ds)).await?;
 
     // Create ceph cluster controller
