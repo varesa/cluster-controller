@@ -48,9 +48,16 @@ async fn schedule(_vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
 async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
     let vm_name = name_namespaced(vm);
     for (index, nic) in vm.spec.networks.iter_mut().enumerate() {
+
+        // Generate a new MAC address if not set
         if nic.mac_address.is_none() {
             let new_mac = generate_mac_address(&vm_name, nic, index);
             nic.mac_address = Some(new_mac.clone());
+        }
+
+        // Generate a new OVN port ID if not set and using OVN network
+        if nic.name.is_some() && nic.ovn_id.is_none() {
+            nic.ovn_id = Some(Uuid::new_v4().to_hyphenated().encode_lower(&mut Uuid::encode_buffer()).into());
         }
     }
     let vms: Api<VirtualMachine> = Api::namespaced(client, &ResourceExt::namespace(vm).expect("get VM namespace"));
