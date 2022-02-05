@@ -57,10 +57,10 @@ pub fn connect() -> Result<rados_t, Error> {
         call!("rados_conect", rados_connect(cluster));
 
         // Return control to rust for freeing the memory
-        CString::from_raw(user_c);
-        CString::from_raw(opt_keyring_c);
-        CString::from_raw(keyring_c);
-        CString::from_raw(conf_c);
+        drop(CString::from_raw(user_c));
+        drop(CString::from_raw(opt_keyring_c));
+        drop(CString::from_raw(keyring_c));
+        drop(CString::from_raw(conf_c));
         Ok(cluster)
     }
 }
@@ -103,7 +103,7 @@ pub fn get_pool(cluster: rados_t, pool_name: String) -> Result<rados_ioctx_t, Er
         call!("rados_ioctx_create", rados_ioctx_create(cluster, pool_name_c, &mut pool));
 
         // Take back control to free memory
-        CString::from_raw(pool_name_c);
+        drop(CString::from_raw(pool_name_c));
     }
     Ok(pool)
 }
@@ -134,7 +134,7 @@ pub fn create_image(pool: rados_ioctx_t, name: String, size: u64) -> Result<(), 
         call!("rbd_create", rbd_create(pool, name_c, size, &mut 0));
 
         // Take back control and release memory
-        CString::from_raw(name_c);
+        drop(CString::from_raw(name_c));
     }
     Ok(())
 }
