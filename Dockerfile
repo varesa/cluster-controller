@@ -19,7 +19,7 @@ RUN cargo install --path .
 
 # Run
 
-FROM centos:8
+FROM docker.io/library/rockylinux:8
 
 RUN dnf update -y && \
     dnf install -y centos-release-ceph-pacific && \
