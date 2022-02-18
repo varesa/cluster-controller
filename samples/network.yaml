@@ -1,0 +1,6 @@
+apiVersion: cluster-virt.acl.fi/v1beta
+kind: Network
+metadata:
+  name: testnet
+  namespace: test
+spec: {}
