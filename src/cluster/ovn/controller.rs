@@ -18,7 +18,7 @@ struct State {
     client: Client,
 }
 
-/// Handle updates to volumes in the cluster
+/// Handle updates to networks in the cluster
 async fn reconcile(network: Network, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let _client = ctx.get_ref().client.clone();
     let name = name_namespaced(&network);
