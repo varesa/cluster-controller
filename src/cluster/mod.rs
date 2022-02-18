@@ -57,6 +57,12 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
         );
     });
 
+    // Create libvirt cluster controller
+    let client_clone = client.clone();
+    tokio::task::spawn(async {
+        panic!("OVN task exited: {:?}", ovn::run(client_clone).await);
+    });
+
     loop {
         tokio::time::sleep(Duration::from_secs(10)).await;
     }
