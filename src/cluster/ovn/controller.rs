@@ -25,7 +25,7 @@ async fn reconcile(network: Network, ctx: Context<State>) -> Result<ReconcilerAc
 
     println!("ovn: updated: {}", name);
 
-    let mut ovn = Ovn::new("10.4.0.31", 6641);
+    let mut ovn = Ovn::new("10.4.3.31", 6641);
     if ovn.list_ls().iter().any(|sw| sw.name == name) {
         println!("Sw {} exists", name);
     } else {
