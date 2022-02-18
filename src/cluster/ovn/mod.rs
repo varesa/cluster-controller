@@ -1,6 +1,7 @@
 mod controller;
 mod jsonrpc;
 mod lowlevel;
+mod types;
 
 use kube::Client;
 

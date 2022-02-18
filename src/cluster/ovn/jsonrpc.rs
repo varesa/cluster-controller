@@ -25,14 +25,14 @@ impl JsonRpcConnection {
             .unwrap();
         let deserializer = Deserializer::from_reader(self.stream.try_clone().unwrap());
         let response: Response = deserializer.into_iter().next().unwrap().unwrap();
-        assert!(response.id == request.id);
-        return response;
+        assert_eq!(response.id, request.id);
+        response
     }
 
     fn next_id(&mut self) -> u64 {
         let current_id = self.id;
         self.id += 1;
-        return current_id;
+        current_id
     }
 }
 

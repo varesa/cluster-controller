@@ -1,6 +1,4 @@
-use virt::{
-    connect::Connect,
-};
+use virt::connect::Connect;
 
 use crate::errors::Error;
 

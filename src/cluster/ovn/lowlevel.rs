@@ -1,4 +1,5 @@
 use super::jsonrpc::JsonRpcConnection;
+use crate::cluster::ovn::types::LogicalSwitch;
 use serde_json::{json, Value};
 
 pub struct Ovn {
@@ -38,12 +39,24 @@ impl Ovn {
             ])),
         );
         assert!(response.error.is_null());
-
-        return response.result[2][object_type].clone();
+        response.result[2][object_type].clone()
     }
 
-    pub fn list_ls(&mut self) {
-        let ls = self.list_objects("Logical_Switch");
-        println!("{ls:#?}");
+    pub fn list_ls(&mut self) -> Vec<LogicalSwitch> {
+        let response = self.list_objects("Logical_Switch");
+        let mut switches = Vec::new();
+        for (uuid, params) in response.as_object().unwrap().iter() {
+            switches.push(LogicalSwitch::from_json(
+                uuid,
+                params
+                    .as_object()
+                    .expect("Should be object")
+                    .get("initial")
+                    .expect("Should contain initial key")
+                    .as_object()
+                    .expect("asd"),
+            ));
+        }
+        switches
     }
 }

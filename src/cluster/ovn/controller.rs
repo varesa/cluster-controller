@@ -1,20 +1,16 @@
 use futures::StreamExt;
-use k8s_openapi::api::core::v1::Node;
 use kube::runtime::controller::{Context, Controller, ReconcilerAction};
 use kube::{
-    api::{Api, ListParams, PostParams, ResourceExt},
+    api::{Api, ListParams},
     Client,
 };
 use tokio::time::Duration;
-//use humanize_rs::bytes::Bytes;
-use serde_json::json;
 
-//use crate::GROUP_NAME;
+use crate::cluster::ovn::lowlevel::Ovn;
 use crate::crd::ovn::Network;
 use crate::create_controller;
 use crate::errors::Error;
 use crate::utils::name_namespaced;
-use uuid::Uuid;
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -23,12 +19,18 @@ struct State {
 }
 
 /// Handle updates to volumes in the cluster
-async fn reconcile(mut network: Network, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+async fn reconcile(network: Network, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let client = ctx.get_ref().client.clone();
     let name = name_namespaced(&network);
 
     println!("ovn: updated: {}", name);
 
+    let mut ovn = Ovn::new("localhost", 6641);
+    if ovn.list_ls().iter().any(|sw| sw.name == name) {
+        println!("Sw {} exists", name);
+    } else {
+        println!("Sw {} not exists", name);
+    }
     Ok(ReconcilerAction {
         requeue_after: Some(Duration::from_secs(600)),
     })
