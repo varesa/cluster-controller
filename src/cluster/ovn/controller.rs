@@ -20,12 +20,12 @@ struct State {
 
 /// Handle updates to volumes in the cluster
 async fn reconcile(network: Network, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let client = ctx.get_ref().client.clone();
+    let _client = ctx.get_ref().client.clone();
     let name = name_namespaced(&network);
 
     println!("ovn: updated: {}", name);
 
-    let mut ovn = Ovn::new("localhost", 6641);
+    let mut ovn = Ovn::new("10.4.0.31", 6641);
     if ovn.list_ls().iter().any(|sw| sw.name == name) {
         println!("Sw {} exists", name);
     } else {

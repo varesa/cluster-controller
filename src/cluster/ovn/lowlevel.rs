@@ -13,7 +13,7 @@ impl Ovn {
         }
     }
 
-    pub fn echo(&mut self) {
+    /*pub fn echo(&mut self) {
         let echo = self.connection.request("echo", Some(json!([])));
         assert!(echo.error.is_null());
     }
@@ -24,7 +24,7 @@ impl Ovn {
             .connection
             .request("get_schema", Some(json!(["OVN_Northbound"])));
         print!("{schema:#?}");
-    }
+    }*/
 
     fn list_objects(&mut self, object_type: &str) -> Value {
         let response = self.connection.request(
