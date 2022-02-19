@@ -1,5 +1,6 @@
-use super::jsonrpc::JsonRpcConnection;
+use super::jsonrpc::{JsonRpcConnection, Message};
 use crate::cluster::ovn::types::LogicalSwitch;
+use core::panicking::panic;
 use serde_json::{json, Map, Value};
 
 pub struct Ovn {
@@ -29,24 +30,39 @@ impl Ovn {
     fn list_objects(&mut self, object_type: &str) -> Value {
         let response = self.connection.request(
             "monitor_cond_since",
-            Some(json!([
+            json!([
                 "OVN_Northbound",
                 ["monid", "OVN_Northbound"],
                 {
                     object_type: [{"columns": ["name"]}]
                 },
                 "00000000-0000-0000-0000-000000000000"
-            ])),
+            ])
+            .as_object()
+            .unwrap(),
         );
-        assert!(response.error.is_null());
-        response.result[2][object_type].clone()
+        match response {
+            Message::Response { error, result, .. } => {
+                assert!(error.is_null());
+                result[2][object_type].clone()
+            }
+            _ => panic!("Didn't get response"),
+        }
     }
 
     fn transact(&mut self, operations: &Vec<Value>) {
         let mut params = vec![Value::String("OVN_Northbound".to_string())];
         params.append(&mut operations.clone());
-        let response = self.connection.request("transact", Some(json!(params)));
-        assert!(response.error.is_null());
+        let response = self
+            .connection
+            .request("transact", json!(params).as_object().unwrap());
+        match response {
+            Message::Response { error, result, .. } => {
+                assert!(error.is_null());
+                //result[2][object_type].clone()
+            }
+            _ => panic!("Didn't get response"),
+        }
     }
 
     fn insert(&mut self, object_type: &str, params: Map<String, Value>) {

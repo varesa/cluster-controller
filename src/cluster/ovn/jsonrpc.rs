@@ -3,6 +3,8 @@ use serde_json::de::Deserializer;
 use serde_json::Value;
 use std::{io::Write, net::TcpStream};
 
+type Params = serde_json::Map<String, serde_json::Value>;
+
 pub struct JsonRpcConnection {
     stream: TcpStream,
     id: u64,
@@ -14,19 +16,30 @@ impl JsonRpcConnection {
         JsonRpcConnection { stream, id: 0 }
     }
 
-    pub fn request(&mut self, method: &str, params: Option<Value>) -> Response {
-        let request = Request {
-            id: self.next_id().into(),
+    pub fn request(&mut self, method: &str, params: &Params) -> Message {
+        let request_id = self.next_id().into();
+        let request = Message::Request {
+            id: request_id,
             method: method.into(),
-            params,
+            params: params.clone(),
         };
         self.stream
             .write_all(&serde_json::to_vec(&request).unwrap())
             .unwrap();
         let deserializer = Deserializer::from_reader(self.stream.try_clone().unwrap());
-        let response: Response = deserializer.into_iter().next().unwrap().unwrap();
-        assert_eq!(response.id, request.id);
-        response
+        while let Some(Ok(message)) = deserializer.into_iter().next() {
+            match &message {
+                Message::Request { id, method, params } => { /* ignore */ }
+                Message::Response {
+                    id: response_id, ..
+                } => {
+                    if response_id == &request_id {
+                        return message;
+                    }
+                }
+            }
+        }
+        panic!("no response found");
     }
 
     fn next_id(&mut self) -> u64 {
@@ -36,17 +49,17 @@ impl JsonRpcConnection {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct Request {
-    pub id: Value,
-    pub method: String,
-    pub params: Option<Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Response {
-    pub result: Value,
-    pub error: Value,
-    pub id: Value,
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Message {
+    Request {
+        id: Value,
+        method: String,
+        params: Params,
+    },
+    Response {
+        id: Value,
+        result: Value,
+        error: Value,
+    },
 }
