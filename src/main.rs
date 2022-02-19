@@ -1,5 +1,3 @@
-extern crate core;
-
 mod cluster;
 mod errors;
 mod host;

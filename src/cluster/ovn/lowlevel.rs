@@ -1,4 +1,5 @@
 use super::jsonrpc::{JsonRpcConnection, Message};
+use crate::cluster::ovn::jsonrpc::Params;
 use crate::cluster::ovn::types::LogicalSwitch;
 use serde_json::{json, Map, Value};
 
@@ -29,16 +30,14 @@ impl Ovn {
     fn list_objects(&mut self, object_type: &str) -> Value {
         let response = self.connection.request(
             "monitor_cond_since",
-            json!([
+            &Params::from_json(json!([
                 "OVN_Northbound",
                 ["monid", "OVN_Northbound"],
                 {
                     object_type: [{"columns": ["name"]}]
                 },
                 "00000000-0000-0000-0000-000000000000"
-            ])
-            .as_object()
-            .unwrap(),
+            ])),
         );
         match response {
             Message::Response { error, result, .. } => {
@@ -54,7 +53,7 @@ impl Ovn {
         params.append(&mut operations.to_owned());
         let response = self
             .connection
-            .request("transact", json!(params).as_object().unwrap());
+            .request("transact", &Params::from_json(json!(params)));
         match response {
             Message::Response { error, .. } => {
                 assert!(error.is_null());

@@ -3,8 +3,6 @@ use serde_json::de::Deserializer;
 use serde_json::Value;
 use std::{io::Write, net::TcpStream};
 
-type Params = serde_json::Map<String, serde_json::Value>;
-
 pub struct JsonRpcConnection {
     stream: TcpStream,
     id: u64,
@@ -51,7 +49,24 @@ impl JsonRpcConnection {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(untagged)]
+pub enum Params {
+    ByPosition(Vec<serde_json::Value>),
+    ByName(serde_json::Map<String, serde_json::Value>),
+}
+
+impl Params {
+    pub fn from_json(json: serde_json::Value) -> Self {
+        match json {
+            Value::Array(params) => Params::ByPosition(params),
+            Value::Object(params) => Params::ByName(params),
+            _ => panic!("Bad JSON value for Params"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Message {
     Request {
