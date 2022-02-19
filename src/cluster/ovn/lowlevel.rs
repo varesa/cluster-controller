@@ -49,9 +49,9 @@ impl Ovn {
         assert!(response.error.is_null());
     }
 
-    fn add(&mut self, object_type: &str, params: Map<String, Value>) {
+    fn insert(&mut self, object_type: &str, params: Map<String, Value>) {
         let operation = json!({
-            "op": "add",
+            "op": "insert",
             "table": object_type,
             "row": params
         });
@@ -61,7 +61,7 @@ impl Ovn {
     pub fn add_ls(&mut self, name: &str) {
         let mut params = Map::new();
         params.insert("name".to_string(), Value::String(name.to_string()));
-        self.add("Logical_Switch", params);
+        self.insert("Logical_Switch", params);
     }
 
     pub fn list_ls(&mut self) -> Vec<LogicalSwitch> {
