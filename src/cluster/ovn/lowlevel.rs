@@ -1,6 +1,6 @@
 use super::jsonrpc::JsonRpcConnection;
 use crate::cluster::ovn::types::LogicalSwitch;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 pub struct Ovn {
     connection: JsonRpcConnection,
@@ -40,6 +40,28 @@ impl Ovn {
         );
         assert!(response.error.is_null());
         response.result[2][object_type].clone()
+    }
+
+    fn transact(&mut self, operations: &Vec<Value>) {
+        let mut params = vec![Value::String("OVN_Northbound".to_string())];
+        params.append(&mut operations.clone());
+        let response = self.connection.request("transact", Some(json!(params)));
+        assert!(response.error.is_null());
+    }
+
+    fn add(&mut self, object_type: &str, params: Map<String, Value>) {
+        let operation = json!({
+            "op": "add",
+            "table": object_type,
+            "row": params
+        });
+        self.transact(&vec![operation]);
+    }
+
+    pub fn add_ls(&mut self, name: &str) {
+        let mut params = Map::new();
+        params.insert("name".to_string(), Value::String(name.to_string()));
+        self.add("Logical_Switch", params);
     }
 
     pub fn list_ls(&mut self) -> Vec<LogicalSwitch> {
