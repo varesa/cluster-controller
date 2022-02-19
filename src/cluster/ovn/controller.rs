@@ -23,15 +23,15 @@ async fn reconcile(network: Network, ctx: Context<State>) -> Result<ReconcilerAc
     let _client = ctx.get_ref().client.clone();
     let name = name_namespaced(&network);
 
-    println!("ovn: updated: {}", name);
+    println!("ovn: updated: {name}");
 
     let mut ovn = Ovn::new("10.4.3.1", 6641);
     if ovn.list_ls().iter().any(|sw| sw.name == name) {
-        println!("ovn: Sw {} exists, OK", name);
+        println!("ovn: Sw {name} exists, OK");
     } else {
-        println!("ovn: Sw {} not exists, creating", name);
+        println!("ovn: Sw {name} doesn't exist, creating");
         ovn.add_ls(&name);
-        println!("ovn: Sw {} created, OK", name);
+        println!("ovn: Sw {name} created, OK");
     }
     Ok(ReconcilerAction {
         requeue_after: Some(Duration::from_secs(600)),
