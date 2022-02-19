@@ -1,6 +1,5 @@
 use super::jsonrpc::{JsonRpcConnection, Message};
 use crate::cluster::ovn::types::LogicalSwitch;
-use core::panicking::panic;
 use serde_json::{json, Map, Value};
 
 pub struct Ovn {
@@ -50,16 +49,15 @@ impl Ovn {
         }
     }
 
-    fn transact(&mut self, operations: &Vec<Value>) {
+    fn transact(&mut self, operations: &[Value]) {
         let mut params = vec![Value::String("OVN_Northbound".to_string())];
-        params.append(&mut operations.clone());
+        params.append(&mut operations.to_owned());
         let response = self
             .connection
             .request("transact", json!(params).as_object().unwrap());
         match response {
-            Message::Response { error, result, .. } => {
+            Message::Response { error, .. } => {
                 assert!(error.is_null());
-                //result[2][object_type].clone()
             }
             _ => panic!("Didn't get response"),
         }
@@ -71,7 +69,7 @@ impl Ovn {
             "table": object_type,
             "row": params
         });
-        self.transact(&vec![operation]);
+        self.transact(&[operation]);
     }
 
     pub fn add_ls(&mut self, name: &str) {

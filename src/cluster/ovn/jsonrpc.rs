@@ -17,9 +17,9 @@ impl JsonRpcConnection {
     }
 
     pub fn request(&mut self, method: &str, params: &Params) -> Message {
-        let request_id = self.next_id().into();
+        let request_id: Value = self.next_id().into();
         let request = Message::Request {
-            id: request_id,
+            id: request_id.clone(),
             method: method.into(),
             params: params.clone(),
         };
@@ -27,14 +27,16 @@ impl JsonRpcConnection {
             .write_all(&serde_json::to_vec(&request).unwrap())
             .unwrap();
         let deserializer = Deserializer::from_reader(self.stream.try_clone().unwrap());
-        while let Some(Ok(message)) = deserializer.into_iter().next() {
-            match &message {
-                Message::Request { id, method, params } => { /* ignore */ }
+        let mut iter = deserializer.into_iter();
+        while let Some(Ok(message)) = iter.next() {
+            match message {
+                Message::Request { .. } => { /* ignore */ }
                 Message::Response {
-                    id: response_id, ..
+                    id: ref response_id,
+                    ..
                 } => {
                     if response_id == &request_id {
-                        return message;
+                        return message.clone();
                     }
                 }
             }
@@ -49,7 +51,7 @@ impl JsonRpcConnection {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum Message {
     Request {
