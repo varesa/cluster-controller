@@ -64,7 +64,7 @@ fn ensure_removed(name: &str) -> Result<(), Error> {
 }
 
 fn get_ceph_keyring() -> Result<String, Error> {
-    println!("Ceph: Getting keyring from cluster");
+    println!("ceph: Getting keyring from cluster");
     let cluster = lowlevel::connect()?;
     let key = lowlevel::auth_get_key(cluster, KEYRING.into())?;
     lowlevel::disconnect(cluster);
@@ -73,7 +73,7 @@ fn get_ceph_keyring() -> Result<String, Error> {
 }
 
 async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error> {
-    println!("Ceph: Saving keyring in secret");
+    println!("ceph: Saving keyring in secret");
     let secrets: Api<Secret> = Api::namespaced(client, NAMESPACE);
     let secret: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
@@ -102,14 +102,14 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
     let keyring = secrets.get(KEYRING_SECRET).await;
     match keyring {
         Ok(_) => {
-            println!("Ceph: Keyring secret exists");
+            println!("ceph: Keyring secret exists");
             Ok(())
         }
         Err(kube::Error::Api(ErrorResponse { code: 404, .. })) => {
-            println!("Ceph: Keyring missing");
+            println!("ceph: Keyring missing");
             let key = get_ceph_keyring()?;
             create_ceph_secret(client.clone(), key).await?;
-            println!("Ceph: Keyring saved");
+            println!("ceph: Keyring saved");
             Ok(())
         }
         Err(e) => Err(e.into()),
@@ -122,13 +122,15 @@ async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerActi
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
 
     if volume.metadata.deletion_timestamp.is_some() {
-        println!("Ceph: Volume {name} waiting for deletion");
+        println!("ceph: Volume {name} waiting for deletion");
         ensure_removed(&name)?;
         client_remove_finalizer!(ctx.get_ref().client.clone(), Volume, &volume, "ceph");
-        println!("Ceph: Volume {name} deleted");
+        println!("ceph: Volume {name} deleted");
     } else {
+        println!("ceph: Volume {name} updated");
         client_ensure_finalizer!(ctx.get_ref().client.clone(), Volume, &volume, "ceph");
         ensure_exists(name, bytes)?;
+        println!("ceph: Volume {name} update success");
     }
 
     Ok(ReconcilerAction {
@@ -148,7 +150,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
         client: client.clone(),
     });
     let volumes: Api<Volume> = Api::all(client.clone());
-    println!("Ceph: Starting controller");
+    println!("ceph: Starting controller");
     create_controller!(volumes, reconcile, error_policy, context);
     Ok(())
 }
