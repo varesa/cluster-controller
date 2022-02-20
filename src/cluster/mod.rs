@@ -10,7 +10,6 @@ use kube::{
     api::{Patch, PatchParams},
     Api, Client,
 };
-use tokio::time::Duration;
 
 const DEPLOYMENT_NAME: &str = "cluster-controller";
 

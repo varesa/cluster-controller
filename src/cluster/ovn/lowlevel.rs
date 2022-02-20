@@ -32,18 +32,18 @@ impl Ovn {
     }*/
 
     fn list_objects(&mut self, object_type: &str) -> Value {
+        let mon_id = format!("ls-{object_type}");
         let params = json!([
             "OVN_Northbound",
-            ["monid", "OVN_Northbound"],
+            ["monid", mon_id],
             {
                 object_type: [{"columns": ["name"]}]
             },
-            "00000000-0000-0000-0000-000000000000"
         ]);
 
         let response = self
             .connection
-            .request("monitor_cond_since", &Params::from_json(params.clone()));
+            .request("monitor_cond", &Params::from_json(params));
         let objects = match response {
             Message::Response { error, result, .. } => {
                 assert!(error.is_null());
@@ -56,8 +56,10 @@ impl Ovn {
             _ => panic!("Didn't get response"),
         };
         // Cancel the monitor
-        self.connection
-            .request("monitor_cancel", &Params::from_json(params));
+        self.connection.request(
+            "monitor_cancel",
+            &Params::from_json(json!(["OVN_Northbound", ["monid", mon_id]])),
+        );
         objects
     }
 
