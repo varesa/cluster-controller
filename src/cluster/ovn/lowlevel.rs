@@ -5,6 +5,7 @@ use crate::Error;
 use serde_json::{json, Map, Value};
 
 const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
+const TYPE_LOGICAL_SWITCH_PORT: &str = "Logical_Switch_Port";
 
 pub struct Ovn {
     connection: JsonRpcConnection,
@@ -123,6 +124,34 @@ impl Ovn {
             .get_ls(name)
             .ok_or_else(|| Error::SwitchNotFound(name.to_string()))?;
         self.delete_by_uuid(TYPE_LOGICAL_SWITCH, &ls.uuid);
+        Ok(())
+    }
+
+    pub fn add_lsp(&mut self, ls_name: &str, lsp_id: &str) -> Result<(), Error> {
+        let ls = self
+            .get_ls(ls_name)
+            .ok_or_else(|| Error::SwitchNotFound(ls_name.to_string()))?;
+
+        let add_lsp = json!({
+            "op": "insert",
+            "table": TYPE_LOGICAL_SWITCH_PORT,
+            "row": {
+                "name": lsp_id
+            },
+            "uuid-name": "new-lsp"
+        });
+        let add_lsp_to_ls = json!({
+            "op": "mutate",
+            "table": TYPE_LOGICAL_SWITCH,
+            "where": [
+                ["_uuid", "==", ls.uuid]
+            ],
+            "mutations": [
+                ["ports", "insert", ["set", [["named-uuid", "new-lsp"]]]]
+            ]
+        });
+        self.transact(&[add_lsp, add_lsp_to_ls]);
+
         Ok(())
     }
 }

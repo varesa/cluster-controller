@@ -49,7 +49,7 @@ where
 
 #[macro_export]
 macro_rules! create_controller {
-    ($resource_type:ident, $reconciler:ident, $error_policy:ident, $context:ident) => {
+    ($resource_type:ident, $reconciler:ident, $error_policy:ident, $context:expr) => {
         Controller::new($resource_type, ListParams::default())
             .run($reconciler, $error_policy, $context)
             .for_each(|res| async move {
@@ -163,6 +163,15 @@ macro_rules! client_remove_finalizer {
             new_resource.metadata.finalizers = Some(finalizers);
             api_replace_resource!(api, &new_resource);
         }
+    };
+}
+
+#[macro_export]
+macro_rules! ok_and_requeue {
+    ($duration:expr) => {
+        Ok(ReconcilerAction {
+            requeue_after: Some(Duration::from_secs($duration)),
+        })
     };
 }
 

@@ -8,12 +8,13 @@ use serde_json::json;
 use tokio::time::Duration;
 
 use crate::cluster::ovn::lowlevel::Ovn;
+use crate::crd::libvirt::{NetworkAttachment, VirtualMachine};
 use crate::crd::ovn::{Network, NetworkStatus};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
 use crate::{
     api_replace_resource, client_ensure_finalizer, client_remove_finalizer, create_controller,
-    create_set_status, resource_has_finalizer, GROUP_NAME,
+    create_set_status, ok_and_requeue, resource_has_finalizer, GROUP_NAME,
 };
 
 /// State available for the reconcile and error_policy functions
@@ -39,7 +40,10 @@ fn delete(name: &str) -> Result<(), Error> {
 }
 
 /// Handle updates to networks in the cluster
-async fn reconcile(network: Network, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+async fn reconcile_network(
+    network: Network,
+    ctx: Context<State>,
+) -> Result<ReconcilerAction, Error> {
     let client = ctx.get_ref().client.clone();
     let name = name_namespaced(&network);
 
@@ -58,9 +62,31 @@ async fn reconcile(network: Network, ctx: Context<State>) -> Result<ReconcilerAc
         set_status(&network, status, client.clone()).await?;
     }
 
-    Ok(ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(600)),
-    })
+    ok_and_requeue!(600)
+}
+
+fn reconcile_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), Error> {
+    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    let ls_name = format!(
+        "{}-{}",
+        ResourceExt::namespace(vm).expect("Failed to get VM namespace"),
+        nic.name.as_ref().expect("No network name set")
+    );
+    ovn.add_lsp(&ls_name, nic.ovn_id.as_ref().unwrap())?;
+    Ok(())
+}
+
+/// Handle updates to VMs in the cluster
+async fn reconcile_vm(vm: VirtualMachine, _ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+    /*if vm.status.clone().and_then(|status| status.node).is_none() {
+        return ok_and_requeue!(600);
+    }*/
+
+    for nic in vm.spec.networks.iter().filter(|net| net.ovn_id.is_some()) {
+        reconcile_vm_nic(&vm, nic)?;
+    }
+
+    ok_and_requeue!(600)
 }
 
 fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
@@ -75,7 +101,9 @@ pub async fn create(client: Client) -> Result<(), Error> {
     });
     println!("ovn: Starting controller");
 
-    let vms: Api<Network> = Api::all(client.clone());
-    create_controller!(vms, reconcile, error_policy, context);
+    let networks: Api<Network> = Api::all(client.clone());
+    let vms: Api<VirtualMachine> = Api::all(client.clone());
+    create_controller!(networks, reconcile_network, error_policy, context.clone());
+    create_controller!(vms, reconcile_vm, error_policy, context);
     Ok(())
 }
