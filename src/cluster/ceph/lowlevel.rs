@@ -1,40 +1,28 @@
-use std::{
-    ffi::CString,
-    ptr,
-    str,
-};
 use libc::c_char;
 use serde_json::json;
+use std::{ffi::CString, ptr, str};
 
 use librados_sys::{
-    rados_t,
-    rados_ioctx_t,
-    rados_create,
-    rados_conf_set,
-    rados_conf_read_file,
-    rados_connect,
-    rados_ioctx_create,
-    rados_ioctx_destroy,
-    rados_pool_list,
-    rados_shutdown,
-    rados_mon_command,
-    rados_buffer_free,
+    rados_buffer_free, rados_conf_read_file, rados_conf_set, rados_connect, rados_create,
+    rados_ioctx_create, rados_ioctx_destroy, rados_ioctx_t, rados_mon_command, rados_pool_list,
+    rados_shutdown, rados_t,
 };
 
-use librbd_sys::{
-    rbd_list,
-    rbd_create,
-};
+use librbd_sys::{rbd_create, rbd_list};
 
-use crate::errors::{RadosError, Error};
+use crate::errors::{Error, RadosError};
 
 macro_rules! call {
     ($operation:literal, $rados_call:expr) => {
         let code = $rados_call;
         if code < 0 {
-            return Err(RadosError { operation: String::from($operation), code}.into());
+            return Err(RadosError {
+                operation: String::from($operation),
+                code,
+            }
+            .into());
         }
-    }
+    };
 }
 
 pub fn connect() -> Result<rados_t, Error> {
@@ -43,17 +31,27 @@ pub fn connect() -> Result<rados_t, Error> {
 
         // Must be returned and freed at the end
         let user_c = CString::new("admin")
-            .expect("Failed to create CString").into_raw();
+            .expect("Failed to create CString")
+            .into_raw();
         let opt_keyring_c = CString::new("keyring")
-            .expect("Failed to create CString").into_raw();
+            .expect("Failed to create CString")
+            .into_raw();
         let keyring_c = CString::new("/etc/ceph/ceph.client.admin.keyring")
-            .expect("Failed to create CString").into_raw();
+            .expect("Failed to create CString")
+            .into_raw();
         let conf_c = CString::new("/etc/ceph/ceph.conf")
-            .expect("Failed to create CString").into_raw();
+            .expect("Failed to create CString")
+            .into_raw();
 
         call!("rados_create", rados_create(&mut cluster, user_c));
-        call!("rados_conf_read_file", rados_conf_read_file(cluster, conf_c));
-        call!("rados_conf_set", rados_conf_set(cluster, opt_keyring_c, keyring_c));
+        call!(
+            "rados_conf_read_file",
+            rados_conf_read_file(cluster, conf_c)
+        );
+        call!(
+            "rados_conf_set",
+            rados_conf_set(cluster, opt_keyring_c, keyring_c)
+        );
         call!("rados_conect", rados_connect(cluster));
 
         // Return control to rust for freeing the memory
@@ -73,10 +71,11 @@ pub fn disconnect(cluster: rados_t) {
 
 fn null_separeted_to_vec(null_separated_list: Vec<u8>) -> Vec<String> {
     let mut result = Vec::new();
-    for item in null_separated_list.split(|c| { *c == 0 }) {
-        if item.is_empty() { break; }
-        result.push(String::from_utf8(item.into())
-            .expect("Failed to convert pool name to String"));
+    for item in null_separated_list.split(|c| *c == 0) {
+        if item.is_empty() {
+            break;
+        }
+        result.push(String::from_utf8(item.into()).expect("Failed to convert pool name to String"));
     }
     result
 }
@@ -86,7 +85,10 @@ pub fn get_pools(cluster: rados_t) -> Result<Vec<String>, Error> {
     let mut buffer = vec![0u8; 1024];
     let buffer_len = buffer.len();
     unsafe {
-        call!("rados_pool_list", rados_pool_list(cluster, buffer.as_mut_ptr() as *mut i8, buffer_len));
+        call!(
+            "rados_pool_list",
+            rados_pool_list(cluster, buffer.as_mut_ptr() as *mut i8, buffer_len)
+        );
     }
     let pools = null_separeted_to_vec(buffer);
     Ok(pools)
@@ -98,9 +100,13 @@ pub fn get_pool(cluster: rados_t, pool_name: String) -> Result<rados_ioctx_t, Er
     unsafe {
         // Must be returned and freed at the end
         let pool_name_c = CString::new(pool_name)
-            .expect("Failed to create CString").into_raw();
+            .expect("Failed to create CString")
+            .into_raw();
 
-        call!("rados_ioctx_create", rados_ioctx_create(cluster, pool_name_c, &mut pool));
+        call!(
+            "rados_ioctx_create",
+            rados_ioctx_create(cluster, pool_name_c, &mut pool)
+        );
 
         // Take back control to free memory
         drop(CString::from_raw(pool_name_c));
@@ -119,7 +125,10 @@ pub fn get_images(pool: rados_ioctx_t) -> Result<Vec<String>, Error> {
     let mut buffer_len: libc::size_t = buffer.len();
 
     unsafe {
-        call!("rbd_list", rbd_list(pool, buffer.as_mut_ptr() as *mut i8, &mut buffer_len));
+        call!(
+            "rbd_list",
+            rbd_list(pool, buffer.as_mut_ptr() as *mut i8, &mut buffer_len)
+        );
     }
 
     let images = null_separeted_to_vec(buffer);
@@ -143,7 +152,8 @@ pub fn auth_get_key(cluster: rados_t, key_name: String) -> Result<String, Error>
     let cmd = json!({
         "prefix": "auth get-key",
         "entity": key_name
-    }).to_string();
+    })
+    .to_string();
 
     // Important! The .as[_mut]_ptr() must not be combined with the previous line,
     // or the "intermediate" product will be dropped and the pointer will become
@@ -166,21 +176,26 @@ pub fn auth_get_key(cluster: rados_t, key_name: String) -> Result<String, Error>
             rados_mon_command(
                 cluster,
                 /* command */
-                cmd_array_ptr, 1,
+                cmd_array_ptr,
+                1,
                 /* input data */
-                ptr::null_mut::<c_char>(), 0,
+                ptr::null_mut::<c_char>(),
+                0,
                 /* output data */
-                &mut outbuf, &mut outbuf_len,
+                &mut outbuf,
+                &mut outbuf_len,
                 /* other outputs */
-                &mut outs, &mut outs_len,
-        ));
+                &mut outs,
+                &mut outs_len,
+            )
+        );
 
         if outbuf_len > 0 {
             let key_bytes = std::slice::from_raw_parts(outbuf as *const u8, outbuf_len);
             key = Some(
                 str::from_utf8(key_bytes)
                     .expect("Failed to decode key")
-                    .to_owned()
+                    .to_owned(),
             );
             rados_buffer_free(outbuf);
         }
@@ -190,6 +205,10 @@ pub fn auth_get_key(cluster: rados_t, key_name: String) -> Result<String, Error>
     }
     match key {
         Some(key) => Ok(key),
-        None => Err(RadosError { operation: String::from("auth get-key"), code: 1 }.into())
+        None => Err(RadosError {
+            operation: String::from("auth get-key"),
+            code: 1,
+        }
+        .into()),
     }
 }
