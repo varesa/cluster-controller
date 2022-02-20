@@ -9,4 +9,4 @@ spec:
   volumes:
     - name: vm-1-root
   networks:
-    - bridge: managementx
+    - name: testnet
