@@ -58,7 +58,7 @@ macro_rules! create_controller {
                     Err(e) => println!("reconcile failed: {:?}", e),
                 }
             })
-            .await;
+            .await
     };
 }
 

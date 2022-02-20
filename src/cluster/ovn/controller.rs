@@ -108,11 +108,21 @@ pub async fn create(client: Client) -> Result<(), Error> {
     let context = Context::new(State {
         client: client.clone(),
     });
-    println!("ovn: Starting controller");
+    println!("ovn: Starting controllers");
 
     let networks: Api<Network> = Api::all(client.clone());
     let vms: Api<VirtualMachine> = Api::all(client.clone());
-    create_controller!(networks, reconcile_network, error_policy, context.clone());
-    create_controller!(vms, reconcile_vm, error_policy, context);
+
+    let context_clone = context.clone();
+
+    // Only one controller can run in this task, so create a second task for the other controller
+    tokio::task::spawn(async {
+        panic!(
+            "OVN VM-controller task exited: {:?}",
+            create_controller!(vms, reconcile_vm, error_policy, context)
+        );
+    });
+
+    create_controller!(networks, reconcile_network, error_policy, context_clone);
     Ok(())
 }
