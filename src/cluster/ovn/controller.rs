@@ -78,11 +78,20 @@ fn reconcile_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), 
 
 /// Handle updates to VMs in the cluster
 async fn reconcile_vm(vm: VirtualMachine, _ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+    let name = name_namespaced(&vm);
     /*if vm.status.clone().and_then(|status| status.node).is_none() {
         return ok_and_requeue!(600);
     }*/
 
-    for nic in vm.spec.networks.iter().filter(|net| net.ovn_id.is_some()) {
+    println!("ovn: VM {name} updated");
+    for (index, nic) in vm
+        .spec
+        .networks
+        .iter()
+        .filter(|net| net.ovn_id.is_some())
+        .enumerate()
+    {
+        println!("ovn: reconciling NIC {index} for VM {name}");
         reconcile_vm_nic(&vm, nic)?;
     }
 
