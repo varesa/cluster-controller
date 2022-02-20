@@ -17,10 +17,13 @@ fi
 CACHE_DIR=".podman_cache"
 
 if [[ -d ${CACHE_DIR} ]]; then 
+    echo "Using $(readlink -f ${CACHE_DIR}) as cache"
     [[ -d ${CACHE_DIR}/registry ]] || mkdir ${CACHE_DIR}/registry
     [[ -d ${CACHE_DIR}/build ]] || mkdir ${CACHE_DIR}/build
 
     PODMAN_BUILD_OPTS="-v ${PWD}/${CACHE_DIR}/registry:/usr/local/cargo/registry:Z -v ${PWD}/${CACHE_DIR}/build:/usr/src/cluster-controller/target:Z"
+else
+    echo "Warning: Building without cache. Optimize compile times by running: ln -s \$(mktemp -d) .podman_cache"
 fi
 
 podman build ${PODMAN_BUILD_OPTS:-} -t "$TMP" .
