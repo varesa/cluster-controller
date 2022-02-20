@@ -158,7 +158,33 @@ impl Ovn {
             ]
         });
         self.transact(&[add_lsp, add_lsp_to_ls]);
+        Ok(())
+    }
 
+    pub fn del_lsp(&mut self, ls_name: &str, lsp_id: &str) -> Result<(), Error> {
+        let ls = self
+            .get_ls(ls_name)
+            .ok_or_else(|| Error::SwitchNotFound(ls_name.to_string()))?;
+
+        let lsp = self
+            .get_lsp(lsp_id)
+            .ok_or_else(|| Error::SwitchPortNotFound(lsp_id.to_string()))?;
+
+        let del_lsp = json!({
+          "op": "mutate",
+          "table": TYPE_LOGICAL_SWITCH,
+          "mutations": [[
+              "ports",
+              "delete",
+              [
+                "set", [[ "uuid", lsp.uuid() ]]
+              ]
+          ]],
+          "where": [[
+              "_uuid", "==", ["uuid", ls.uuid()]
+          ]]
+        });
+        self.transact(&[del_lsp]);
         Ok(())
     }
 }

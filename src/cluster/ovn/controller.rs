@@ -14,7 +14,7 @@ use crate::errors::Error;
 use crate::utils::name_namespaced;
 use crate::{
     api_replace_resource, client_ensure_finalizer, client_remove_finalizer, create_controller,
-    create_set_status, ok_and_requeue, resource_has_finalizer, GROUP_NAME,
+    create_set_status, ok_and_requeue, ok_no_requeue, resource_has_finalizer, GROUP_NAME,
 };
 
 /// State available for the reconcile and error_policy functions
@@ -65,7 +65,7 @@ async fn reconcile_network(
     ok_and_requeue!(600)
 }
 
-fn reconcile_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), Error> {
+fn connect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), Error> {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
     let ls_name = format!(
         "{}-{}",
@@ -79,26 +79,52 @@ fn reconcile_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), 
     Ok(())
 }
 
-/// Handle updates to VMs in the cluster
-async fn reconcile_vm(vm: VirtualMachine, _ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let name = name_namespaced(&vm);
-    /*if vm.status.clone().and_then(|status| status.node).is_none() {
-        return ok_and_requeue!(600);
-    }*/
-
-    println!("ovn: VM {name} updated");
-    for (index, nic) in vm
-        .spec
-        .networks
-        .iter()
-        .filter(|net| net.ovn_id.is_some())
-        .enumerate()
-    {
-        println!("ovn: reconciling NIC {index} for VM {name}");
-        reconcile_vm_nic(&vm, nic)?;
+fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), Error> {
+    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    let ls_name = format!(
+        "{}-{}",
+        ResourceExt::namespace(vm).expect("Failed to get VM namespace"),
+        nic.name.as_ref().expect("No network name set")
+    );
+    if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_some() {
+        println!("ovn: lsp exists for NIC, removing");
+        ovn.del_lsp(&ls_name, nic.ovn_id.as_ref().unwrap())?;
     }
+    Ok(())
+}
 
-    ok_and_requeue!(600)
+fn get_vm_ovn_nics(vm: &VirtualMachine) -> Vec<NetworkAttachment> {
+    vm.spec
+        .networks
+        .clone()
+        .into_iter()
+        .filter(|net| net.ovn_id.is_some())
+        .collect()
+}
+
+/// Handle updates to VMs in the cluster
+async fn reconcile_vm(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+    let name = name_namespaced(&vm);
+    let client = ctx.get_ref().client.clone();
+
+    if vm.metadata.deletion_timestamp.is_some() {
+        println!("ovn: VM {name} waiting for deletion");
+        for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
+            println!("ovn: disconnecting NIC {index} for VM {name}");
+            disconnect_vm_nic(&vm, nic)?;
+        }
+
+        ok_no_requeue!()
+    } else {
+        println!("ovn: VM {name} updated");
+        client_ensure_finalizer!(client, VirtualMachine, &vm, "ovn");
+        for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
+            println!("ovn: connecting NIC {index} for VM {name}");
+            connect_vm_nic(&vm, nic)?;
+        }
+
+        ok_and_requeue!(600)
+    }
 }
 
 fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
