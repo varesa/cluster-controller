@@ -14,6 +14,15 @@ else
     CLEAN=false
 fi
 
+CACHE_DIR=".podman_cache"
+
+if [[ -d ${CACHE_DIR} ]]; then 
+    [[ -d ${CACHE_DIR}/registry ]] || mkdir ${CACHE_DIR}/registry
+    [[ -d ${CACHE_DIR}/build ]] || mkdir ${CACHE_DIR}/build
+
+    PODMAN_BUILD_OPTS="-v ${PWD}/${CACHE_DIR}/registry:/usr/local/cargo/registry:Z -v ${PWD}/${CACHE_DIR}/build:/usr/src/cluster-controller/target:Z"
+fi
+
 podman build ${PODMAN_BUILD_OPTS:-} -t "$TMP" .
 version="$(podman run --rm tmp-cluster-controller-build cluster-controller --version)"
 

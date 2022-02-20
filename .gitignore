@@ -3,3 +3,4 @@
 kubeconfig
 .idea
 test*.yaml
+.podman_cache
