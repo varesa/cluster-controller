@@ -9,8 +9,8 @@ pub struct DomainTemplate {
     pub machine_type: String,
     pub cpu: String,
 
-    pub cpus: u8,
-    pub memory: u32,
+    pub cpus: usize,
+    pub memory: usize,
     pub memory_unit: String,
 
     pub network_interfaces: Vec<NetworkInterfaceTemplate>,

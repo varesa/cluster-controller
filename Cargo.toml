@@ -32,6 +32,8 @@ humanize-rs = "0.1.5"
 askama = "0.8"
 sha2 = "0.9.3"
 uuid = { version = "0.8", features = ["v4"] }
+regex = "1.5.4"
+lazy_static = "1.4.0"
 
 # ceph
 libc = "0.2.82"

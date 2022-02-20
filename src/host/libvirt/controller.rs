@@ -6,6 +6,8 @@ use kube::{
     api::{Api, ListParams, PostParams, ResourceExt},
     Client,
 };
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::{convert::TryInto, env};
 use tokio::time::Duration;
 use virt::{domain::Domain, secret::Secret as LibvirtSecret};
@@ -66,6 +68,17 @@ async fn get_cluster(ctx: &Context<State>) -> Result<Cluster, ClusterNotFound> {
     }
 }
 
+fn parse_memory(input: &str) -> Result<(usize, String), Error> {
+    lazy_static! {
+        static ref RE: Regex = Regex::new(r"(\d+)\w*([a-zA-Z]+)").unwrap();
+    }
+    let captures = RE.captures(input).unwrap();
+    Ok((
+        captures.get(0).unwrap().as_str().parse().unwrap(),
+        captures.get(1).unwrap().as_str().to_string(),
+    ))
+}
+
 fn create_domain(
     vm: &VirtualMachine,
     cluster: &Cluster,
@@ -96,14 +109,15 @@ fn create_domain(
         })
     }
     println!("{:?}", &vm);
+    let (memory_amount, memory_unit) = parse_memory(&vm.spec.memory)?;
     let xml = DomainTemplate {
         name: get_domain_name(vm).expect("no domain name specified"),
         uuid: vm.spec.uuid.clone().expect("VM has no UUID"),
         machine_type: cluster.spec.machine_type.clone(),
         cpu: cluster.spec.cpu.clone(),
-        cpus: 1,
-        memory: 128,
-        memory_unit: String::from("MiB"),
+        cpus: vm.spec.cpus,
+        memory: memory_amount,
+        memory_unit,
         network_interfaces: nics,
         storage_devices: volumes,
     }

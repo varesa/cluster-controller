@@ -123,6 +123,7 @@ dependencies = [
  "humanize-rs",
  "k8s-openapi",
  "kube",
+ "lazy_static",
  "libc",
  "librados-sys",
  "librbd-sys",
