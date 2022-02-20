@@ -1,7 +1,10 @@
 use super::jsonrpc::{JsonRpcConnection, Message};
 use crate::cluster::ovn::jsonrpc::Params;
 use crate::cluster::ovn::types::LogicalSwitch;
+use crate::Error;
 use serde_json::{json, Map, Value};
+
+const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
 
 pub struct Ovn {
     connection: JsonRpcConnection,
@@ -71,14 +74,25 @@ impl Ovn {
         self.transact(&[operation]);
     }
 
+    fn delete_by_uuid(&mut self, object_type: &str, uuid: &str) {
+        let operation = json!({
+            "op": "delete",
+            "table": object_type,
+            "where": [
+                ["_uuid", "==", ["uuid", uuid]]
+            ]
+        });
+        self.transact(&[operation]);
+    }
+
     pub fn add_ls(&mut self, name: &str) {
         let mut params = Map::new();
         params.insert("name".to_string(), Value::String(name.to_string()));
-        self.insert("Logical_Switch", params);
+        self.insert(TYPE_LOGICAL_SWITCH, params);
     }
 
     pub fn list_ls(&mut self) -> Vec<LogicalSwitch> {
-        let response = self.list_objects("Logical_Switch");
+        let response = self.list_objects(TYPE_LOGICAL_SWITCH);
         let mut switches = Vec::new();
         for (uuid, params) in response.as_object().unwrap().iter() {
             switches.push(LogicalSwitch::from_json(
@@ -93,5 +107,18 @@ impl Ovn {
             ));
         }
         switches
+    }
+
+    pub fn get_ls(&mut self, name: &str) -> Option<LogicalSwitch> {
+        let switches = self.list_ls();
+        switches.into_iter().find(|sw| sw.name == name)
+    }
+
+    pub fn del_ls_by_name(&mut self, name: &str) -> Result<(), Error> {
+        let ls = self
+            .get_ls(name)
+            .ok_or_else(|| Error::SwitchNotFound(name.to_string()))?;
+        self.delete_by_uuid(TYPE_LOGICAL_SWITCH, &ls.uuid);
+        Ok(())
     }
 }

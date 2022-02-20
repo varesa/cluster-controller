@@ -15,7 +15,10 @@ use crate::crd::ceph::Volume;
 use crate::create_controller;
 use crate::errors::Error;
 use crate::utils::name_namespaced;
-use crate::{client_ensure_finalizer, GROUP_NAME, KEYRING_SECRET, NAMESPACE};
+use crate::{
+    api_replace_resource, client_ensure_finalizer, resource_has_finalizer, GROUP_NAME,
+    KEYRING_SECRET, NAMESPACE,
+};
 
 const POOL: &str = "volumes";
 const KEYRING: &str = "client.libvirt";

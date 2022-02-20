@@ -38,8 +38,7 @@ impl std::fmt::Display for ClusterNotFound {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "Cluster {} not found - inner error: {}",
-            self.name,
-            self.inner_error,
+            self.name, self.inner_error,
         ))
     }
 }
@@ -59,6 +58,10 @@ pub enum Error {
     // Libvirt
     #[error("libvirt error {0}")]
     Libvirt(#[from] virt::error::Error),
+
+    // OVN
+    #[error("Logical switch {0} not found")]
+    SwitchNotFound(String),
 
     // Misc libs
     #[error("JSON error {0}")]
