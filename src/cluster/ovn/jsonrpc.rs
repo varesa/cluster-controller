@@ -21,12 +21,18 @@ impl JsonRpcConnection {
             method: method.into(),
             params: params.clone(),
         };
-        self.stream
-            .write_all(&serde_json::to_vec(&request).unwrap())
-            .unwrap();
+
+        let request_encoded = serde_json::to_vec(&request).unwrap();
+        println!(
+            "jsonrpc: request: {}",
+            String::from_utf8(request_encoded.clone()).unwrap()
+        );
+
+        self.stream.write_all(&request_encoded).unwrap();
         let deserializer = Deserializer::from_reader(self.stream.try_clone().unwrap());
         let mut iter = deserializer.into_iter();
         while let Some(Ok(message)) = iter.next() {
+            println!("jsonrpc: response: {:?}", &message);
             match message {
                 Message::Request { .. } => { /* ignore */ }
                 Message::Response {

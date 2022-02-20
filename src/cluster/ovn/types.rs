@@ -6,9 +6,18 @@ pub struct LogicalSwitch {
 }
 
 impl LogicalSwitch {
-    pub fn from_json(uuid: &str, parameters: &Map<String, Value>) -> Self {
+    pub fn from_json(parameters: &Map<String, Value>) -> Self {
         LogicalSwitch {
-            uuid: uuid.to_string(),
+            uuid: parameters
+                .get("_uuid")
+                .expect("Switch should have an uuid")
+                .as_array()
+                .expect("row[*].uuid should be an array")
+                .get(1)
+                .expect("second element should be the UUID")
+                .as_str()
+                .expect("UUID should be string")
+                .to_owned(),
             name: parameters
                 .get("name")
                 .expect("Switch should have name")
@@ -25,12 +34,21 @@ pub struct LogicalSwitchPort {
 }
 
 impl LogicalSwitchPort {
-    pub fn from_json(uuid: &str, parameters: &Map<String, Value>) -> Self {
+    pub fn from_json(parameters: &Map<String, Value>) -> Self {
         LogicalSwitchPort {
-            uuid: uuid.to_string(),
+            uuid: parameters
+                .get("_uuid")
+                .expect("Switch should have an uuid")
+                .as_array()
+                .expect("row[*].uuid should be an array")
+                .get(1)
+                .expect("second element should be the UUID")
+                .as_str()
+                .expect("UUID should be string")
+                .to_owned(),
             name: parameters
                 .get("name")
-                .expect("Switch port should have name")
+                .expect("Switch should have name")
                 .as_str()
                 .expect("Name should be string")
                 .to_string(),

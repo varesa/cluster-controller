@@ -31,50 +31,44 @@ impl Ovn {
         print!("{schema:#?}");
     }*/
 
-    fn list_objects(&mut self, object_type: &str) -> Value {
-        let mon_id = format!("ls-{object_type}");
-        let params = json!([
-            "OVN_Northbound",
-            ["monid", mon_id],
-            {
-                object_type: [{"columns": ["name"]}]
-            },
-        ]);
-
-        let response = self
-            .connection
-            .request("monitor_cond", &Params::from_json(params));
-        let objects = match response {
-            Message::Response { error, result, .. } => {
-                assert!(error.is_null());
-                if result.as_object().unwrap().contains_key(object_type) {
-                    result[object_type].clone()
-                } else {
-                    Value::Object(Map::new())
-                }
-            }
-            _ => panic!("Didn't get response"),
-        };
-        // Cancel the monitor
-        self.connection.request(
-            "monitor_cancel",
-            &Params::from_json(json!(["OVN_Northbound", ["monid", mon_id]])),
-        );
-        objects
-    }
-
-    fn transact(&mut self, operations: &[Value]) {
+    fn transact(&mut self, operations: &[Value]) -> Vec<Value> {
         let mut params = vec![Value::String("OVN_Northbound".to_string())];
         params.append(&mut operations.to_owned());
         let response = self
             .connection
             .request("transact", &Params::from_json(json!(params)));
         match response {
-            Message::Response { error, .. } => {
+            Message::Response { error, result, .. } => {
                 assert!(error.is_null());
+                let results = result.as_array().expect("result not an array").to_owned();
+                for result in results.iter() {
+                    let error = result
+                        .as_object()
+                        .expect("result should be an object")
+                        .get("error");
+                    assert!(error.is_none() || error.unwrap().is_null());
+                }
+                results
             }
             _ => panic!("Didn't get response"),
         }
+    }
+
+    fn list_objects(&mut self, object_type: &str) -> Vec<Value> {
+        let select = json!({
+            "op": "select",
+            "table": object_type,
+            "where": [],
+            "columns": ["_uuid", "name"]
+        });
+        self.transact(&[select])[0]
+            .as_object()
+            .expect("Transaction result not an object")
+            .get("rows")
+            .expect("Transaction didn't return rows")
+            .as_array()
+            .expect("Rows is not an array")
+            .to_owned()
     }
 
     fn insert(&mut self, object_type: &str, params: Map<String, Value>) {
@@ -106,34 +100,21 @@ impl Ovn {
     pub fn list_ls(&mut self) -> Vec<LogicalSwitch> {
         let response = self.list_objects(TYPE_LOGICAL_SWITCH);
         let mut switches = Vec::new();
-        for (uuid, params) in response.as_object().unwrap().iter() {
+        for row in response {
             switches.push(LogicalSwitch::from_json(
-                uuid,
-                params
-                    .as_object()
-                    .expect("Should be object")
-                    .get("initial")
-                    .expect("Should contain initial key")
-                    .as_object()
-                    .expect("asd"),
+                row.as_object().expect("row should be an object"),
             ));
         }
+
         switches
     }
 
     pub fn list_lsp(&mut self) -> Vec<LogicalSwitchPort> {
         let response = self.list_objects(TYPE_LOGICAL_SWITCH_PORT);
         let mut ports = Vec::new();
-        for (uuid, params) in response.as_object().unwrap().iter() {
+        for row in response {
             ports.push(LogicalSwitchPort::from_json(
-                uuid,
-                params
-                    .as_object()
-                    .expect("Should be object")
-                    .get("initial")
-                    .expect("Should contain initial key")
-                    .as_object()
-                    .expect("asd"),
+                row.as_object().expect("row should be an object"),
             ));
         }
         ports
@@ -174,7 +155,7 @@ impl Ovn {
             "op": "mutate",
             "table": TYPE_LOGICAL_SWITCH,
             "where": [
-                ["_uuid", "==", ls.uuid]
+                ["_uuid", "==", ["uuid", ls.uuid]]
             ],
             "mutations": [
                 ["ports", "insert", ["set", [["named-uuid", "new-lsp"]]]]
