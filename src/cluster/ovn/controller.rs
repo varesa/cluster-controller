@@ -1,22 +1,25 @@
 use futures::StreamExt;
 use kube::runtime::controller::{Context, Controller, ReconcilerAction};
 use kube::{
-    api::{Api, ListParams},
-    Client,
+    api::{Api, ListParams, PostParams},
+    Client, ResourceExt,
 };
+use serde_json::json;
 use tokio::time::Duration;
 
 use crate::cluster::ovn::lowlevel::Ovn;
-use crate::crd::ovn::Network;
-use crate::create_controller;
+use crate::crd::ovn::{Network, NetworkStatus};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
+use crate::{create_controller, create_set_status};
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
 struct State {
     client: Client,
 }
+
+create_set_status!(Network, NetworkStatus);
 
 /// Handle updates to networks in the cluster
 async fn reconcile(network: Network, ctx: Context<State>) -> Result<ReconcilerAction, Error> {

@@ -1,16 +1,9 @@
-use k8s_openapi::{
-    apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
-};
+use futures::{StreamExt, TryStreamExt};
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
-    api::{
-        ListParams,
-        Resource,
-        ResourceExt,
-        WatchEvent,
-    },
+    api::{ListParams, Resource, ResourceExt, WatchEvent},
     Api,
 };
-use futures::{StreamExt, TryStreamExt};
 
 use crate::errors::Error;
 
@@ -43,7 +36,10 @@ pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) ->
     return Err(Error::Timeout(format!("Apply CRD {}", name)));
 }
 
-pub fn name_namespaced<T>(resource: &T) -> String where T: Resource {
+pub fn name_namespaced<T>(resource: &T) -> String
+where
+    T: Resource,
+{
     format!(
         "{}-{}",
         ResourceExt::namespace(resource).expect("get resource namespace"),
@@ -58,11 +54,40 @@ macro_rules! create_controller {
             .run($reconciler, $error_policy, $context)
             .for_each(|res| async move {
                 match res {
-                    Ok(_o) => { /*println!("reconciled {:?}", o)*/ },
+                    Ok(_o) => { /*println!("reconciled {:?}", o)*/ }
                     Err(e) => println!("reconcile failed: {:?}", e),
                 }
             })
             .await;
+    };
+}
+
+#[macro_export]
+macro_rules! create_set_status {
+    ($resource_type:ident, $resource_status_type:ident) => {
+        async fn set_status(resource: &$resource_type, status: $resource_status_type, client: Client) -> Result<(), Error> {
+            let api: Api<$resource_type> = Api::namespaced(
+                client.clone(),
+                &ResourceExt::namespace(resource).expect("get resource namespace"),
+            );
+            let status_update = json!({
+                "apiVersion": resource.api_version,
+                "kind": resource.kind,
+                "metadata": {
+                    "name": ResourceExt::name(resource),
+                    "resourceVersion": ResourceExt::resource_version(resource),
+                },
+                "status": status,
+            });
+            api
+                .replace_status(
+                    &ResourceExt::name(resource),
+                    &PostParams::default(),
+                    serde_json::to_vec(&status_update).expect("serialize status"),
+                )
+                .await?;
+            Ok(())
+        }
     }
 }
 
