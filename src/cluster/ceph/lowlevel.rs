@@ -135,7 +135,7 @@ pub fn get_images(pool: rados_ioctx_t) -> Result<Vec<String>, Error> {
     Ok(images)
 }
 
-pub fn create_image(pool: rados_ioctx_t, name: String, size: u64) -> Result<(), Error> {
+pub fn create_image(pool: rados_ioctx_t, name: &str, size: u64) -> Result<(), Error> {
     unsafe {
         let name_c = CString::new(name)
             .expect("failed to convert to cstring")

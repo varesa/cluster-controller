@@ -31,13 +31,13 @@ struct State {
 
 /// Check if an volume already exists in the cluster and
 /// create if it doesn't.
-fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
+fn ensure_exists(name: &str, size: u64) -> Result<(), Error> {
     let cluster = lowlevel::connect()?;
     let pool = lowlevel::get_pool(cluster, POOL.into())?;
 
     lowlevel::get_images(pool)?
         .iter()
-        .find(|&existing| existing == &name)
+        .find(|&existing| existing == name)
         .map(|_| Ok(()))
         .or_else(|| {
             println!("Volume {} does not exist", name);
@@ -129,7 +129,7 @@ async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerActi
     } else {
         println!("ceph: Volume {name} updated");
         client_ensure_finalizer!(ctx.get_ref().client.clone(), Volume, &volume, "ceph");
-        ensure_exists(name, bytes)?;
+        ensure_exists(&name, bytes)?;
         println!("ceph: Volume {name} update success");
     }
 
