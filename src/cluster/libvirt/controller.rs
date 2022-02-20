@@ -12,7 +12,10 @@ use crate::cluster::libvirt::utils::generate_mac_address;
 use crate::crd::libvirt::{VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
-use crate::{api_replace_resource, client_replace_resource, create_controller, create_set_status};
+use crate::{
+    api_replace_resource, client_replace_resource, create_controller, create_set_status,
+    ok_and_requeue,
+};
 use uuid::Uuid;
 
 /// State available for the reconcile and error_policy functions
@@ -74,23 +77,43 @@ async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<Reconc
     let client = ctx.get_ref().client.clone();
     let name = name_namespaced(&vm);
 
+    if vm.metadata.deletion_timestamp.is_some() {
+        println!("VM {} waiting for deletion by host controller", name);
+        return ok_and_requeue!(600);
+    }
+
     fill_nics(&mut vm, client.clone()).await?;
     fill_uuid(&mut vm, client.clone()).await?;
-    let node = schedule(&vm, client.clone()).await?;
 
-    let status = VirtualMachineStatus {
-        scheduled: false,
-        running: false,
-        node: Some(node.metadata.name.expect("Unknown node name")),
-        domain_name: name.clone(),
-    };
-    set_status(&vm, status, client.clone()).await?;
+    let old_status = vm
+        .status
+        .clone()
+        .or_else(|| {
+            Some(VirtualMachineStatus {
+                scheduled: false,
+                running: false,
+                node: None,
+                domain_name: String::new(),
+            })
+        })
+        .unwrap();
+
+    let mut new_status = VirtualMachineStatus { ..old_status };
+
+    if new_status.domain_name.is_empty() {
+        new_status.domain_name = name.clone();
+    }
+
+    if !old_status.scheduled {
+        let node = schedule(&vm, client.clone()).await?;
+        new_status.node = Some(node.metadata.name.expect("Unknown node name"));
+        new_status.scheduled = true;
+    }
+
+    set_status(&vm, new_status, client.clone()).await?;
 
     println!("libvirt: updated: {}", name);
-
-    Ok(ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(600)),
-    })
+    return ok_and_requeue!(600);
 }
 
 fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
