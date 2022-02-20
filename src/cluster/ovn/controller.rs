@@ -12,8 +12,8 @@ use crate::crd::ovn::{Network, NetworkStatus};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
 use crate::{
-    api_replace_resource, client_ensure_finalizer, create_controller, create_set_status,
-    resource_has_finalizer, GROUP_NAME,
+    api_replace_resource, client_ensure_finalizer, client_remove_finalizer, create_controller,
+    create_set_status, resource_has_finalizer, GROUP_NAME,
 };
 
 /// State available for the reconcile and error_policy functions
@@ -49,6 +49,7 @@ async fn reconcile(network: Network, ctx: Context<State>) -> Result<ReconcilerAc
     if network.metadata.deletion_timestamp.is_some() {
         println!("ovn: Network {} waiting for deletion", name);
         delete(&name)?;
+        client_remove_finalizer!(client, Network, &network, "ovn");
     } else {
         println!("ovn: updated: {name}");
         client_ensure_finalizer!(client, Network, &network, "ovn");

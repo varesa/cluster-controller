@@ -149,6 +149,23 @@ macro_rules! client_ensure_finalizer {
     };
 }
 
+#[macro_export]
+macro_rules! client_remove_finalizer {
+    ($client:expr, $resource_type:ident, $resource:expr, $controller_name:expr) => {
+        let finalizer_name = format!("{}/{}", GROUP_NAME, $controller_name);
+        let namespace = ResourceExt::namespace($resource).expect("Unable to get namespace");
+        let api: Api<$resource_type> = Api::namespaced($client.clone(), &namespace);
+
+        if resource_has_finalizer!($resource, &finalizer_name) {
+            let mut finalizers = $resource.metadata.finalizers.clone().unwrap();
+            finalizers.retain(|f| f != &finalizer_name);
+            let mut new_resource = $resource.to_owned();
+            new_resource.metadata.finalizers = Some(finalizers);
+            api_replace_resource!(api, &new_resource);
+        }
+    };
+}
+
 pub fn get_version_string() -> String {
     format!("{}-{}", env!("GIT_COUNT"), env!("GIT_HASH"))
 }
