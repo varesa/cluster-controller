@@ -33,7 +33,6 @@ async fn schedule(_vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
         println!("Candidate: {}", ResourceExt::name(&node));
     }*/
     Ok(nodes.items[0].clone())
-    //Err(Error::Timeout(String::from("asd")))
 }
 
 async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {

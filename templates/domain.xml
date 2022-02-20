@@ -3,8 +3,8 @@
     <uuid>{{uuid}}</uuid>
 
     <vcpu placement='auto'>{{cpus}}</vcpu>
-    <memory>{{memory}}</memory>
-    <currentMemory>{{memory}}</currentMemory>
+    <memory unit="{{memory_unit}}">{{memory}}</memory>
+    <currentMemory unit="{{memory_unit}}">{{memory}}</currentMemory>
 
 
     {% include "features.xml" %}

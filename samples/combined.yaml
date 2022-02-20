@@ -20,6 +20,7 @@ metadata:
   namespace: test2
 spec:
   size: 100G
+  template: rocky-test
 ---
 
 apiVersion: cluster-virt.acl.fi/v1beta
@@ -44,6 +45,7 @@ metadata:
   namespace: test2
 spec:
   size: 100G
+  template: rocky-test
 ---
 
 apiVersion: cluster-virt.acl.fi/v1beta
@@ -68,6 +70,7 @@ metadata:
   namespace: test2
 spec:
   size: 100G
+  template: rocky-test
 ---
 
 apiVersion: cluster-virt.acl.fi/v1beta
