@@ -18,8 +18,8 @@ use crate::errors::ClusterNotFound;
 use crate::errors::Error;
 use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
 use crate::{
-    api_replace_resource, client_ensure_finalizer, create_controller, ok_and_requeue,
-    ok_no_requeue, resource_has_finalizer, GROUP_NAME, KEYRING_SECRET, NAMESPACE,
+    api_replace_resource, client_ensure_finalizer, client_remove_finalizer, create_controller,
+    ok_and_requeue, ok_no_requeue, resource_has_finalizer, GROUP_NAME, KEYRING_SECRET, NAMESPACE,
 };
 
 const LIBVIRT_URI: &str = "qemu:///system";
@@ -174,6 +174,8 @@ async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconciler
                 println!("Domain {vm_name} doesn't exist, ignoring");
             }
         };
+
+        client_remove_finalizer!(client.clone(), VirtualMachine, &vm, "libvirt-host");
 
         ok_no_requeue!()
     } else {

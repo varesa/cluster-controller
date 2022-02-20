@@ -40,7 +40,7 @@ fn ensure_exists(name: &str, size: u64) -> Result<(), Error> {
         .find(|&existing| existing == name)
         .map(|_| Ok(()))
         .or_else(|| {
-            println!("Volume {} does not exist", name);
+            println!("ceph: Volume {} does not exist", name);
             Some(lowlevel::create_image(pool, name, size))
         })
         .transpose()?;
