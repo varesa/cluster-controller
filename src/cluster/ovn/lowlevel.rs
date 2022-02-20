@@ -1,6 +1,6 @@
 use super::jsonrpc::{JsonRpcConnection, Message};
 use crate::cluster::ovn::jsonrpc::Params;
-use crate::cluster::ovn::types::LogicalSwitch;
+use crate::cluster::ovn::types::{LogicalSwitch, LogicalSwitchPort};
 use crate::Error;
 use serde_json::{json, Map, Value};
 
@@ -32,18 +32,19 @@ impl Ovn {
     }*/
 
     fn list_objects(&mut self, object_type: &str) -> Value {
-        let response = self.connection.request(
-            "monitor_cond_since",
-            &Params::from_json(json!([
-                "OVN_Northbound",
-                ["monid", "OVN_Northbound"],
-                {
-                    object_type: [{"columns": ["name"]}]
-                },
-                "00000000-0000-0000-0000-000000000000"
-            ])),
-        );
-        match response {
+        let params = json!([
+            "OVN_Northbound",
+            ["monid", "OVN_Northbound"],
+            {
+                object_type: [{"columns": ["name"]}]
+            },
+            "00000000-0000-0000-0000-000000000000"
+        ]);
+
+        let response = self
+            .connection
+            .request("monitor_cond_since", &Params::from_json(params.clone()));
+        let objects = match response {
             Message::Response { error, result, .. } => {
                 assert!(error.is_null());
                 if result[2].as_object().unwrap().contains_key(object_type) {
@@ -53,7 +54,11 @@ impl Ovn {
                 }
             }
             _ => panic!("Didn't get response"),
-        }
+        };
+        // Cancel the monitor
+        self.connection
+            .request("monitor_cancel", &Params::from_json(params));
+        objects
     }
 
     fn transact(&mut self, operations: &[Value]) {
@@ -114,9 +119,32 @@ impl Ovn {
         switches
     }
 
+    pub fn list_lsp(&mut self) -> Vec<LogicalSwitchPort> {
+        let response = self.list_objects(TYPE_LOGICAL_SWITCH_PORT);
+        let mut ports = Vec::new();
+        for (uuid, params) in response.as_object().unwrap().iter() {
+            ports.push(LogicalSwitchPort::from_json(
+                uuid,
+                params
+                    .as_object()
+                    .expect("Should be object")
+                    .get("initial")
+                    .expect("Should contain initial key")
+                    .as_object()
+                    .expect("asd"),
+            ));
+        }
+        ports
+    }
+
     pub fn get_ls(&mut self, name: &str) -> Option<LogicalSwitch> {
         let switches = self.list_ls();
         switches.into_iter().find(|sw| sw.name == name)
+    }
+
+    pub fn get_lsp(&mut self, name: &str) -> Option<LogicalSwitchPort> {
+        let ports = self.list_lsp();
+        ports.into_iter().find(|lsp| lsp.name == name)
     }
 
     pub fn del_ls_by_name(&mut self, name: &str) -> Result<(), Error> {

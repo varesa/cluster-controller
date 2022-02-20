@@ -72,7 +72,10 @@ fn reconcile_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), 
         ResourceExt::namespace(vm).expect("Failed to get VM namespace"),
         nic.name.as_ref().expect("No network name set")
     );
-    ovn.add_lsp(&ls_name, nic.ovn_id.as_ref().unwrap())?;
+    if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_none() {
+        println!("ovn: lsp missing for NIC, creating");
+        ovn.add_lsp(&ls_name, nic.ovn_id.as_ref().unwrap())?;
+    }
     Ok(())
 }
 
@@ -114,15 +117,20 @@ pub async fn create(client: Client) -> Result<(), Error> {
     let vms: Api<VirtualMachine> = Api::all(client.clone());
 
     let context_clone = context.clone();
-
-    // Only one controller can run in this task, so create a second task for the other controller
-    tokio::task::spawn(async {
+    let vm_task = tokio::task::spawn(async {
         panic!(
             "OVN VM-controller task exited: {:?}",
-            create_controller!(vms, reconcile_vm, error_policy, context)
+            create_controller!(vms, reconcile_vm, error_policy, context_clone)
         );
     });
 
-    create_controller!(networks, reconcile_network, error_policy, context_clone);
+    let network_task = tokio::task::spawn(async {
+        panic!(
+            "OVN Network-controller task exited: {:?}",
+            create_controller!(networks, reconcile_network, error_policy, context)
+        );
+    });
+
+    let _ = tokio::try_join!(vm_task, network_task);
     Ok(())
 }

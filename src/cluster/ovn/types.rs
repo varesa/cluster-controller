@@ -18,3 +18,22 @@ impl LogicalSwitch {
         }
     }
 }
+
+pub struct LogicalSwitchPort {
+    pub uuid: String,
+    pub name: String,
+}
+
+impl LogicalSwitchPort {
+    pub fn from_json(uuid: &str, parameters: &Map<String, Value>) -> Self {
+        LogicalSwitchPort {
+            uuid: uuid.to_string(),
+            name: parameters
+                .get("name")
+                .expect("Switch port should have name")
+                .as_str()
+                .expect("Name should be string")
+                .to_string(),
+        }
+    }
+}

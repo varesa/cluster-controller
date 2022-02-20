@@ -44,13 +44,13 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
 
     // Create ceph cluster controller
     let client_clone = client.clone();
-    tokio::task::spawn(async {
+    let ceph_task = tokio::task::spawn(async {
         panic!("Ceph task exited: {:?}", ceph::run(client_clone).await);
     });
 
     // Create libvirt cluster controller
     let client_clone = client.clone();
-    tokio::task::spawn(async {
+    let libvirt_task = tokio::task::spawn(async {
         panic!(
             "Libvirt task exited: {:?}",
             libvirt::run(client_clone).await
@@ -59,11 +59,10 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
 
     // Create libvirt cluster controller
     let client_clone = client.clone();
-    tokio::task::spawn(async {
+    let ovn_task = tokio::task::spawn(async {
         panic!("OVN task exited: {:?}", ovn::run(client_clone).await);
     });
 
-    loop {
-        tokio::time::sleep(Duration::from_secs(10)).await;
-    }
+    let _ = tokio::try_join!(ceph_task, libvirt_task, ovn_task);
+    panic!("One of the controllers exited");
 }
