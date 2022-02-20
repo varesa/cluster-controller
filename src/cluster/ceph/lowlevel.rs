@@ -8,7 +8,7 @@ use librados_sys::{
     rados_shutdown, rados_t,
 };
 
-use librbd_sys::{rbd_create, rbd_list};
+use librbd_sys::{rbd_create, rbd_list, rbd_remove};
 
 use crate::errors::{Error, RadosError};
 
@@ -143,6 +143,18 @@ pub fn create_image(pool: rados_ioctx_t, name: String, size: u64) -> Result<(), 
         call!("rbd_create", rbd_create(pool, name_c, size, &mut 0));
 
         // Take back control and release memory
+        drop(CString::from_raw(name_c));
+    }
+    Ok(())
+}
+
+pub fn remove_image(pool: rados_ioctx_t, name: &str) -> Result<(), Error> {
+    unsafe {
+        let name_c = CString::new(name)
+            .expect("failed to convert to cstring")
+            .into_raw();
+        call!("rbd_delete", rbd_remove(pool, name_c));
+
         drop(CString::from_raw(name_c));
     }
     Ok(())

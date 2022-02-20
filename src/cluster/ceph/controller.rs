@@ -12,13 +12,13 @@ use tokio::time::Duration;
 
 use super::lowlevel;
 use crate::crd::ceph::Volume;
-use crate::create_controller;
 use crate::errors::Error;
 use crate::utils::name_namespaced;
 use crate::{
     api_replace_resource, client_ensure_finalizer, resource_has_finalizer, GROUP_NAME,
     KEYRING_SECRET, NAMESPACE,
 };
+use crate::{client_remove_finalizer, create_controller};
 
 const POOL: &str = "volumes";
 const KEYRING: &str = "client.libvirt";
@@ -47,6 +47,19 @@ fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
 
     lowlevel::close_pool(pool);
     lowlevel::disconnect(cluster);
+    Ok(())
+}
+
+fn ensure_removed(name: &str) -> Result<(), Error> {
+    let cluster = lowlevel::connect()?;
+    let pool = lowlevel::get_pool(cluster, POOL.into())?;
+
+    if lowlevel::get_images(pool)?
+        .iter()
+        .any(|existing_name| existing_name == name)
+    {
+        lowlevel::remove_image(pool, name)?;
+    }
     Ok(())
 }
 
@@ -109,10 +122,10 @@ async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerActi
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
 
     if volume.metadata.deletion_timestamp.is_some() {
-        println!(
-            "Ceph: Volume {} waiting for deletion",
-            &volume.metadata.name.expect("Volume has no name")
-        );
+        println!("Ceph: Volume {name} waiting for deletion");
+        ensure_removed(&name)?;
+        client_remove_finalizer!(ctx.get_ref().client.clone(), Volume, &volume, "ceph");
+        println!("Ceph: Volume {name} deleted");
     } else {
         client_ensure_finalizer!(ctx.get_ref().client.clone(), Volume, &volume, "ceph");
         ensure_exists(name, bytes)?;
