@@ -130,7 +130,7 @@ impl Ovn {
         let ls = self
             .get_ls(name)
             .ok_or_else(|| Error::SwitchNotFound(name.to_string()))?;
-        self.delete_by_uuid(TYPE_LOGICAL_SWITCH, &ls.uuid);
+        self.delete_by_uuid(TYPE_LOGICAL_SWITCH, &ls.uuid());
         Ok(())
     }
 
@@ -151,7 +151,7 @@ impl Ovn {
             "op": "mutate",
             "table": TYPE_LOGICAL_SWITCH,
             "where": [
-                ["_uuid", "==", ["uuid", ls.uuid]]
+                ["_uuid", "==", ["uuid", ls.uuid()]]
             ],
             "mutations": [
                 ["ports", "insert", ["set", [["named-uuid", "new_lsp"]]]]

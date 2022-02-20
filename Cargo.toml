@@ -17,7 +17,7 @@ kube = { version = "0.64.0", features = ["runtime","derive", "jsonpatch"] }
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_21"] }
 
 # serialization
-serde = "1.0.117"
+serde = "1.0.136"
 serde_json = "1.0.61"
 serde_yaml = "0.8.14"
 serde_derive = "1.0.117"

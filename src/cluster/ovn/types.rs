@@ -1,15 +1,39 @@
 use serde::{Deserialize, Serialize};
 
+struct Uuid(Vec<String>);
+
+impl From<Uuid> for String {
+    fn from(uuid: Uuid) -> Self {
+        uuid.0
+            .get(1)
+            .expect("Uuid array should have two elements")
+            .to_string()
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct LogicalSwitch {
-    #[serde(rename = "_uuid")]
-    pub uuid: String,
+    pub _uuid: Vec<String>,
     pub name: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct LogicalSwitchPort {
-    #[serde(rename = "_uuid")]
-    pub uuid: String,
+    pub _uuid: Vec<String>,
     pub name: String,
+}
+
+impl LogicalSwitch {
+    pub fn uuid(&self) -> String {
+        assert_eq!(self._uuid.len(), 2);
+        self._uuid[1].to_string()
+    }
+}
+
+impl LogicalSwitchPort {
+    #[allow(dead_code)]
+    pub fn uuid(&self) -> String {
+        assert_eq!(self._uuid.len(), 2);
+        self._uuid[1].to_string()
+    }
 }
