@@ -70,12 +70,13 @@ async fn get_cluster(ctx: &Context<State>) -> Result<Cluster, ClusterNotFound> {
 
 fn parse_memory(input: &str) -> Result<(usize, String), Error> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r"(\d+)\w*([a-zA-Z]+)").unwrap();
+        static ref RE: Regex = Regex::new(r"(\d+)\s*([a-zA-Z]+)").unwrap();
     }
     let captures = RE.captures(input).unwrap();
+    //println!("{captures:?}");
     Ok((
-        captures.get(0).unwrap().as_str().parse().unwrap(),
-        captures.get(1).unwrap().as_str().to_string(),
+        captures.get(1).unwrap().as_str().parse().unwrap(),
+        captures.get(2).unwrap().as_str().to_string(),
     ))
 }
 
