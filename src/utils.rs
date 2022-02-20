@@ -175,6 +175,15 @@ macro_rules! ok_and_requeue {
     };
 }
 
+#[macro_export]
+macro_rules! ok_no_requeue {
+    () => {
+        Ok(ReconcilerAction {
+            requeue_after: None,
+        })
+    };
+}
+
 pub fn get_version_string() -> String {
     format!("{}-{}", env!("GIT_COUNT"), env!("GIT_HASH"))
 }
