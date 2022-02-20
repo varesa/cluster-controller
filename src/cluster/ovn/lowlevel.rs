@@ -187,4 +187,21 @@ impl Ovn {
         self.transact(&[del_lsp]);
         Ok(())
     }
+
+    pub fn set_lsp_address(&mut self, lsp_id: &str, mac_address: &str) -> Result<(), Error> {
+        let lsp = self
+            .get_lsp(lsp_id)
+            .ok_or_else(|| Error::SwitchPortNotFound(lsp_id.to_string()))?;
+
+        let set_address = json!({
+            "op": "update",
+            "table": "Logical_Switch_Port",
+            "where": [
+                [ "_uuid", "==", [ "uuid", lsp.uuid() ] ]
+            ],
+            "row": { "addresses": mac_address }
+        });
+        self.transact(&[set_address]);
+        Ok(())
+    }
 }

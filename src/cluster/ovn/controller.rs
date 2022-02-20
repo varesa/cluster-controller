@@ -74,7 +74,12 @@ fn connect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), Er
     );
     if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_none() {
         println!("ovn: lsp missing for NIC, creating");
-        ovn.add_lsp(&ls_name, nic.ovn_id.as_ref().unwrap())?;
+        let lsp_id = nic.ovn_id.as_ref().unwrap();
+        ovn.add_lsp(&ls_name, lsp_id)?;
+        ovn.set_lsp_address(
+            lsp_id,
+            nic.mac_address.as_ref().expect("MAC address missing"),
+        )?;
     }
     Ok(())
 }
