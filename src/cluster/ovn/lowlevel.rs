@@ -149,7 +149,7 @@ impl Ovn {
             "row": {
                 "name": lsp_id
             },
-            "uuid-name": "new-lsp"
+            "uuid-name": "new_lsp"
         });
         let add_lsp_to_ls = json!({
             "op": "mutate",
@@ -158,7 +158,7 @@ impl Ovn {
                 ["_uuid", "==", ["uuid", ls.uuid]]
             ],
             "mutations": [
-                ["ports", "insert", ["set", [["named-uuid", "new-lsp"]]]]
+                ["ports", "insert", ["set", [["named-uuid", "new_lsp"]]]]
             ]
         });
         self.transact(&[add_lsp, add_lsp_to_ls]);
