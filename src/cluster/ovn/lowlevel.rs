@@ -48,7 +48,7 @@ impl Ovn {
                 if result[2].as_object().unwrap().contains_key(object_type) {
                     result[2][object_type].clone()
                 } else {
-                    Value::Array(Vec::new())
+                    Value::Object(Map::new())
                 }
             }
             _ => panic!("Didn't get response"),
