@@ -78,10 +78,7 @@ async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<Reconc
     let name = name_namespaced(&vm);
 
     if vm.metadata.deletion_timestamp.is_some() {
-        println!(
-            "libvirt: VM {} waiting for deletion by host controller",
-            name
-        );
+        println!("libvirt: VM {} waiting for deletion", name);
         return ok_and_requeue!(600);
     }
 

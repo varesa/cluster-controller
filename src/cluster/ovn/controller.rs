@@ -113,7 +113,7 @@ async fn reconcile_vm(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconci
             println!("ovn: disconnecting NIC {index} for VM {name}");
             disconnect_vm_nic(&vm, nic)?;
         }
-
+        client_remove_finalizer!(client, VirtualMachine, &vm, "ovn");
         ok_no_requeue!()
     } else {
         println!("ovn: VM {name} updated");
