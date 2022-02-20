@@ -1,17 +1,21 @@
-use k8s_openapi::api::core::v1::Secret;
-use kube::{Client, api::{Api, ListParams, ResourceExt, Patch, PatchParams, PostParams}, error::ErrorResponse};
-use kube::runtime::controller::{Context, Controller, ReconcilerAction};
-use tokio::time::Duration;
 use futures::StreamExt;
 use humanize_rs::bytes::Bytes;
+use k8s_openapi::api::core::v1::Secret;
+use kube::runtime::controller::{Context, Controller, ReconcilerAction};
+use kube::{
+    api::{Api, ListParams, Patch, PatchParams, PostParams, ResourceExt},
+    error::ErrorResponse,
+    Client,
+};
 use serde_json::json;
+use tokio::time::Duration;
 
-use crate::{GROUP_NAME, NAMESPACE, KEYRING_SECRET};
-use crate::errors::Error;
-use crate::crd::ceph::Volume;
 use super::lowlevel;
-use crate::utils::name_namespaced;
+use crate::crd::ceph::Volume;
 use crate::create_controller;
+use crate::errors::Error;
+use crate::utils::name_namespaced;
+use crate::{client_ensure_finalizer, GROUP_NAME, KEYRING_SECRET, NAMESPACE};
 
 const POOL: &str = "volumes";
 const KEYRING: &str = "client.libvirt";
@@ -27,7 +31,6 @@ struct State {
 fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
     let cluster = lowlevel::connect()?;
     let pool = lowlevel::get_pool(cluster, POOL.into())?;
-    
 
     lowlevel::get_images(pool)?
         .iter()
@@ -41,34 +44,6 @@ fn ensure_exists(name: String, size: u64) -> Result<(), Error> {
 
     lowlevel::close_pool(pool);
     lowlevel::disconnect(cluster);
-    Ok(())
-}
-
-/// Ensure that all the volumes have finalizers so that we will be
-/// notified in case a volume is marked for deletion from the API
-async fn ensure_finalizers(client: Client, volume: &Volume) -> Result<(), Error> {
-    let volume_name = ResourceExt::name(volume);
-    let finalizer_name = format!("{}/ceph", GROUP_NAME);
-    let namespace = ResourceExt::namespace(volume).expect("Unable to get namespace");
-    let volumes: Api<Volume> = Api::namespaced(client.clone(), &namespace);
-
-    if volume.metadata.finalizers.as_ref().and_then(
-        |finalizers| finalizers.iter().find(|&finalizer| finalizer == &finalizer_name)
-    ).is_some() {
-        return Ok(())
-    }
-
-    let mut new_vol = volume.to_owned();
-    if let Some(finalizers) = new_vol.metadata.finalizers.as_mut() {
-        finalizers.push(finalizer_name);
-    } else {
-        new_vol.metadata.finalizers = Some(vec![finalizer_name]);
-    }
-    volumes.replace(
-        &volume_name,
-        &PostParams::default(),
-        &new_vol,
-    ).await?;
     Ok(())
 }
 
@@ -95,7 +70,13 @@ async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error>
             "key": secret
         }
     }))?;
-    secrets.patch(KEYRING_SECRET, &PatchParams::apply("ceph-controller-cluster"), &Patch::Apply(&secret)).await?;
+    secrets
+        .patch(
+            KEYRING_SECRET,
+            &PatchParams::apply("ceph-controller-cluster"),
+            &Patch::Apply(&secret),
+        )
+        .await?;
     Ok(())
 }
 
@@ -107,19 +88,16 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
         Ok(_) => {
             println!("Ceph: Keyring secret exists");
             Ok(())
-        },
+        }
         Err(kube::Error::Api(ErrorResponse { code: 404, .. })) => {
             println!("Ceph: Keyring missing");
             let key = get_ceph_keyring()?;
             create_ceph_secret(client.clone(), key).await?;
             println!("Ceph: Keyring saved");
             Ok(())
-        },
-        Err(e) => {
-            Err(e.into())
-        },
+        }
+        Err(e) => Err(e.into()),
     }
-
 }
 
 /// Handle updates to volumes in the cluster
@@ -128,9 +106,12 @@ async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerActi
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
 
     if volume.metadata.deletion_timestamp.is_some() {
-        println!("Ceph: Volume {} waiting for deletion", &volume.metadata.name.expect("Volume has no name"));
+        println!(
+            "Ceph: Volume {} waiting for deletion",
+            &volume.metadata.name.expect("Volume has no name")
+        );
     } else {
-        ensure_finalizers(ctx.get_ref().client.clone(), &volume).await?;
+        client_ensure_finalizer!(ctx.get_ref().client.clone(), Volume, &volume, "ceph");
         ensure_exists(name, bytes)?;
     }
 
@@ -147,7 +128,9 @@ fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
 
 pub async fn create(client: Client) -> Result<(), Error> {
     ensure_keyring(client.clone()).await?;
-    let context = Context::new(State { client: client.clone() });
+    let context = Context::new(State {
+        client: client.clone(),
+    });
     let volumes: Api<Volume> = Api::all(client.clone());
     println!("Ceph: Starting controller");
     create_controller!(volumes, reconcile, error_policy, context);

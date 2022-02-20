@@ -91,6 +91,60 @@ macro_rules! create_set_status {
     }
 }
 
+#[macro_export]
+macro_rules! api_replace_resource {
+    ($api:ident, $resource_type:ident, $resource:ident) => {
+        $api.replace(
+            &ResourceExt::name($resource),
+            &PostParams::default(),
+            $resource,
+        )
+        .await?;
+    };
+}
+
+#[macro_export]
+macro_rules! client_replace_resource {
+    ($client:ident, $resource_type:ident, $resource:ident) => {
+        let api: Api<$resource_type> = Api::namespaced(
+            $client.clone(),
+            &ResourceExt::namespace($resource).expect("get resource namespace"),
+        );
+        api_replace_resource!(api, $resource_type, $resource);
+    };
+}
+
+#[macro_export]
+macro_rules! client_ensure_finalizer {
+    ($client:expr, $resource_type:ident, $resource:expr, $controller_name:expr) => {
+        let resource_name = ResourceExt::name($resource);
+        let finalizer_name = format!("{}/{}", GROUP_NAME, $controller_name);
+        let namespace = ResourceExt::namespace($resource).expect("Unable to get namespace");
+        let api: Api<$resource_type> = Api::namespaced($client.clone(), &namespace);
+
+        if $resource
+            .metadata
+            .finalizers
+            .as_ref()
+            .and_then(|finalizers| {
+                finalizers
+                    .iter()
+                    .find(|&finalizer| finalizer == &finalizer_name)
+            })
+            .is_none()
+        {
+            let mut new_resource = $resource.to_owned();
+            if let Some(finalizers) = new_resource.metadata.finalizers.as_mut() {
+                finalizers.push(finalizer_name);
+            } else {
+                new_resource.metadata.finalizers = Some(vec![finalizer_name]);
+            }
+            api.replace(&resource_name, &PostParams::default(), &new_resource)
+                .await?;
+        }
+    };
+}
+
 pub fn get_version_string() -> String {
     format!("{}-{}", env!("GIT_COUNT"), env!("GIT_HASH"))
 }

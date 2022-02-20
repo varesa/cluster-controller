@@ -12,7 +12,7 @@ use crate::cluster::libvirt::utils::generate_mac_address;
 use crate::crd::libvirt::{VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
-use crate::{create_controller, create_set_status};
+use crate::{api_replace_resource, client_replace_resource, create_controller, create_set_status};
 use uuid::Uuid;
 
 /// State available for the reconcile and error_policy functions
@@ -52,12 +52,7 @@ async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
             );
         }
     }
-    let vms: Api<VirtualMachine> = Api::namespaced(
-        client,
-        &ResourceExt::namespace(vm).expect("get VM namespace"),
-    );
-    vms.replace(&ResourceExt::name(vm), &PostParams::default(), vm)
-        .await?;
+    client_replace_resource!(client, VirtualMachine, vm);
     Ok(())
 }
 
@@ -69,12 +64,7 @@ async fn fill_uuid(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
                 .encode_lower(&mut Uuid::encode_buffer())
                 .into(),
         );
-        let vms: Api<VirtualMachine> = Api::namespaced(
-            client,
-            &ResourceExt::namespace(vm).expect("get VM namespace"),
-        );
-        vms.replace(&ResourceExt::name(vm), &PostParams::default(), vm)
-            .await?;
+        client_replace_resource!(client, VirtualMachine, vm);
     }
     Ok(())
 }

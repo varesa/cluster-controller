@@ -33,7 +33,7 @@ pub struct NetworkSpec {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct NetworkStatus {
-    is_created: bool,
+    pub is_created: bool,
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
