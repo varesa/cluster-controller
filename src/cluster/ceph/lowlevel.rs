@@ -8,7 +8,9 @@ use librados_sys::{
     rados_shutdown, rados_t,
 };
 
-use librbd_sys::{rbd_create, rbd_list, rbd_remove};
+use librbd_sys::{
+    rbd_clone, rbd_close, rbd_create, rbd_get_features, rbd_image_t, rbd_list, rbd_open, rbd_remove,
+};
 
 use crate::errors::{Error, RadosError};
 
@@ -25,23 +27,35 @@ macro_rules! call {
     };
 }
 
+macro_rules! create_cstring {
+    ([
+        $(($name:ident, $value:expr)),+
+    ]) => {
+        $(
+            let $name = CString::new($value).expect(&format!("Failed to create CString {}", stringify!($name))).into_raw();
+        )+
+    };
+}
+
+macro_rules! drop_cstring {
+    ([$($name:ident),+]) => {
+        $(
+        drop(CString::from_raw($name));
+        )+
+    }
+}
+
 pub fn connect() -> Result<rados_t, Error> {
     unsafe {
         let mut cluster: rados_t = 0 as rados_t;
 
         // Must be returned and freed at the end
-        let user_c = CString::new("admin")
-            .expect("Failed to create CString")
-            .into_raw();
-        let opt_keyring_c = CString::new("keyring")
-            .expect("Failed to create CString")
-            .into_raw();
-        let keyring_c = CString::new("/etc/ceph/ceph.client.admin.keyring")
-            .expect("Failed to create CString")
-            .into_raw();
-        let conf_c = CString::new("/etc/ceph/ceph.conf")
-            .expect("Failed to create CString")
-            .into_raw();
+        create_cstring!([
+            (user_c, "admin"),
+            (opt_keyring_c, "keyring"),
+            (keyring_c, "/etc/ceph/ceph.client.admin.keyring"),
+            (conf_c, "/etc/ceph/ceph.conf")
+        ]);
 
         call!("rados_create", rados_create(&mut cluster, user_c));
         call!(
@@ -54,11 +68,7 @@ pub fn connect() -> Result<rados_t, Error> {
         );
         call!("rados_conect", rados_connect(cluster));
 
-        // Return control to rust for freeing the memory
-        drop(CString::from_raw(user_c));
-        drop(CString::from_raw(opt_keyring_c));
-        drop(CString::from_raw(keyring_c));
-        drop(CString::from_raw(conf_c));
+        drop_cstring!([user_c, opt_keyring_c, keyring_c, conf_c]);
         Ok(cluster)
     }
 }
@@ -69,7 +79,7 @@ pub fn disconnect(cluster: rados_t) {
     }
 }
 
-fn null_separeted_to_vec(null_separated_list: Vec<u8>) -> Vec<String> {
+fn null_separated_to_vec(null_separated_list: Vec<u8>) -> Vec<String> {
     let mut result = Vec::new();
     for item in null_separated_list.split(|c| *c == 0) {
         if item.is_empty() {
@@ -90,7 +100,7 @@ pub fn get_pools(cluster: rados_t) -> Result<Vec<String>, Error> {
             rados_pool_list(cluster, buffer.as_mut_ptr() as *mut i8, buffer_len)
         );
     }
-    let pools = null_separeted_to_vec(buffer);
+    let pools = null_separated_to_vec(buffer);
     Ok(pools)
 }
 
@@ -131,7 +141,7 @@ pub fn get_images(pool: rados_ioctx_t) -> Result<Vec<String>, Error> {
         );
     }
 
-    let images = null_separeted_to_vec(buffer);
+    let images = null_separated_to_vec(buffer);
     Ok(images)
 }
 
@@ -144,6 +154,56 @@ pub fn create_image(pool: rados_ioctx_t, name: &str, size: u64) -> Result<(), Er
 
         // Take back control and release memory
         drop(CString::from_raw(name_c));
+    }
+    Ok(())
+}
+
+pub fn get_features(pool: rados_ioctx_t, name: &str, snapshot: &str) -> Result<u64, Error> {
+    let mut features: u64 = 0;
+    unsafe {
+        create_cstring!([(name_c, name), (snapshot_c, snapshot)]);
+
+        let mut image: rbd_image_t = 0 as rbd_image_t;
+        call!("rbd_open", rbd_open(pool, name_c, &mut image, snapshot_c));
+
+        call!("rbd_get_features", rbd_get_features(image, &mut features));
+
+        call!("rbd_close", rbd_close(image));
+        drop_cstring!([name_c, snapshot_c]);
+    }
+
+    Ok(features)
+}
+
+pub fn clone_image(
+    pool: rados_ioctx_t,
+    name: &str,
+    _size: u64,
+    template_pool: rados_ioctx_t,
+    template_name: &str,
+) -> Result<(), Error> {
+    unsafe {
+        create_cstring!([
+            (name_c, name),
+            (template_name_c, template_name),
+            (snapshot_name_c, "default")
+        ]);
+
+        let features = get_features(template_pool, template_name, "default")?;
+
+        call!(
+            "rbd_clone",
+            rbd_clone(
+                template_pool,
+                template_name_c,
+                snapshot_name_c,
+                pool,
+                name_c,
+                features,
+                &mut 0
+            )
+        );
+        drop_cstring!([name_c, template_name_c, snapshot_name_c]);
     }
     Ok(())
 }

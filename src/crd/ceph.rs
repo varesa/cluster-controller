@@ -1,18 +1,10 @@
-use k8s_openapi::{
-    apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
-};
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
-    api::{
-        Patch,
-        PatchParams,
-    },
-    Api,
-    Client,
-    CustomResource,
-    CustomResourceExt,
+    api::{Patch, PatchParams},
+    Api, Client, CustomResource, CustomResourceExt,
 };
-use serde::{Deserialize, Serialize};
 use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use crate::errors::Error;
 use crate::utils::wait_crd_ready;
@@ -32,11 +24,12 @@ const CRD_NAME: &str = "volumes.cluster-virt.acl.fi";
     derive = "PartialEq",
     derive = "Default",
     shortname = "v",
-    namespaced,
+    namespaced
 )]
 pub struct VolumeSpec {
     // String to allow suffixes like '1 Gi'
     pub size: String,
+    pub template: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -49,8 +42,8 @@ pub async fn create(client: Client) -> Result<(), Error> {
     let patch_params = PatchParams::apply("cluster-manager.ceph").force();
 
     let crd = Volume::crd();
-    //println!("Creating CRD: {}", serde_json::to_string_pretty(&crd).expect("Failed to convert CRD to JSON"));
-    crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&crd)).await?;
+    crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&crd))
+        .await?;
     wait_crd_ready(&crds, CRD_NAME).await?;
     Ok(())
 }
