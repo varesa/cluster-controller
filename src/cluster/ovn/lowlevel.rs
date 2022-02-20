@@ -101,9 +101,7 @@ impl Ovn {
         let response = self.list_objects(TYPE_LOGICAL_SWITCH);
         let mut switches = Vec::new();
         for row in response {
-            switches.push(LogicalSwitch::from_json(
-                row.as_object().expect("row should be an object"),
-            ));
+            switches.push(serde_json::from_value(row).expect("LS deserialization failure"));
         }
 
         switches
@@ -113,9 +111,7 @@ impl Ovn {
         let response = self.list_objects(TYPE_LOGICAL_SWITCH_PORT);
         let mut ports = Vec::new();
         for row in response {
-            ports.push(LogicalSwitchPort::from_json(
-                row.as_object().expect("row should be an object"),
-            ));
+            ports.push(serde_json::from_value(row).expect("LSP deserialization failure"));
         }
         ports
     }
