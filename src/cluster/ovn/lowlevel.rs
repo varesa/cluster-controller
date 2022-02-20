@@ -47,8 +47,8 @@ impl Ovn {
         let objects = match response {
             Message::Response { error, result, .. } => {
                 assert!(error.is_null());
-                if result[2].as_object().unwrap().contains_key(object_type) {
-                    result[2][object_type].clone()
+                if result.as_object().unwrap().contains_key(object_type) {
+                    result[object_type].clone()
                 } else {
                     Value::Object(Map::new())
                 }
