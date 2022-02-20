@@ -26,12 +26,9 @@ create_set_status!(Network, NetworkStatus);
 
 fn ensure_exists(name: &str) {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
-    if ovn.get_ls(name).is_some() {
-        println!("ovn: Sw {name} exists, OK");
-    } else {
+    if ovn.get_ls(name).is_none() {
         println!("ovn: Sw {name} doesn't exist, creating");
         ovn.add_ls(name);
-        println!("ovn: Sw {name} created, OK");
     }
 }
 
@@ -50,10 +47,12 @@ async fn reconcile(network: Network, ctx: Context<State>) -> Result<ReconcilerAc
         println!("ovn: Network {} waiting for deletion", name);
         delete(&name)?;
         client_remove_finalizer!(client, Network, &network, "ovn");
+        println!("ovn: Network {} deleted", name);
     } else {
-        println!("ovn: updated: {name}");
+        println!("ovn: update for {name}");
         client_ensure_finalizer!(client, Network, &network, "ovn");
         ensure_exists(&name);
+        println!("ovn: update for {name} successful");
 
         let status = NetworkStatus { is_created: true };
         set_status(&network, status, client.clone()).await?;
