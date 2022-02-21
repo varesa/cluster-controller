@@ -199,7 +199,7 @@ impl Ovn {
             "where": [
                 [ "_uuid", "==", [ "uuid", lsp.uuid() ] ]
             ],
-            "row": { "addresses": mac_address }
+            "row": { "addresses": format!("{mac_address} dynamic") }
         });
         self.transact(&[set_address]);
         Ok(())

@@ -14,6 +14,15 @@ pub struct Quantity(String);
 
 const CRD_NAME: &str = "networks.cluster-virt.acl.fi";
 
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+pub struct DhcpOptions {
+    cidr: String,
+    lease_time: Option<String>,
+    dns_server: Option<String>,
+    domain_name: Option<String>,
+    router: Option<String>,
+}
+
 #[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
 #[kube(
     apiextensions = "v1",
@@ -27,8 +36,7 @@ const CRD_NAME: &str = "networks.cluster-virt.acl.fi";
     namespaced
 )]
 pub struct NetworkSpec {
-    // String to allow suffixes like '1 Gi'
-//pub size: String,
+    dhcp: Option<DhcpOptions>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
