@@ -3,7 +3,10 @@ kind: Network
 metadata:
   name: testneta
   namespace: test2
-spec: {}
+spec: 
+  dhcp:
+    cidr: 172.16.0.0/24
+
 ---
 apiVersion: cluster-virt.acl.fi/v1beta
 kind: Network
