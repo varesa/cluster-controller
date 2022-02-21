@@ -235,7 +235,8 @@ impl Ovn {
 
         let options = json!([
             ["server_id", format!("{prefix}1")],
-            ["server_mac", "c0:ff:ee:00:00:01"]
+            ["server_mac", "c0:ff:ee:00:00:01"],
+            ["lease_time", "3600"]
         ]);
 
         let set_options = json!({
