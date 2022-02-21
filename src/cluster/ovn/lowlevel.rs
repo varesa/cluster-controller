@@ -1,14 +1,36 @@
 use super::jsonrpc::{JsonRpcConnection, Message};
 use crate::cluster::ovn::jsonrpc::Params;
-use crate::cluster::ovn::types::{LogicalSwitch, LogicalSwitchPort};
+use crate::cluster::ovn::types::{DhcpOptions, LogicalSwitch, LogicalSwitchPort};
+use crate::crd::ovn::DhcpOptions as DhcpOptionsCrd;
 use crate::Error;
 use serde_json::{json, Map, Value};
 
 const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
 const TYPE_LOGICAL_SWITCH_PORT: &str = "Logical_Switch_Port";
+const TYPE_DHCP_OPTIONS: &str = "DHCP_Options";
 
 pub struct Ovn {
     connection: JsonRpcConnection,
+}
+
+macro_rules! generate_list_fn {
+    ($name:ident, $type:ident, $type_name:ident) => {
+        pub fn $name(&mut self) -> Vec<$type> {
+            let response = self.list_objects($type_name);
+            let mut objects = Vec::new();
+            for row in response {
+                objects.push(serde_json::from_value(row).expect("LSP deserialization failure"));
+            }
+            objects
+        }
+    };
+}
+
+fn split_cidr(cidr: &str) -> (String, String) {
+    let mut split = cidr.split('/');
+    let prefix = split.next().unwrap().to_string();
+    let length = split.next().unwrap().to_string();
+    (prefix, length)
 }
 
 impl Ovn {
@@ -97,24 +119,9 @@ impl Ovn {
         self.insert(TYPE_LOGICAL_SWITCH, params);
     }
 
-    pub fn list_ls(&mut self) -> Vec<LogicalSwitch> {
-        let response = self.list_objects(TYPE_LOGICAL_SWITCH);
-        let mut switches = Vec::new();
-        for row in response {
-            switches.push(serde_json::from_value(row).expect("LS deserialization failure"));
-        }
-
-        switches
-    }
-
-    pub fn list_lsp(&mut self) -> Vec<LogicalSwitchPort> {
-        let response = self.list_objects(TYPE_LOGICAL_SWITCH_PORT);
-        let mut ports = Vec::new();
-        for row in response {
-            ports.push(serde_json::from_value(row).expect("LSP deserialization failure"));
-        }
-        ports
-    }
+    generate_list_fn!(list_ls, LogicalSwitch, TYPE_LOGICAL_SWITCH);
+    generate_list_fn!(list_lsp, LogicalSwitchPort, TYPE_LOGICAL_SWITCH_PORT);
+    generate_list_fn!(list_dhcp_options, DhcpOptions, TYPE_DHCP_OPTIONS);
 
     pub fn get_ls(&mut self, name: &str) -> Option<LogicalSwitch> {
         let switches = self.list_ls();
@@ -124,6 +131,13 @@ impl Ovn {
     pub fn get_lsp(&mut self, name: &str) -> Option<LogicalSwitchPort> {
         let ports = self.list_lsp();
         ports.into_iter().find(|lsp| lsp.name == name)
+    }
+
+    pub fn get_dhcp_options(&mut self, cidr: &str) -> Option<DhcpOptions> {
+        let option_sets = self.list_dhcp_options();
+        option_sets
+            .into_iter()
+            .find(|option_set| option_set.cidr == cidr)
     }
 
     pub fn del_ls_by_name(&mut self, name: &str) -> Result<(), Error> {
@@ -202,6 +216,66 @@ impl Ovn {
             "row": { "addresses": format!("{mac_address} dynamic") }
         });
         self.transact(&[set_address]);
+        Ok(())
+    }
+
+    pub fn create_dhcp_option_set(&mut self, dhcp_options: &DhcpOptionsCrd) -> Result<(), Error> {
+        let cidr = dhcp_options.cidr.clone();
+        let (prefix, _prefix_length) = split_cidr(&cidr);
+        let create_options = json!({
+            "op": "insert",
+            "table": "DHCP_Options",
+            "row": {"cidr": cidr},
+            "named-uuid": "new_dhcp_options"
+        });
+
+        let options = json!([
+            ["server_id", format!("{prefix}1")],
+            ["server_mac", "c0:ff:ee:00:00:01"]
+        ]);
+
+        let set_options = json!({
+            "op": "update",
+            "table": "DHCP_Options",
+            "where": [["_uuid", "==", ["named-uuid", "new_dhcp_options"]]],
+            "row": {"options": ["map", options]}
+        });
+        self.transact(&[create_options, set_options]);
+        Ok(())
+    }
+
+    pub fn set_ls_cidr(&mut self, ls_name: &str, cidr: &str) -> Result<(), Error> {
+        let ls = self
+            .get_ls(ls_name)
+            .ok_or_else(|| Error::SwitchNotFound(ls_name.to_string()))?;
+
+        let set_cidr = json!({
+            "op": "update",
+            "table": "Logical_Switch",
+            "where": [["_uuid", "==", ["uuid", ls.uuid()]]],
+            "row": {"other_config": ["map", [["subnet", cidr]]]}
+        });
+        self.transact(&[set_cidr]);
+        Ok(())
+    }
+
+    pub fn set_lsp_dhcp_options(&mut self, lsp_id: &str, cidr: &str) -> Result<(), Error> {
+        let lsp = self
+            .get_lsp(lsp_id)
+            .ok_or_else(|| Error::SwitchPortNotFound(lsp_id.to_string()))?;
+
+        let dhcp_options = self
+            .get_dhcp_options(cidr)
+            .ok_or_else(|| Error::DhcpOptionsNotFound(cidr.to_string()))?;
+
+        let set_dhcp_options = json!({
+            "op": "update",
+            "table": "Logical_Switch_Port",
+            "where": [["_uuid", "==", ["uuid", lsp.uuid()]]],
+            "row": {"dhcpv4_options":["uuid", dhcp_options.uuid()]}
+        });
+
+        self.transact(&[set_dhcp_options]);
         Ok(())
     }
 }

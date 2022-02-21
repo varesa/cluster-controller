@@ -23,6 +23,12 @@ pub struct LogicalSwitchPort {
     pub name: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct DhcpOptions {
+    pub _uuid: Vec<String>,
+    pub cidr: String,
+}
+
 impl LogicalSwitch {
     pub fn uuid(&self) -> String {
         assert_eq!(self._uuid.len(), 2);
@@ -32,6 +38,13 @@ impl LogicalSwitch {
 
 impl LogicalSwitchPort {
     #[allow(dead_code)]
+    pub fn uuid(&self) -> String {
+        assert_eq!(self._uuid.len(), 2);
+        self._uuid[1].to_string()
+    }
+}
+
+impl DhcpOptions {
     pub fn uuid(&self) -> String {
         assert_eq!(self._uuid.len(), 2);
         self._uuid[1].to_string()
