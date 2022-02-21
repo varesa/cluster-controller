@@ -230,7 +230,7 @@ impl Ovn {
             "op": "insert",
             "table": "DHCP_Options",
             "row": {"cidr": cidr},
-            "named-uuid": "new_dhcp_options"
+            "uuid-name": "new_dhcp_options"
         });
 
         let options = json!([
