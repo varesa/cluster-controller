@@ -77,11 +77,15 @@ impl Ovn {
     }
 
     fn list_objects(&mut self, object_type: &str) -> Vec<Value> {
+        let columns = match object_type {
+            TYPE_DHCP_OPTIONS => json!(["_uuid", "cidr"]),
+            _ => json!(["_uuid", "name"]),
+        };
         let select = json!({
             "op": "select",
             "table": object_type,
             "where": [],
-            "columns": ["_uuid", "name"]
+            "columns": columns
         });
         self.transact(&[select])[0]
             .as_object()
