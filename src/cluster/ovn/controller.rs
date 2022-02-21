@@ -37,8 +37,8 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
     if ovn.get_dhcp_options(&dhcp.cidr).is_none() {
         ovn.create_dhcp_option_set(dhcp)?;
-        ovn.set_ls_cidr(name, &dhcp.cidr)?;
     }
+    ovn.set_ls_cidr(name, &dhcp.cidr)?;
     Ok(())
 }
 
