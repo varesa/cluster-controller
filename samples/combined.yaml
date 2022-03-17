@@ -6,6 +6,8 @@ metadata:
 spec: 
   dhcp:
     cidr: 172.16.0.0/24
+    router: 172.16.0.1
+    lease_time: "3600"
 
 ---
 apiVersion: cluster-virt.acl.fi/v1beta
