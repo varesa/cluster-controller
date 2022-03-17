@@ -237,6 +237,7 @@ impl Ovn {
 
     pub fn set_dhcp_option_set_options(&mut self, dhcp_options: &DhcpOptionsCrd) -> Result<(), Error> {
         let cidr = dhcp_options.cidr.clone();
+        let option_set = self.get_dhcp_options(&cidr).ok_or_else(|| Error::DhcpOptionsNotFound(cidr.to_string()))?;
 
         let (prefix, _prefix_length) = split_cidr(&cidr);
         let mut options = vec![
@@ -259,7 +260,7 @@ impl Ovn {
         let set_options = json!({
             "op": "update",
             "table": "DHCP_Options",
-            "where": [["_uuid", "==", ["named-uuid", "new_dhcp_options"]]],
+            "where": [["_uuid", "==", ["uuid", option_set.uuid()]]],
             "row": {"options": ["map", options]}
         });
         self.transact(&[set_options]);
