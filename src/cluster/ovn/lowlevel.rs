@@ -249,16 +249,12 @@ impl Ovn {
             ($source:ident, $destination:ident, [$($name:ident),+]) => {
                 $(
                 if let Some(value) = $source.$name.clone() {
-                    $destination.push([String::from(stringify!($name)), value]);
+                    $destination.push([String::from(stringify!($name)), value.to_string()]);
                 }
                 )+
             }
         }
         push_dhcp_opts!(dhcp_options, options, [lease_time, dns_server, domain_name, router]);
-
-        if let Some(lease_time) = dhcp_options.lease_time.clone() {
-            options.push([String::from("lease_time"), lease_time]);
-        }
 
         let set_options = json!({
             "op": "update",
