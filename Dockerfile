@@ -3,13 +3,13 @@
 FROM docker.io/library/rust:latest as builder
 
 WORKDIR /usr/src/cluster-controller
-COPY Cargo.toml Cargo.lock build.rs .
 
 RUN apt-get update && \
     apt-get install -y librados-dev librbd-dev libvirt-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Only install dependencies
+COPY Cargo.toml Cargo.lock build.rs .
 RUN mkdir src && \
     echo "fn main() {}" >> src/main.rs && \
     cargo build --release
