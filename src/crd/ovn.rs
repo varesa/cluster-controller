@@ -16,11 +16,11 @@ const CRD_NAME: &str = "networks.cluster-virt.acl.fi";
 
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
 pub struct DhcpOptions {
-    pub(crate) cidr: String,
-    lease_time: Option<String>,
-    dns_server: Option<String>,
-    domain_name: Option<String>,
-    router: Option<String>,
+    pub cidr: String,
+    pub lease_time: Option<String>,
+    pub dns_server: Option<String>,
+    pub domain_name: Option<String>,
+    pub router: Option<String>,
 }
 
 #[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]

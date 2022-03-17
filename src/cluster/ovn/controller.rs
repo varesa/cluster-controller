@@ -38,6 +38,8 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
     if ovn.get_dhcp_options(&dhcp.cidr).is_none() {
         ovn.create_dhcp_option_set(dhcp)?;
     }
+    // Lazily try to always update, effectively noop if current value are already correct
+    ovn.set_dhcp_option_set_options(dhcp)?;
     ovn.set_ls_cidr(name, &dhcp.cidr)?;
     Ok(())
 }

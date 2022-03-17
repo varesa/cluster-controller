@@ -225,19 +225,40 @@ impl Ovn {
 
     pub fn create_dhcp_option_set(&mut self, dhcp_options: &DhcpOptionsCrd) -> Result<(), Error> {
         let cidr = dhcp_options.cidr.clone();
-        let (prefix, _prefix_length) = split_cidr(&cidr);
         let create_options = json!({
             "op": "insert",
             "table": "DHCP_Options",
             "row": {"cidr": cidr},
             "uuid-name": "new_dhcp_options"
         });
+        self.transact(&[create_options]);
+        Ok(())
+    }
 
-        let options = json!([
-            ["server_id", format!("{prefix}2")],
-            ["server_mac", "c0:ff:ee:00:00:01"],
-            ["lease_time", "3600"]
-        ]);
+    pub fn set_dhcp_option_set_options(&mut self, dhcp_options: &DhcpOptionsCrd) -> Result<(), Error> {
+        let cidr = dhcp_options.cidr.clone();
+
+        let (prefix, _prefix_length) = split_cidr(&cidr);
+        let mut options = vec![
+            [String::from("server_id"), format!("{prefix}2")],
+            [String::from("server_mac"), String::from("c0:ff:ee:00:00:01")],
+        ];
+
+        // Copy values from CRD to above vector 
+        macro_rules! push_dhcp_opts {
+            ($source:ident, $destination:ident, [$($name:ident),+]) => {
+                $(
+                if let Some(value) = $source.$name.clone() {
+                    $destination.push([String::from(stringify!($name)), value]);
+                }
+                )+
+            }
+        }
+        push_dhcp_opts!(dhcp_options, options, [lease_time, dns_server, domain_name, router]);
+
+        if let Some(lease_time) = dhcp_options.lease_time.clone() {
+            options.push([String::from("lease_time"), lease_time]);
+        }
 
         let set_options = json!({
             "op": "update",
@@ -245,8 +266,9 @@ impl Ovn {
             "where": [["_uuid", "==", ["named-uuid", "new_dhcp_options"]]],
             "row": {"options": ["map", options]}
         });
-        self.transact(&[create_options, set_options]);
+        self.transact(&[set_options]);
         Ok(())
+
     }
 
     pub fn set_ls_cidr(&mut self, ls_name: &str, cidr: &str) -> Result<(), Error> {
