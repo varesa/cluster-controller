@@ -71,9 +71,11 @@ pub enum Error {
     #[error("JSON error {0}")]
     Json(#[from] serde_json::Error),
     #[error("Error parsing value: {0}")]
-    Parse(#[from] humanize_rs::ParseError),
+    ParseHumanize(#[from] humanize_rs::ParseError),
     #[error("Error rendering template: {0}")]
     Template(#[from] askama::Error),
+    #[error("Error parsing CIDR: {0}")]
+    ParseNetwork(#[from] ipnet::AddrParseError),
 
     // Custom/generic
     #[error("Timed out waiting for operation: {0}")]

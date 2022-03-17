@@ -1,9 +1,12 @@
+use std::net::IpAddr;
+
 use super::jsonrpc::{JsonRpcConnection, Message};
 use crate::cluster::ovn::jsonrpc::Params;
 use crate::cluster::ovn::types::{DhcpOptions, LogicalSwitch, LogicalSwitchPort};
 use crate::crd::ovn::DhcpOptions as DhcpOptionsCrd;
 use crate::Error;
 use serde_json::{json, Map, Value};
+use ipnet::IpNet;
 
 const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
 const TYPE_LOGICAL_SWITCH_PORT: &str = "Logical_Switch_Port";
@@ -24,13 +27,6 @@ macro_rules! generate_list_fn {
             objects
         }
     };
-}
-
-fn split_cidr(cidr: &str) -> (String, String) {
-    let mut split = cidr.split('/');
-    let prefix = split.next().unwrap().to_string();
-    let length = split.next().unwrap().to_string();
-    (prefix, length)
 }
 
 impl Ovn {
@@ -239,9 +235,10 @@ impl Ovn {
         let cidr = dhcp_options.cidr.clone();
         let option_set = self.get_dhcp_options(&cidr).ok_or_else(|| Error::DhcpOptionsNotFound(cidr.to_string()))?;
 
-        let (prefix, _prefix_length) = split_cidr(&cidr);
+        let net: IpNet = cidr.parse()?;
+        let hosts: Vec<IpAddr> = net.hosts().collect();
         let mut options = vec![
-            [String::from("server_id"), format!("{prefix}2")],
+            [String::from("server_id"), hosts[1].to_string()],
             [String::from("server_mac"), String::from("c0:ff:ee:00:00:01")],
         ];
 
