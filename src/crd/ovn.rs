@@ -12,7 +12,8 @@ use crate::utils::wait_crd_ready;
 #[derive(Debug, PartialEq, Clone, JsonSchema, Serialize, Deserialize, Default)]
 pub struct Quantity(String);
 
-const CRD_NAME: &str = "networks.cluster-virt.acl.fi";
+const NETWORK_CRD_NAME: &str = "networks.cluster-virt.acl.fi";
+const ROUTER_CRD_NAME: &str = "routers.cluster-virt.acl.fi";
 
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
 pub struct DhcpOptions {
@@ -44,13 +45,44 @@ pub struct NetworkStatus {
     pub is_created: bool,
 }
 
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+pub struct Route {
+    pub cidr: String,
+    pub nexthop: String,
+}
+
+#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+#[kube(
+    apiextensions = "v1",
+    group = "cluster-virt.acl.fi",
+    version = "v1beta",
+    kind = "Router",
+    status = "RouterStatus",
+    derive = "PartialEq",
+    derive = "Default",
+    shortname = "r",
+    namespaced
+)]
+pub struct RouterSpec {
+    pub routes: Option<Vec<Route>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
+pub struct RouterStatus {
+    pub is_created: bool,
+}
+
 pub async fn create(client: Client) -> Result<(), Error> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     let patch_params = PatchParams::apply("cluster-manager.ceph").force();
 
-    let crd = Network::crd();
-    crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&crd))
+    let network_crd = Network::crd();
+    crds.patch(NETWORK_CRD_NAME, &patch_params, &Patch::Apply(&network_crd))
         .await?;
-    wait_crd_ready(&crds, CRD_NAME).await?;
+    let router_crd = Router::crd();
+    crds.patch(ROUTER_CRD_NAME, &patch_params, &Patch::Apply(&router_crd))
+        .await?;
+    wait_crd_ready(&crds, NETWORK_CRD_NAME).await?;
+    wait_crd_ready(&crds, ROUTER_CRD_NAME).await?;
     Ok(())
 }

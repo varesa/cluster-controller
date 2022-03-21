@@ -9,7 +9,7 @@ use tokio::time::Duration;
 
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::crd::libvirt::{NetworkAttachment, VirtualMachine};
-use crate::crd::ovn::{DhcpOptions, Network, NetworkStatus};
+use crate::crd::ovn::{DhcpOptions, Network, NetworkStatus, Router, RouterStatus};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
 use crate::{
@@ -23,9 +23,10 @@ struct State {
     client: Client,
 }
 
-create_set_status!(Network, NetworkStatus);
+create_set_status!(Network, NetworkStatus, set_network_status);
+create_set_status!(Router, RouterStatus, set_router_status);
 
-fn ensure_exists(name: &str) {
+fn ensure_network_exists(name: &str) {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
     if ovn.get_ls(name).is_none() {
         println!("ovn: Sw {name} doesn't exist, creating");
@@ -44,7 +45,7 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
     Ok(())
 }
 
-fn delete(name: &str) -> Result<(), Error> {
+fn delete_network(name: &str) -> Result<(), Error> {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
     ovn.del_ls_by_name(name)?;
     Ok(())
@@ -60,20 +61,20 @@ async fn reconcile_network(
 
     if network.metadata.deletion_timestamp.is_some() {
         println!("ovn: Network {} waiting for deletion", name);
-        delete(&name)?;
+        delete_network(&name)?;
         client_remove_finalizer!(client, Network, &network, "ovn");
         println!("ovn: Network {} deleted", name);
     } else {
-        println!("ovn: update for {name}");
+        println!("ovn: update for network {name}");
         client_ensure_finalizer!(client, Network, &network, "ovn");
-        ensure_exists(&name);
+        ensure_network_exists(&name);
         if let Some(dhcp_options) = network.spec.dhcp.as_ref() {
             ensure_dhcp(&name, dhcp_options)?;
         }
-        println!("ovn: update for {name} successful");
+        println!("ovn: update for network {name} successful");
 
         let status = NetworkStatus { is_created: true };
-        set_status(&network, status, client.clone()).await?;
+        set_network_status(&network, status, client.clone()).await?;
     }
 
     ok_and_requeue!(600)
@@ -154,6 +155,32 @@ async fn reconcile_vm(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconci
     }
 }
 
+/// Handle updates to routers in the cluster
+async fn reconcile_router(
+    router: Router,
+    ctx: Context<State>,
+) -> Result<ReconcilerAction, Error> {
+    let client = ctx.get_ref().client.clone();
+    let name = name_namespaced(&router);
+
+    if router.metadata.deletion_timestamp.is_some() {
+        println!("ovn: Router {} waiting for deletion", name);
+        //delete_router(&name)?;
+        client_remove_finalizer!(client, Router, &router, "ovn");
+        println!("ovn: Router {} deleted", name);
+    } else {
+        println!("ovn: update for router {name}");
+        client_ensure_finalizer!(client, Router, &router, "ovn");
+        //ensure_router_exists(&name);
+        println!("ovn: update for router {name} successful");
+
+        //let status = RouterStatus { is_created: true };
+        //set_router_status(&router, status, client.clone()).await?;
+    }
+
+    ok_and_requeue!(600)
+}
+
 fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
     ReconcilerAction {
         requeue_after: Some(Duration::from_secs(15)),
@@ -167,6 +194,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
     println!("ovn: Starting controllers");
 
     let networks: Api<Network> = Api::all(client.clone());
+    let routers: Api<Router> = Api::all(client.clone());
     let vms: Api<VirtualMachine> = Api::all(client.clone());
 
     let context_clone = context.clone();
@@ -177,13 +205,21 @@ pub async fn create(client: Client) -> Result<(), Error> {
         );
     });
 
+    let context_clone = context.clone();
     let network_task = tokio::task::spawn(async {
         panic!(
             "OVN Network-controller task exited: {:?}",
-            create_controller!(networks, reconcile_network, error_policy, context)
+            create_controller!(networks, reconcile_network, error_policy, context_clone)
         );
     });
 
-    let _ = tokio::try_join!(vm_task, network_task);
+    let router_task = tokio::task::spawn(async {
+        panic!(
+            "OVN Router-controller task exited: {:?}",
+            create_controller!(routers, reconcile_router, error_policy, context)
+        );
+    });
+
+    let _ = tokio::try_join!(vm_task, network_task, router_task);
     Ok(())
 }
