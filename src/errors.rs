@@ -64,6 +64,10 @@ pub enum Error {
     SwitchNotFound(String),
     #[error("Logical switch port {0} not found")]
     SwitchPortNotFound(String),
+    #[error("Logical router {0} not found")]
+    RouterNotFound(String),
+    #[error("Logical router port {0} not found")]
+    RouterPortNotFound(String),
     #[error("DHCP options {0} not found")]
     DhcpOptionsNotFound(String),
 

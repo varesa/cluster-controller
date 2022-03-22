@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use super::jsonrpc::{JsonRpcConnection, Message};
 use crate::cluster::ovn::jsonrpc::Params;
-use crate::cluster::ovn::types::{DhcpOptions, LogicalSwitch, LogicalSwitchPort};
+use crate::cluster::ovn::types::{DhcpOptions, LogicalSwitch, LogicalSwitchPort, LogicalRouter, LogicalRouterPort};
 use crate::crd::ovn::DhcpOptions as DhcpOptionsCrd;
 use crate::Error;
 use serde_json::{json, Map, Value};
@@ -10,6 +10,8 @@ use ipnet::IpNet;
 
 const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
 const TYPE_LOGICAL_SWITCH_PORT: &str = "Logical_Switch_Port";
+const TYPE_LOGICAL_ROUTER: &str = "Logical_Router";
+const TYPE_LOGICAL_ROUTER_PORT: &str = "Logical_Router_Port";
 const TYPE_DHCP_OPTIONS: &str = "DHCP_Options";
 
 pub struct Ovn {
@@ -119,8 +121,16 @@ impl Ovn {
         self.insert(TYPE_LOGICAL_SWITCH, params);
     }
 
+    pub fn add_lr(&mut self, name: &str) {
+        let mut params = Map::new();
+        params.insert("name".to_string(), Value::String(name.to_string()));
+        self.insert(TYPE_LOGICAL_ROUTER, params);
+    }
+
     generate_list_fn!(list_ls, LogicalSwitch, TYPE_LOGICAL_SWITCH);
     generate_list_fn!(list_lsp, LogicalSwitchPort, TYPE_LOGICAL_SWITCH_PORT);
+    generate_list_fn!(list_lr, LogicalRouter, TYPE_LOGICAL_ROUTER);
+    generate_list_fn!(list_lrp, LogicalRouterPort, TYPE_LOGICAL_ROUTER_PORT);
     generate_list_fn!(list_dhcp_options, DhcpOptions, TYPE_DHCP_OPTIONS);
 
     pub fn get_ls(&mut self, name: &str) -> Option<LogicalSwitch> {
@@ -131,6 +141,16 @@ impl Ovn {
     pub fn get_lsp(&mut self, name: &str) -> Option<LogicalSwitchPort> {
         let ports = self.list_lsp();
         ports.into_iter().find(|lsp| lsp.name == name)
+    }
+
+    pub fn get_lr(&mut self, name: &str) -> Option<LogicalRouter> {
+        let routers = self.list_lr();
+        routers.into_iter().find(|rt| rt.name == name)
+    }
+
+    pub fn get_lrp(&mut self, name: &str) -> Option<LogicalRouterPort> {
+        let ports = self.list_lrp();
+        ports.into_iter().find(|lrp| lrp.name == name)
     }
 
     pub fn get_dhcp_options(&mut self, cidr: &str) -> Option<DhcpOptions> {
@@ -147,6 +167,15 @@ impl Ovn {
         self.delete_by_uuid(TYPE_LOGICAL_SWITCH, &ls.uuid());
         Ok(())
     }
+
+    pub fn del_lr_by_name(&mut self, name: &str) -> Result<(), Error> {
+        let lr = self
+            .get_lr(name)
+            .ok_or_else(|| Error::RouterNotFound(name.to_string()))?;
+        self.delete_by_uuid(TYPE_LOGICAL_ROUTER, &lr.uuid());
+        Ok(())
+    }
+
 
     pub fn add_lsp(&mut self, ls_name: &str, lsp_id: &str) -> Result<(), Error> {
         let ls = self

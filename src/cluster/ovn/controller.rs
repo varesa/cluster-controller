@@ -34,6 +34,14 @@ fn ensure_network_exists(name: &str) {
     }
 }
 
+fn ensure_router_exists(name: &str) {
+    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    if ovn.get_lr(name).is_none() {
+        println!("ovn: Router {name} doesn't exist, creating");
+        ovn.add_lr(name);
+    }
+}
+
 fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
     if ovn.get_dhcp_options(&dhcp.cidr).is_none() {
@@ -48,6 +56,12 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
 fn delete_network(name: &str) -> Result<(), Error> {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
     ovn.del_ls_by_name(name)?;
+    Ok(())
+}
+
+fn delete_router(name: &str) -> Result<(), Error> {
+    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    ovn.del_lr_by_name(name)?;
     Ok(())
 }
 
@@ -165,17 +179,17 @@ async fn reconcile_router(
 
     if router.metadata.deletion_timestamp.is_some() {
         println!("ovn: Router {} waiting for deletion", name);
-        //delete_router(&name)?;
+        delete_router(&name)?;
         client_remove_finalizer!(client, Router, &router, "ovn");
         println!("ovn: Router {} deleted", name);
     } else {
         println!("ovn: update for router {name}");
         client_ensure_finalizer!(client, Router, &router, "ovn");
-        //ensure_router_exists(&name);
+        ensure_router_exists(&name);
         println!("ovn: update for router {name} successful");
 
-        //let status = RouterStatus { is_created: true };
-        //set_router_status(&router, status, client.clone()).await?;
+        let status = RouterStatus { is_created: true };
+        set_router_status(&router, status, client.clone()).await?;
     }
 
     ok_and_requeue!(600)
