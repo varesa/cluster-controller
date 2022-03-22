@@ -24,6 +24,12 @@ pub struct DhcpOptions {
     pub router: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+pub struct RouterAttachment {
+    pub name: String,
+    pub address: String,
+}
+
 #[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
 #[kube(
     apiextensions = "v1",
@@ -37,7 +43,8 @@ pub struct DhcpOptions {
     namespaced
 )]
 pub struct NetworkSpec {
-    pub(crate) dhcp: Option<DhcpOptions>,
+    pub dhcp: Option<DhcpOptions>,
+    pub routers: Option<Vec<RouterAttachment>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
