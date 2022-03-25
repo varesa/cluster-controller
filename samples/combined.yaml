@@ -9,7 +9,7 @@ spec:
     router: 172.16.0.1
     lease_time: 3600
   routers:
-  - name: test2-testrouter
+  - name: testrouter
     address: 172.16.0.1/24
 
 ---
