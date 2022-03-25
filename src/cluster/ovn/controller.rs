@@ -54,12 +54,7 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
 }
 
 fn ensure_router_attachment(network: &Network, router_attachment: &RouterAttachment) -> Result<(), Error> {
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
-    let lr = ovn.get_lr(&router_attachment.name)?;
-
     let network_ns = ResourceExt::namespace(network).expect("Get network ns");
-    let ls_name = name_namespaced(network);
-    ovn.get_ls(&ls_name)?;
 
     let split: Vec<String> = router_attachment.name.split('/').map(String::from).collect();
     let (namespace, name) = match split.len() {
@@ -68,12 +63,19 @@ fn ensure_router_attachment(network: &Network, router_attachment: &RouterAttachm
         _ => panic!("Malformed router name (todo: error)"),
     };
 
+    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    let lr = ovn.get_lr(&format!("{}-{}", &namespace, &name))?;
+
+    let ls_name = name_namespaced(network);
+    ovn.get_ls(&ls_name)?;
+
+
     let lrp_name = format!("lr_{}-{}_ls_{}", namespace, name, name_namespaced(network));
     if ovn.get_lrp(&lrp_name).is_err() {
         ovn.add_lrp(&lr.name, &lrp_name, &router_attachment.address)?;
     }
 
-    let lsp_name = format!("ls_{}_lr_unknown-{}", ls_name, router_attachment.name);
+    let lsp_name = format!("ls_{}_lr_{}-{}", ls_name, namespace, name);
     let params = json!({
         "type": "router",
         "addresses": "router",
