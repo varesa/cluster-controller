@@ -8,6 +8,9 @@ spec:
     cidr: 172.16.0.0/24
     router: 172.16.0.1
     lease_time: 3600
+  routers:
+  - name: test2-testrouter
+    address: 172.16.0.1/24
 
 ---
 apiVersion: cluster-virt.acl.fi/v1beta
