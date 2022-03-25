@@ -151,8 +151,8 @@ impl Ovn {
     generate_list_fn!(list_lsp, LogicalSwitchPort, TYPE_LOGICAL_SWITCH_PORT);
     generate_get_fn!(get_lsp, LogicalSwitchPort, TYPE_LOGICAL_SWITCH_PORT, list_lsp);
 
-    //generate_list_fn!(list_lrp, LogicalRouterPort, TYPE_LOGICAL_ROUTER_PORT);
-    //generate_get_fn!(get_lrp, LogicalRouterPort, TYPE_LOGICAL_ROUTER_PORT, list_lrp);
+    generate_list_fn!(list_lrp, LogicalRouterPort, TYPE_LOGICAL_ROUTER_PORT);
+    generate_get_fn!(get_lrp, LogicalRouterPort, TYPE_LOGICAL_ROUTER_PORT, list_lrp);
 
     generate_list_fn!(list_dhcp_options, DhcpOptions, TYPE_DHCP_OPTIONS);
 

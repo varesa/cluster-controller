@@ -61,7 +61,9 @@ fn ensure_router_attachment(network: &Network, router_attachment: &RouterAttachm
     ovn.get_ls(&ls_name)?;
 
     let lrp_name = format!("lr_unknown-{}_ls_{}", router_attachment.name, name_namespaced(network));
-    ovn.add_lrp(&lr.name, &lrp_name, &router_attachment.address)?;
+    if ovn.get_lrp(&lrp_name).is_err() {
+        ovn.add_lrp(&lr.name, &lrp_name, &router_attachment.address)?;
+    }
 
     let lsp_name = format!("ls_{}_lr_unknown-{}", ls_name, router_attachment.name);
     let params = json!({
@@ -69,7 +71,9 @@ fn ensure_router_attachment(network: &Network, router_attachment: &RouterAttachm
         "addresses": "router",
         "options": ["map", [ ["router-port", lrp_name] ]]
     });
-    ovn.add_lsp(&ls_name, &lsp_name, Some(params.as_object().unwrap()))?;
+    if ovn.get_lsp(&lsp_name).is_err() {
+        ovn.add_lsp(&ls_name, &lsp_name, Some(params.as_object().unwrap()))?;
+    }
     Ok(())
 }
 
