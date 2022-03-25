@@ -81,19 +81,6 @@ impl Ovn {
         }
     }
 
-    /*pub fn echo(&mut self) {
-        let echo = self.connection.request("echo", Some(json!([])));
-        assert!(echo.error.is_null());
-    }
-
-    #[allow(dead_code)]
-    pub fn print_schema(&mut self) {
-        let schema = self
-            .connection
-            .request("get_schema", Some(json!(["OVN_Northbound"])));
-        print!("{schema:#?}");
-    }*/
-
     fn transact(&mut self, operations: &[Value]) -> Vec<Value> {
         let mut params = vec![Value::String("OVN_Northbound".to_string())];
         params.append(&mut operations.to_owned());
