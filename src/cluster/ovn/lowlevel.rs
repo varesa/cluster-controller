@@ -163,17 +163,24 @@ impl Ovn {
             .find(|option_set| option_set.cidr == cidr)
     }
 
-    pub fn add_lsp(&mut self, ls_name: &str, lsp_id: &str) -> Result<(), Error> {
+    pub fn add_lsp(&mut self, ls_name: &str, lsp_name: &str, extra_params: Option<&Map<String, Value>>) -> Result<(), Error> {
         let ls = self.get_ls(ls_name)?;
+
+        let mut params = if let Some(extra_params) = extra_params {
+            extra_params.clone()
+        } else {
+            Map::new()
+        };
+        params.insert("name".to_string(), Value::String(lsp_name.to_string()));
 
         let add_lsp = json!({
             "op": "insert",
             "table": TYPE_LOGICAL_SWITCH_PORT,
-            "row": {
-                "name": lsp_id
-            },
+            "row": params,
             "uuid-name": "new_lsp"
         });
+
+
         let add_lsp_to_ls = json!({
             "op": "mutate",
             "table": TYPE_LOGICAL_SWITCH,

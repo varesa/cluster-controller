@@ -58,13 +58,18 @@ fn ensure_router_attachment(network: &Network, router_attachment: &RouterAttachm
     let lr = ovn.get_lr(&router_attachment.name)?;
 
     let ls_name = name_namespaced(network);
-    let ls = ovn.get_ls(&ls_name)?;
+    ovn.get_ls(&ls_name)?;
 
     let lrp_name = format!("lr_unknown-{}_ls_{}", router_attachment.name, name_namespaced(network));
     ovn.add_lrp(&lr.name, &lrp_name, &router_attachment.address)?;
 
     let lsp_name = format!("ls_{}_lr_unknown-{}", ls_name, router_attachment.name);
-    ovn.add_lsp(&ls_name, &lsp_name)?;
+    let params = json!({
+        "type": "router",
+        "addresses": "router",
+        "options": ["map", [ ["router-port", lrp_name] ]]
+    });
+    ovn.add_lsp(&ls_name, &lsp_name, Some(params.as_object().unwrap()))?;
     Ok(())
 }
 
@@ -128,7 +133,7 @@ async fn connect_vm_nic(
     if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_err() {
         println!("ovn: lsp missing for NIC, creating");
         let lsp_id = nic.ovn_id.as_ref().unwrap();
-        ovn.add_lsp(&ls_name, lsp_id)?;
+        ovn.add_lsp(&ls_name, lsp_id, None)?;
         ovn.set_lsp_address(
             lsp_id,
             nic.mac_address.as_ref().expect("MAC address missing"),
