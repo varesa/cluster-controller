@@ -1,4 +1,10 @@
 apiVersion: cluster-virt.acl.fi/v1beta
+kind: Router
+metadata:
+  name: testrouter
+  namespace: test2
+spec: {}
+apiVersion: cluster-virt.acl.fi/v1beta
 kind: Network
 metadata:
   name: testneta
@@ -11,9 +17,21 @@ spec:
   routers:
   - name: testrouter
     address: 172.16.0.1/24
-
 ---
-
+apiVersion: cluster-virt.acl.fi/v1beta
+kind: Network
+metadata:
+  name: testnetb
+  namespace: test2
+spec: 
+  dhcp:
+    cidr: 172.16.1.0/24
+    router: 172.16.1.1
+    lease_time: 3600
+  routers:
+  - name: testrouter
+    address: 172.16.1.1/24
+---
 apiVersion: cluster-virt.acl.fi/v1beta
 kind: Volume
 metadata:
@@ -22,9 +40,16 @@ metadata:
 spec:
   size: 100G
   template: rocky-test
-
 ---
-
+apiVersion: cluster-virt.acl.fi/v1beta
+kind: Volume
+metadata:
+  name: vm-2-root
+  namespace: test2
+spec:
+  size: 100G
+  template: rocky-test
+---
 apiVersion: cluster-virt.acl.fi/v1beta
 kind: VirtualMachine
 metadata:
@@ -37,3 +62,16 @@ spec:
     - name: vm-1-root
   networks:
     - name: testneta
+---
+apiVersion: cluster-virt.acl.fi/v1beta
+kind: VirtualMachine
+metadata:
+  name: vm-2.mydomain.com
+  namespace: test2
+spec:
+  cpus: 3
+  memory: 2G
+  volumes:
+    - name: vm-2-root
+  networks:
+    - name: testnetb

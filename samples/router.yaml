@@ -1,6 +1,0 @@
-apiVersion: cluster-virt.acl.fi/v1beta
-kind: Router
-metadata:
-  name: testrouter
-  namespace: test2
-spec: {}
