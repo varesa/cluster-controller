@@ -2,11 +2,13 @@ use std::net::IpAddr;
 
 use super::jsonrpc::{JsonRpcConnection, Message};
 use crate::cluster::ovn::jsonrpc::Params;
-use crate::cluster::ovn::types::{DhcpOptions, LogicalSwitch, LogicalSwitchPort, LogicalRouter, LogicalRouterPort};
+use crate::cluster::ovn::types::{
+    DhcpOptions, LogicalRouter, LogicalRouterPort, LogicalSwitch, LogicalSwitchPort,
+};
 use crate::crd::ovn::DhcpOptions as DhcpOptionsCrd;
 use crate::Error;
-use serde_json::{json, Map, Value};
 use ipnet::IpNet;
+use serde_json::{json, Map, Value};
 
 const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
 const TYPE_LOGICAL_SWITCH_PORT: &str = "Logical_Switch_Port";
@@ -28,6 +30,47 @@ macro_rules! generate_list_fn {
             }
             objects
         }
+    };
+}
+
+macro_rules! generate_get_fn {
+    ($name:ident, $type:ident, $type_name:ident, $list_fn:ident) => {
+        pub fn $name(&mut self, name: &str) -> Result<$type, Error> {
+            let objects = self.$list_fn();
+            objects
+                .into_iter()
+                .find(|o| o.name == name)
+                .ok_or_else(|| Error::OvnNotFound($type_name.to_string(), name.to_string()))
+        }
+    };
+}
+
+macro_rules! generate_delete_fn {
+    ($name:ident, $type:ident, $type_name:ident, $get_fn:ident) => {
+        pub fn $name(&mut self, name: &str) -> Result<(), Error> {
+            let object = self.$get_fn(name)?;
+            self.delete_by_uuid($type_name, &object.uuid());
+            Ok(())
+        }
+    };
+}
+
+macro_rules! generate_add_fn {
+    ($name:ident, $type_name:ident) => {
+        pub fn $name(&mut self, name: &str) {
+            let mut params = Map::new();
+            params.insert("name".to_string(), Value::String(name.to_string()));
+            self.insert($type_name, params);
+        }
+    };
+}
+
+macro_rules! generate_all_fn {
+    ($type_name:ident, $type:ident, $add_fn:ident, $list_fn:ident, $get_fn:ident, $delete_fn:ident) => {
+        generate_add_fn!($add_fn, $type_name);
+        generate_list_fn!($list_fn, $type, $type_name);
+        generate_get_fn!($get_fn, $type, $type_name, $list_fn);
+        generate_delete_fn!($delete_fn, $type, $type_name, $get_fn);
     };
 }
 
@@ -115,43 +158,16 @@ impl Ovn {
         self.transact(&[operation]);
     }
 
-    pub fn add_ls(&mut self, name: &str) {
-        let mut params = Map::new();
-        params.insert("name".to_string(), Value::String(name.to_string()));
-        self.insert(TYPE_LOGICAL_SWITCH, params);
-    }
+    generate_all_fn!(TYPE_LOGICAL_SWITCH, LogicalSwitch, add_ls, list_ls, get_ls, del_ls_by_name);
+    generate_all_fn!(TYPE_LOGICAL_ROUTER, LogicalRouter, add_lr, list_lr, get_lr, del_lr_by_name); 
 
-    pub fn add_lr(&mut self, name: &str) {
-        let mut params = Map::new();
-        params.insert("name".to_string(), Value::String(name.to_string()));
-        self.insert(TYPE_LOGICAL_ROUTER, params);
-    }
-
-    generate_list_fn!(list_ls, LogicalSwitch, TYPE_LOGICAL_SWITCH);
     generate_list_fn!(list_lsp, LogicalSwitchPort, TYPE_LOGICAL_SWITCH_PORT);
-    generate_list_fn!(list_lr, LogicalRouter, TYPE_LOGICAL_ROUTER);
-    generate_list_fn!(list_lrp, LogicalRouterPort, TYPE_LOGICAL_ROUTER_PORT);
+    generate_get_fn!(get_lsp, LogicalSwitchPort, TYPE_LOGICAL_SWITCH_PORT, list_lsp);
+
+    //generate_list_fn!(list_lrp, LogicalRouterPort, TYPE_LOGICAL_ROUTER_PORT);
+    //generate_get_fn!(get_lrp, LogicalRouterPort, TYPE_LOGICAL_ROUTER_PORT, list_lrp);
+
     generate_list_fn!(list_dhcp_options, DhcpOptions, TYPE_DHCP_OPTIONS);
-
-    pub fn get_ls(&mut self, name: &str) -> Option<LogicalSwitch> {
-        let switches = self.list_ls();
-        switches.into_iter().find(|sw| sw.name == name)
-    }
-
-    pub fn get_lsp(&mut self, name: &str) -> Option<LogicalSwitchPort> {
-        let ports = self.list_lsp();
-        ports.into_iter().find(|lsp| lsp.name == name)
-    }
-
-    pub fn get_lr(&mut self, name: &str) -> Option<LogicalRouter> {
-        let routers = self.list_lr();
-        routers.into_iter().find(|rt| rt.name == name)
-    }
-
-    pub fn get_lrp(&mut self, name: &str) -> Option<LogicalRouterPort> {
-        let ports = self.list_lrp();
-        ports.into_iter().find(|lrp| lrp.name == name)
-    }
 
     pub fn get_dhcp_options(&mut self, cidr: &str) -> Option<DhcpOptions> {
         let option_sets = self.list_dhcp_options();
@@ -160,27 +176,8 @@ impl Ovn {
             .find(|option_set| option_set.cidr == cidr)
     }
 
-    pub fn del_ls_by_name(&mut self, name: &str) -> Result<(), Error> {
-        let ls = self
-            .get_ls(name)
-            .ok_or_else(|| Error::SwitchNotFound(name.to_string()))?;
-        self.delete_by_uuid(TYPE_LOGICAL_SWITCH, &ls.uuid());
-        Ok(())
-    }
-
-    pub fn del_lr_by_name(&mut self, name: &str) -> Result<(), Error> {
-        let lr = self
-            .get_lr(name)
-            .ok_or_else(|| Error::RouterNotFound(name.to_string()))?;
-        self.delete_by_uuid(TYPE_LOGICAL_ROUTER, &lr.uuid());
-        Ok(())
-    }
-
-
     pub fn add_lsp(&mut self, ls_name: &str, lsp_id: &str) -> Result<(), Error> {
-        let ls = self
-            .get_ls(ls_name)
-            .ok_or_else(|| Error::SwitchNotFound(ls_name.to_string()))?;
+        let ls = self.get_ls(ls_name)?;
 
         let add_lsp = json!({
             "op": "insert",
@@ -204,14 +201,39 @@ impl Ovn {
         Ok(())
     }
 
+    pub fn add_lrp(&mut self, lr_name: &str, lrp_name: &str, networks: &str) -> Result<(), Error> {
+        let lr = self
+            .get_lr(lr_name)?;
+
+        let add_lrp = json!({
+            "op": "insert",
+            "table": TYPE_LOGICAL_ROUTER_PORT,
+            "row": {
+                "name": lrp_name,
+                "mac": "02:00:00:00:00:01",
+                "networks": networks,
+            },
+            "uuid-name": "new_lrp"
+        });
+        let add_lrp_to_lr = json!({
+            "op": "mutate",
+            "table": TYPE_LOGICAL_ROUTER,
+            "where": [
+                ["_uuid", "==", ["uuid", lr.uuid()]]
+            ],
+            "mutations": [
+                ["ports", "insert", ["set", [["named-uuid", "new_lrp"]]]]
+            ]
+        });
+        self.transact(&[add_lrp, add_lrp_to_lr]);
+        Ok(())
+    }
+
     pub fn del_lsp(&mut self, ls_name: &str, lsp_id: &str) -> Result<(), Error> {
-        let ls = self
-            .get_ls(ls_name)
-            .ok_or_else(|| Error::SwitchNotFound(ls_name.to_string()))?;
+        let ls = self.get_ls(ls_name)?;
 
         let lsp = self
-            .get_lsp(lsp_id)
-            .ok_or_else(|| Error::SwitchPortNotFound(lsp_id.to_string()))?;
+            .get_lsp(lsp_id)?;
 
         let del_lsp = json!({
           "op": "mutate",
@@ -233,8 +255,7 @@ impl Ovn {
 
     pub fn set_lsp_address(&mut self, lsp_id: &str, mac_address: &str) -> Result<(), Error> {
         let lsp = self
-            .get_lsp(lsp_id)
-            .ok_or_else(|| Error::SwitchPortNotFound(lsp_id.to_string()))?;
+            .get_lsp(lsp_id)?;
 
         let set_address = json!({
             "op": "update",
@@ -260,18 +281,26 @@ impl Ovn {
         Ok(())
     }
 
-    pub fn set_dhcp_option_set_options(&mut self, dhcp_options: &DhcpOptionsCrd) -> Result<(), Error> {
+    pub fn set_dhcp_option_set_options(
+        &mut self,
+        dhcp_options: &DhcpOptionsCrd,
+    ) -> Result<(), Error> {
         let cidr = dhcp_options.cidr.clone();
-        let option_set = self.get_dhcp_options(&cidr).ok_or_else(|| Error::DhcpOptionsNotFound(cidr.to_string()))?;
+        let option_set = self
+            .get_dhcp_options(&cidr)
+            .ok_or_else(|| Error::OvnNotFound(TYPE_DHCP_OPTIONS.to_string(), cidr.to_string()))?;
 
         let net: IpNet = cidr.parse()?;
         let hosts: Vec<IpAddr> = net.hosts().collect();
         let mut options = vec![
             [String::from("server_id"), hosts[1].to_string()],
-            [String::from("server_mac"), String::from("c0:ff:ee:00:00:01")],
+            [
+                String::from("server_mac"),
+                String::from("c0:ff:ee:00:00:01"),
+            ],
         ];
 
-        // Copy values from CRD to above vector 
+        // Copy values from CRD to above vector
         macro_rules! push_dhcp_opts {
             ($source:ident, $destination:ident, [$($name:ident),+]) => {
                 $(
@@ -281,7 +310,11 @@ impl Ovn {
                 )+
             }
         }
-        push_dhcp_opts!(dhcp_options, options, [lease_time, dns_server, domain_name, router]);
+        push_dhcp_opts!(
+            dhcp_options,
+            options,
+            [lease_time, dns_server, domain_name, router]
+        );
 
         let set_options = json!({
             "op": "update",
@@ -291,13 +324,10 @@ impl Ovn {
         });
         self.transact(&[set_options]);
         Ok(())
-
     }
 
     pub fn set_ls_cidr(&mut self, ls_name: &str, cidr: &str) -> Result<(), Error> {
-        let ls = self
-            .get_ls(ls_name)
-            .ok_or_else(|| Error::SwitchNotFound(ls_name.to_string()))?;
+        let ls = self.get_ls(ls_name)?;
 
         let set_cidr = json!({
             "op": "update",
@@ -311,12 +341,11 @@ impl Ovn {
 
     pub fn set_lsp_dhcp_options(&mut self, lsp_id: &str, cidr: &str) -> Result<(), Error> {
         let lsp = self
-            .get_lsp(lsp_id)
-            .ok_or_else(|| Error::SwitchPortNotFound(lsp_id.to_string()))?;
+            .get_lsp(lsp_id)?;
 
         let dhcp_options = self
             .get_dhcp_options(cidr)
-            .ok_or_else(|| Error::DhcpOptionsNotFound(cidr.to_string()))?;
+            .ok_or_else(|| Error::OvnNotFound(TYPE_DHCP_OPTIONS.to_string(), cidr.to_string()))?;
 
         let set_dhcp_options = json!({
             "op": "update",

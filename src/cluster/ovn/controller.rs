@@ -9,7 +9,7 @@ use tokio::time::Duration;
 
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::crd::libvirt::{NetworkAttachment, VirtualMachine};
-use crate::crd::ovn::{DhcpOptions, Network, NetworkStatus, Router, RouterStatus};
+use crate::crd::ovn::{DhcpOptions, Network, NetworkStatus, Router, RouterAttachment, RouterStatus};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
 use crate::{
@@ -28,7 +28,7 @@ create_set_status!(Router, RouterStatus, set_router_status);
 
 fn ensure_network_exists(name: &str) {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
-    if ovn.get_ls(name).is_none() {
+    if ovn.get_ls(name).is_err() {
         println!("ovn: Sw {name} doesn't exist, creating");
         ovn.add_ls(name);
     }
@@ -36,7 +36,7 @@ fn ensure_network_exists(name: &str) {
 
 fn ensure_router_exists(name: &str) {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
-    if ovn.get_lr(name).is_none() {
+    if ovn.get_lr(name).is_err() {
         println!("ovn: Router {name} doesn't exist, creating");
         ovn.add_lr(name);
     }
@@ -50,6 +50,21 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
     // Lazily try to always update, effectively noop if current value are already correct
     ovn.set_dhcp_option_set_options(dhcp)?;
     ovn.set_ls_cidr(name, &dhcp.cidr)?;
+    Ok(())
+}
+
+fn ensure_router_attachment(network: &Network, router_attachment: &RouterAttachment) -> Result<(), Error> {
+    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    let lr = ovn.get_lr(&router_attachment.name)?;
+
+    let ls_name = name_namespaced(network);
+    let ls = ovn.get_ls(&ls_name)?;
+
+    let lrp_name = format!("lr_unknown-{}_ls_{}", router_attachment.name, name_namespaced(network));
+    ovn.add_lrp(&lr.name, &lrp_name, &router_attachment.address)?;
+
+    let lsp_name = format!("ls_{}_lr_unknown-{}", ls_name, router_attachment.name);
+    ovn.add_lsp(&ls_name, &lsp_name)?;
     Ok(())
 }
 
@@ -85,6 +100,13 @@ async fn reconcile_network(
         if let Some(dhcp_options) = network.spec.dhcp.as_ref() {
             ensure_dhcp(&name, dhcp_options)?;
         }
+
+        if let Some(routers) = network.spec.routers.as_ref() {
+            for router in routers {
+                ensure_router_attachment(&network, router)?;
+            }
+        }
+
         println!("ovn: update for network {name} successful");
 
         let status = NetworkStatus { is_created: true };
@@ -103,7 +125,7 @@ async fn connect_vm_nic(
     let namespace = ResourceExt::namespace(vm).expect("Failed to get VM namespace");
     let network_name = nic.name.as_ref().expect("No network name set");
     let ls_name = format!("{}-{}", &namespace, &network_name);
-    if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_none() {
+    if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_err() {
         println!("ovn: lsp missing for NIC, creating");
         let lsp_id = nic.ovn_id.as_ref().unwrap();
         ovn.add_lsp(&ls_name, lsp_id)?;
@@ -128,7 +150,7 @@ fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(),
         ResourceExt::namespace(vm).expect("Failed to get VM namespace"),
         nic.name.as_ref().expect("No network name set")
     );
-    if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_some() {
+    if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_ok() {
         println!("ovn: lsp exists for NIC, removing");
         ovn.del_lsp(&ls_name, nic.ovn_id.as_ref().unwrap())?;
     }

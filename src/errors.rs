@@ -60,16 +60,8 @@ pub enum Error {
     Libvirt(#[from] virt::error::Error),
 
     // OVN
-    #[error("Logical switch {0} not found")]
-    SwitchNotFound(String),
-    #[error("Logical switch port {0} not found")]
-    SwitchPortNotFound(String),
-    #[error("Logical router {0} not found")]
-    RouterNotFound(String),
-    #[error("Logical router port {0} not found")]
-    RouterPortNotFound(String),
-    #[error("DHCP options {0} not found")]
-    DhcpOptionsNotFound(String),
+    #[error("Object {1} of type {0} not found")]
+    OvnNotFound(String, String),
 
     // Misc libs
     #[error("JSON error {0}")]

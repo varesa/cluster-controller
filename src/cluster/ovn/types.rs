@@ -9,6 +9,7 @@ macro_rules! create_type {
         }
 
         impl $type_name {
+            #[allow(unused)]
             pub fn uuid(&self) -> String {
                 assert_eq!(self._uuid.len(), 2);
                 self._uuid[1].to_string()
