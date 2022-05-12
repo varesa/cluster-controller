@@ -477,7 +477,7 @@ impl Ovn {
             if !new_routes.iter().any(|new_route| {
                 new_route.cidr == old_route.ip_prefix && new_route.nexthop == old_route.nexthop
             }) {
-                to_remove.push(json!(["uuid", old_route._uuid[0]]));
+                to_remove.push(json!(["uuid", old_route.uuid()]));
             }
         }
 
