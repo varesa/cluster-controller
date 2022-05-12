@@ -441,7 +441,7 @@ impl Ovn {
             .map(|uuid| {
                 all_routes
                     .iter()
-                    .find(|item| &item._uuid[0] == uuid)
+                    .find(|item| &item._uuid[1] == uuid)
                     .unwrap_or_else(|| {
                         panic!("Unable to find static route {} for {}", uuid, router_name)
                     })
