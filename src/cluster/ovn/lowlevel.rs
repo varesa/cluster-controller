@@ -197,23 +197,6 @@ impl Ovn {
             .find(|option_set| option_set.cidr == cidr)
     }
 
-    pub fn get_lr_static_route(
-        &mut self,
-        prefix: &str,
-        nexthop: &str,
-    ) -> Result<LogicalRouterStaticRoute, Error> {
-        let routes = self.list_lr_static_routes();
-        routes
-            .into_iter()
-            .find(|route| route.ip_prefix == prefix && route.nexthop == nexthop)
-            .ok_or_else(|| {
-                Error::OvnNotFound(
-                    "LogicalRouterStaticRoute".into(),
-                    format!("{} via {}", prefix, nexthop),
-                )
-            })
-    }
-
     pub fn add_lsp(
         &mut self,
         ls_name: &str,
@@ -372,19 +355,6 @@ impl Ovn {
         Ok(())
     }
 
-    pub fn create_lr_static_route(&mut self, route: &RouteCrd) -> Result<(), Error> {
-        let prefix = route.cidr.clone();
-        let nexthop = route.nexthop.clone();
-        let create_options = json!({
-            "op": "insert",
-            "table": TYPE_LOGICAL_ROUTER_STATIC_ROUTE,
-            "row": {"ip_prefix": prefix, "nexthop": nexthop},
-            "uuid-name": "new_dhcp_options"
-        });
-        self.transact(&[create_options]);
-        Ok(())
-    }
-
     pub fn get_lr_routes(
         &mut self,
         router_name: &str,
@@ -424,7 +394,7 @@ impl Ovn {
         let uuids: Vec<String> = match set {
             Value::String(uuid) => vec![uuid.clone()],
             Value::Array(uuids_arrays) => uuids_arrays
-                .into_iter()
+                .iter()
                 .map(|item| {
                     item.as_array()
                         .expect("Row was not an array like ['uuid', uuid]")[1]
@@ -458,19 +428,26 @@ impl Ovn {
     ) -> Result<(), Error> {
         let old_routes = self.get_lr_routes(router_name)?;
 
+        let mut operations = Vec::new();
         let mut to_add = Vec::new();
         let mut to_remove = Vec::new();
+
+        let mut i = 0u8;
 
         for new_route in new_routes {
             if !old_routes.iter().any(|old_route| {
                 old_route.ip_prefix == new_route.cidr && old_route.nexthop == new_route.nexthop
             }) {
-                let uuid = self
-                    .get_lr_static_route(&new_route.cidr, &new_route.nexthop)
-                    .expect("Route missing")
-                    ._uuid[0]
-                    .clone();
-                to_add.push(json!(["uuid", uuid]));
+                let id = format!("new_route_{}", i);
+                i += 1;
+                let create_op = json!({
+                    "op": "insert",
+                    "table": TYPE_LOGICAL_ROUTER_STATIC_ROUTE,
+                    "row": {"ip_prefix": new_route.cidr, "nexthop": new_route.nexthop},
+                    "uuid-name": id
+                });
+                operations.push(create_op);
+                to_add.push(json!(["named-uuid", id]));
             }
         }
         for old_route in old_routes {
@@ -491,8 +468,9 @@ impl Ovn {
             ]],
             "op":"mutate","table":"Logical_Router"
         });
-        self.transact(&[update]);
+        operations.push(update);
 
+        self.transact(&operations);
         Ok(())
     }
 

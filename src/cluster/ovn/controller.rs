@@ -8,7 +8,6 @@ use serde_json::json;
 use tokio::time::Duration;
 
 use crate::cluster::ovn::lowlevel::Ovn;
-use crate::cluster::ovn::types::LogicalRouterStaticRoute;
 use crate::crd::libvirt::{NetworkAttachment, VirtualMachine};
 use crate::crd::ovn::{
     DhcpOptions, Network, NetworkStatus, Route, Router, RouterAttachment, RouterStatus,
@@ -43,17 +42,6 @@ fn ensure_router_exists(name: &str) {
         println!("ovn: Router {name} doesn't exist, creating");
         ovn.add_lr(name);
     }
-}
-
-fn ensure_route_exists(route: &Route) -> Result<(), Error> {
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
-    let ip_prefix = route.cidr.clone();
-    let nexthop = route.nexthop.clone();
-    if ovn.get_lr_static_route(&ip_prefix, &nexthop).is_err() {
-        println!("ovn: Static route {ip_prefix} via {nexthop} doesn't exist, creating");
-        ovn.create_lr_static_route(route)?;
-    }
-    Ok(())
 }
 
 fn ensure_router_routes(router: &str, routes: &[Route]) -> Result<(), Error> {
@@ -249,11 +237,9 @@ async fn reconcile_router(router: Router, ctx: Context<State>) -> Result<Reconci
     } else {
         println!("ovn: update for router {name}");
         client_ensure_finalizer!(client, Router, &router, "ovn");
+
         ensure_router_exists(&name);
         if let Some(routes) = &router.spec.routes {
-            for route in routes {
-                ensure_route_exists(route)?;
-            }
             ensure_router_routes(&name, routes)?;
         } else {
             ensure_router_routes(&name, &[])?;
