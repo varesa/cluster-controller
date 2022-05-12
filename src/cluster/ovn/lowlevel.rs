@@ -111,6 +111,7 @@ impl Ovn {
         let columns = match object_type {
             TYPE_DHCP_OPTIONS => json!(["_uuid", "cidr"]),
             TYPE_LOGICAL_ROUTER => json!(["_uuid", "name", "static_routes"]),
+            TYPE_LOGICAL_ROUTER_STATIC_ROUTE => json!(["_uuid", "ip_prefix", "nexthop"]),
             _ => json!(["_uuid", "name"]),
         };
         let select = json!({
@@ -447,7 +448,6 @@ impl Ovn {
         router_name: &str,
         new_routes: &[RouteCrd],
     ) -> Result<(), Error> {
-        let router = self.get_lr(router_name)?;
         let old_routes = self.get_lr_routes(router_name)?;
 
         let mut to_add = Vec::new();
