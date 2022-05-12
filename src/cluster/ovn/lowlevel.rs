@@ -305,7 +305,7 @@ impl Ovn {
 
         let set_address = json!({
             "op": "update",
-            "table": "Logical_Switch_Port",
+            "table": TYPE_LOGICAL_SWITCH_PORT,
             "where": [
                 [ "_uuid", "==", [ "uuid", lsp.uuid() ] ]
             ],
@@ -319,7 +319,7 @@ impl Ovn {
         let cidr = dhcp_options.cidr.clone();
         let create_options = json!({
             "op": "insert",
-            "table": "DHCP_Options",
+            "table": TYPE_DHCP_OPTIONS,
             "row": {"cidr": cidr},
             "uuid-name": "new_dhcp_options"
         });
@@ -364,7 +364,7 @@ impl Ovn {
 
         let set_options = json!({
             "op": "update",
-            "table": "DHCP_Options",
+            "table": TYPE_DHCP_OPTIONS,
             "where": [["_uuid", "==", ["uuid", option_set.uuid()]]],
             "row": {"options": ["map", options]}
         });
@@ -377,7 +377,7 @@ impl Ovn {
         let nexthop = route.nexthop.clone();
         let create_options = json!({
             "op": "insert",
-            "table": "DHCP_Options",
+            "table": TYPE_LOGICAL_ROUTER_STATIC_ROUTE,
             "row": {"ip_prefix": prefix, "nexthop": nexthop},
             "uuid-name": "new_dhcp_options"
         });
