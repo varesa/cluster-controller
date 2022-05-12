@@ -18,12 +18,10 @@ macro_rules! create_type {
     };
 }
 
-
 create_type!(LogicalSwitch);
 create_type!(LogicalSwitchPort);
 create_type!(LogicalRouter);
 create_type!(LogicalRouterPort);
-
 
 #[derive(Serialize, Deserialize)]
 pub struct DhcpOptions {
@@ -38,3 +36,16 @@ impl DhcpOptions {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct LogicalRouterStaticRoute {
+    pub _uuid: Vec<String>,
+    pub ip_prefix: String,
+    pub nexthop: String,
+}
+
+impl LogicalRouterStaticRoute {
+    pub fn uuid(&self) -> String {
+        assert_eq!(self._uuid.len(), 2);
+        self._uuid[1].to_string()
+    }
+}

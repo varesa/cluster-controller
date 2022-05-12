@@ -8,8 +8,11 @@ use serde_json::json;
 use tokio::time::Duration;
 
 use crate::cluster::ovn::lowlevel::Ovn;
+use crate::cluster::ovn::types::LogicalRouterStaticRoute;
 use crate::crd::libvirt::{NetworkAttachment, VirtualMachine};
-use crate::crd::ovn::{DhcpOptions, Network, NetworkStatus, Router, RouterAttachment, RouterStatus};
+use crate::crd::ovn::{
+    DhcpOptions, Network, NetworkStatus, Route, Router, RouterAttachment, RouterStatus,
+};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
 use crate::{
@@ -42,6 +45,23 @@ fn ensure_router_exists(name: &str) {
     }
 }
 
+fn ensure_route_exists(route: &Route) -> Result<(), Error> {
+    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    let ip_prefix = route.cidr.clone();
+    let nexthop = route.nexthop.clone();
+    if ovn.get_lr_static_route(&ip_prefix, &nexthop).is_err() {
+        println!("ovn: Static route {ip_prefix} via {nexthop} doesn't exist, creating");
+        ovn.create_lr_static_route(route)?;
+    }
+    Ok(())
+}
+
+fn ensure_router_routes(router: &str, routes: &[Route]) -> Result<(), Error> {
+    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    ovn.set_lr_routes(router, routes)?;
+    Ok(())
+}
+
 fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
     if ovn.get_dhcp_options(&dhcp.cidr).is_none() {
@@ -53,10 +73,17 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
     Ok(())
 }
 
-fn ensure_router_attachment(network: &Network, router_attachment: &RouterAttachment) -> Result<(), Error> {
+fn ensure_router_attachment(
+    network: &Network,
+    router_attachment: &RouterAttachment,
+) -> Result<(), Error> {
     let network_ns = ResourceExt::namespace(network).expect("Get network ns");
 
-    let split: Vec<String> = router_attachment.name.split('/').map(String::from).collect();
+    let split: Vec<String> = router_attachment
+        .name
+        .split('/')
+        .map(String::from)
+        .collect();
     let (namespace, name) = match split.len() {
         1 => (&network_ns, split.get(0).unwrap()),
         2 => (split.get(0).unwrap(), split.get(1).unwrap()),
@@ -68,7 +95,6 @@ fn ensure_router_attachment(network: &Network, router_attachment: &RouterAttachm
 
     let ls_name = name_namespaced(network);
     ovn.get_ls(&ls_name)?;
-
 
     let lrp_name = format!("lr_{}-{}_ls_{}", namespace, name, name_namespaced(network));
     if ovn.get_lrp(&lrp_name).is_err() {
@@ -211,10 +237,7 @@ async fn reconcile_vm(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconci
 }
 
 /// Handle updates to routers in the cluster
-async fn reconcile_router(
-    router: Router,
-    ctx: Context<State>,
-) -> Result<ReconcilerAction, Error> {
+async fn reconcile_router(router: Router, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let client = ctx.get_ref().client.clone();
     let name = name_namespaced(&router);
 
@@ -227,6 +250,14 @@ async fn reconcile_router(
         println!("ovn: update for router {name}");
         client_ensure_finalizer!(client, Router, &router, "ovn");
         ensure_router_exists(&name);
+        if let Some(routes) = &router.spec.routes {
+            for route in routes {
+                ensure_route_exists(route)?;
+            }
+            ensure_router_routes(&name, routes)?;
+        } else {
+            ensure_router_routes(&name, &[])?;
+        }
         println!("ovn: update for router {name} successful");
 
         let status = RouterStatus { is_created: true };
