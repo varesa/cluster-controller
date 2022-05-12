@@ -441,7 +441,7 @@ impl Ovn {
             .map(|uuid| {
                 all_routes
                     .iter()
-                    .find(|item| &item._uuid[1] == uuid)
+                    .find(|item| &item.uuid() == uuid)
                     .unwrap_or_else(|| {
                         panic!("Unable to find static route {} for {}", uuid, router_name)
                     })
@@ -483,8 +483,8 @@ impl Ovn {
 
         let update = json!({
             "mutations":[
-                ["static_routes","insert",["set",[to_add]]],
-                ["static_routes","delete",["set",[["named-uuid","row15bc27fc_382b_4e87_a176_08445c64cbcb"]]]]
+                ["static_routes","insert",["set", to_add]],
+                ["static_routes","delete",["set", to_remove]]
             ],
             "where":[[
                 "_uuid","==",["uuid","f1f3d500-b398-4976-ae25-bbaac0fe8125"]
