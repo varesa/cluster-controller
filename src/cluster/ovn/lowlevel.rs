@@ -412,28 +412,36 @@ impl Ovn {
             .expect("Table row was not an object");
 
         let all_routes = self.list_lr_static_routes();
-        let routes = router
+
+        let set = router
             .get("static_routes")
             .expect("Router doesn't have static_routes column")
             .as_array()
             .expect("static_routes was not an array")
             .get(1)
-            .expect("static_routes was not in format ['set', [...]]")
-            .as_array()
-            .expect("set not followed by an array")
+            .expect("static_routes was not in format ['set', [...]]");
+
+        let uuids: Vec<String> = match set {
+            Value::String(uuid) => vec![uuid.clone()],
+            Value::Array(uuids_arrays) => uuids_arrays
+                .into_iter()
+                .map(|item| {
+                    item.as_array()
+                        .expect("Row was not an array like ['uuid', uuid]")[1]
+                        .as_str()
+                        .expect("UUID was not a string")
+                        .to_string()
+                })
+                .collect(),
+            _ => panic!("Unexpected data type"),
+        };
+
+        let routes = uuids
             .iter()
-            .map(|route| {
-                let route = route
-                    .as_array()
-                    .expect("Route was not in format ['uuid', '...']");
-                let uuid = route
-                    .get(1)
-                    .expect("Route didn't have an UUID")
-                    .as_str()
-                    .expect("UUID was not a string");
+            .map(|uuid| {
                 all_routes
                     .iter()
-                    .find(|item| item._uuid[0] == uuid)
+                    .find(|item| &item._uuid[0] == uuid)
                     .unwrap_or_else(|| {
                         panic!("Unable to find static route {} for {}", uuid, router_name)
                     })
