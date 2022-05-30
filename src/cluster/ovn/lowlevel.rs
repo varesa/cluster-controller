@@ -426,6 +426,7 @@ impl Ovn {
         router_name: &str,
         new_routes: &[RouteCrd],
     ) -> Result<(), Error> {
+        let router = self.get_lr(router_name)?;
         let old_routes = self.get_lr_routes(router_name)?;
 
         let mut operations = Vec::new();
@@ -464,7 +465,7 @@ impl Ovn {
                 ["static_routes","delete",["set", to_remove]]
             ],
             "where":[[
-                "_uuid","==",["uuid","f1f3d500-b398-4976-ae25-bbaac0fe8125"]
+                "_uuid","==",["uuid",router.uuid()]
             ]],
             "op":"mutate","table":"Logical_Router"
         });
