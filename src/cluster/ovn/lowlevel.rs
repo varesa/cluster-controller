@@ -273,8 +273,7 @@ impl Ovn {
                 "name": lrp_name,
                 "mac": "02:00:00:00:00:01",
                 "networks": networks,
-            },
-            "uuid-name": "new_lrp"
+            }
         });
         self.transact(&[update_lrp]);
         Ok(())
