@@ -260,6 +260,26 @@ impl Ovn {
         Ok(())
     }
 
+    pub fn update_lrp(&mut self, lrp_name: &str, networks: &str) -> Result<(), Error> {
+        let lrp = self.get_lrp(lrp_name)?;
+
+        let update_lrp = json!({
+            "op": "update",
+            "table": TYPE_LOGICAL_ROUTER_PORT,
+            "where": [
+                ["_uuid", "==", ["uuid", lrp.uuid()]]
+            ],
+            "row": {
+                "name": lrp_name,
+                "mac": "02:00:00:00:00:01",
+                "networks": networks,
+            },
+            "uuid-name": "new_lrp"
+        });
+        self.transact(&[update_lrp]);
+        Ok(())
+    }
+
     pub fn del_lsp(&mut self, ls_name: &str, lsp_id: &str) -> Result<(), Error> {
         let ls = self.get_ls(ls_name)?;
 

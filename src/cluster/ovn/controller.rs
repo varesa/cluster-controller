@@ -87,6 +87,8 @@ fn ensure_router_attachment(
     let lrp_name = format!("lr_{}-{}_ls_{}", namespace, name, name_namespaced(network));
     if ovn.get_lrp(&lrp_name).is_err() {
         ovn.add_lrp(&lr.name, &lrp_name, &router_attachment.address)?;
+    } else {
+        ovn.update_lrp(&lrp_name, &router_attachment.address)?;
     }
 
     let lsp_name = format!("ls_{}_lr_{}-{}", ls_name, namespace, name);
