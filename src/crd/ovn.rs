@@ -9,13 +9,13 @@ use serde::{Deserialize, Serialize};
 use crate::errors::Error;
 use crate::utils::wait_crd_ready;
 
-#[derive(Debug, PartialEq, Clone, JsonSchema, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, JsonSchema, Serialize, Deserialize, Default)]
 pub struct Quantity(String);
 
 const NETWORK_CRD_NAME: &str = "networks.cluster-virt.acl.fi";
 const ROUTER_CRD_NAME: &str = "routers.cluster-virt.acl.fi";
 
-#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
 pub struct DhcpOptions {
     pub cidr: String,
     pub lease_time: Option<u64>,
@@ -24,13 +24,15 @@ pub struct DhcpOptions {
     pub router: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
 pub struct RouterAttachment {
     pub name: String,
     pub address: String,
 }
 
-#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(
+    CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
+)]
 #[kube(
     apiextensions = "v1",
     group = "cluster-virt.acl.fi",
@@ -47,18 +49,20 @@ pub struct NetworkSpec {
     pub routers: Option<Vec<RouterAttachment>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct NetworkStatus {
     pub is_created: bool,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
 pub struct Route {
     pub cidr: String,
     pub nexthop: String,
 }
 
-#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(
+    CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
+)]
 #[kube(
     apiextensions = "v1",
     group = "cluster-virt.acl.fi",
@@ -74,7 +78,7 @@ pub struct RouterSpec {
     pub routes: Option<Vec<Route>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct RouterStatus {
     pub is_created: bool,
 }

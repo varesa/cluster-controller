@@ -137,7 +137,7 @@ async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<Reconc
     set_status(&vm, new_status, client.clone()).await?;
 
     println!("libvirt: updated: {}", name);
-    return ok_and_requeue!(600);
+    ok_and_requeue!(600)
 }
 
 fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {

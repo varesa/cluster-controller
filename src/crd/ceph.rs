@@ -9,12 +9,14 @@ use serde::{Deserialize, Serialize};
 use crate::errors::Error;
 use crate::utils::wait_crd_ready;
 
-#[derive(Debug, PartialEq, Clone, JsonSchema, Serialize, Deserialize, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, JsonSchema, Serialize, Deserialize, Default)]
 pub struct Quantity(String);
 
 const CRD_NAME: &str = "volumes.cluster-virt.acl.fi";
 
-#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(
+    CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
+)]
 #[kube(
     apiextensions = "v1",
     group = "cluster-virt.acl.fi",
@@ -32,7 +34,7 @@ pub struct VolumeSpec {
     pub template: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct VolumeStatus {
     is_created: bool,
 }

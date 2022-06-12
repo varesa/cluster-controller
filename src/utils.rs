@@ -33,7 +33,7 @@ pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) ->
             }
         }
     }
-    return Err(Error::Timeout(format!("Apply CRD {}", name)));
+    Err(Error::Timeout(format!("Apply CRD {}", name)))
 }
 
 pub fn name_namespaced<T>(resource: &T) -> String

@@ -1,5 +1,5 @@
-use sha2::{Sha256, Digest};
 use crate::crd::libvirt::NetworkAttachment;
+use sha2::{Digest, Sha256};
 
 const PREFIX: &str = "52:54:00";
 
@@ -10,8 +10,12 @@ pub fn generate_mac_address(vm_name: &str, nic: &NetworkAttachment, index: usize
     hasher.update(&vm_name);
     let network = nic.name.clone();
     let bridge = nic.bridge.clone();
-    hasher.update(network.or(bridge).expect("bridge or network name should be set"));
+    hasher.update(
+        network
+            .or(bridge)
+            .expect("bridge or network name should be set"),
+    );
     hasher.update(vec![index as u8]);
     let hash = hasher.finalize();
-    return format!("{}:{:x}:{:x}:{:x}", PREFIX, hash[29], hash[30], hash[31]);
+    format!("{}:{:x}:{:x}:{:x}", PREFIX, hash[29], hash[30], hash[31])
 }
