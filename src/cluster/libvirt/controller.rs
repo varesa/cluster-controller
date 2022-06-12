@@ -5,8 +5,10 @@ use kube::{
     api::{Api, ListParams, PostParams, ResourceExt},
     Client,
 };
+use lazy_static::lazy_static;
 use rand::seq::SliceRandom;
 use serde_json::json;
+use tokio::sync::Mutex;
 use tokio::time::Duration;
 
 use crate::cluster::libvirt::utils::generate_mac_address;
@@ -96,6 +98,10 @@ async fn fill_uuid(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
     Ok(())
 }
 
+lazy_static! {
+    static ref SCHEDULE_MUTEX: Mutex<()> = Mutex::new(());
+}
+
 /// Handle updates to volumes in the cluster
 async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let client = ctx.get_ref().client.clone();
@@ -129,13 +135,17 @@ async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<Reconc
         new_status.domain_name = name.clone();
     }
 
-    if !old_status.scheduled {
-        let node = schedule(&vm, client.clone()).await?;
-        new_status.node = Some(node.metadata.name.expect("Unknown node name"));
-        new_status.scheduled = true;
-    }
+    {
+        let _mutex = SCHEDULE_MUTEX.lock().await;
+        println!("libvirt: Acquired mutex to schedule: {}", name);
+        if !old_status.scheduled {
+            let node = schedule(&vm, client.clone()).await?;
+            new_status.node = Some(node.metadata.name.expect("Unknown node name"));
+            new_status.scheduled = true;
+        }
 
-    set_status(&vm, new_status, client.clone()).await?;
+        set_status(&vm, new_status, client.clone()).await?;
+    }
 
     println!("libvirt: updated: {}", name);
     ok_and_requeue!(600)
