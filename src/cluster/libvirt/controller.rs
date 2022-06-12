@@ -1,17 +1,15 @@
 use futures::StreamExt;
-use k8s_openapi::api::core::v1::Node;
 use kube::runtime::controller::{Context, Controller, ReconcilerAction};
 use kube::{
     api::{Api, ListParams, PostParams, ResourceExt},
     Client,
 };
 use lazy_static::lazy_static;
-use rand::seq::SliceRandom;
 use serde_json::json;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
 
-use crate::cluster::libvirt::utils::generate_mac_address;
+use crate::cluster::libvirt::{scheduling, utils::generate_mac_address};
 use crate::crd::libvirt::{VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
@@ -28,39 +26,6 @@ struct State {
 }
 
 create_set_status!(VirtualMachine, VirtualMachineStatus);
-
-async fn schedule(vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
-    let node_api: Api<Node> = Api::all(client.clone());
-    let mut candidates = node_api.list(&ListParams::default()).await?;
-
-    let labels = ResourceExt::labels(vm);
-    let anti_affinity_group = labels.get("antiAffinity");
-    if let Some(anti_affinity_grouo) = anti_affinity_group {
-        let vm_api: Api<VirtualMachine> = Api::all(client.clone());
-        let list_params = ListParams {
-            label_selector: Some(format!("antiAffinity={}", anti_affinity_grouo)),
-            ..ListParams::default()
-        };
-        let conflicting_vms = vm_api.list(&list_params).await?;
-        let conflicting_nodes: Vec<String> = conflicting_vms
-            .iter()
-            .filter_map(|vm| vm.status.clone())
-            .filter_map(|status| status.node)
-            .collect();
-
-        for conflicting_node in conflicting_nodes {
-            candidates
-                .items
-                .retain(|candidate| candidate.metadata.name.as_ref().unwrap() != &conflicting_node);
-        }
-    }
-
-    if let Some(node) = candidates.items.choose(&mut rand::thread_rng()) {
-        Ok(node.clone())
-    } else {
-        Err(Error::ScheduleFailed(vm.metadata.name.clone().unwrap()))
-    }
-}
 
 async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
     let vm_name = name_namespaced(vm);
@@ -139,7 +104,7 @@ async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<Reconc
         let _mutex = SCHEDULE_MUTEX.lock().await;
         println!("libvirt: Acquired mutex to schedule: {}", name);
         if !old_status.scheduled {
-            let node = schedule(&vm, client.clone()).await?;
+            let node = scheduling::schedule(&vm, client.clone()).await?;
             new_status.node = Some(node.metadata.name.expect("Unknown node name"));
             new_status.scheduled = true;
         }

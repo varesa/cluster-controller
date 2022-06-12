@@ -4,6 +4,7 @@ use crate::crd;
 use crate::errors::Error;
 
 mod controller;
+mod scheduling;
 mod utils;
 
 pub async fn run(client: Client) -> Result<(), Error> {
