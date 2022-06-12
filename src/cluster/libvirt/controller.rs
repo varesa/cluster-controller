@@ -100,6 +100,7 @@ async fn fill_uuid(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
 async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let client = ctx.get_ref().client.clone();
     let name = name_namespaced(&vm);
+    println!("libvirt: beginning to reconcile: {}", name);
 
     if vm.metadata.deletion_timestamp.is_some() {
         println!("libvirt: VM {} waiting for deletion", name);
