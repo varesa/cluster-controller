@@ -58,6 +58,8 @@ pub enum Error {
     // Libvirt
     #[error("libvirt error {0}")]
     Libvirt(#[from] virt::error::Error),
+    #[error("no candidates left to schedule: {0}")]
+    ScheduleFailed(String),
 
     // OVN
     #[error("Object {1} of type {0} not found")]

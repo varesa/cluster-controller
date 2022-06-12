@@ -5,6 +5,7 @@ use kube::{
     api::{Api, ListParams, PostParams, ResourceExt},
     Client,
 };
+use rand::seq::SliceRandom;
 use serde_json::json;
 use tokio::time::Duration;
 
@@ -26,13 +27,37 @@ struct State {
 
 create_set_status!(VirtualMachine, VirtualMachineStatus);
 
-async fn schedule(_vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
+async fn schedule(vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
     let node_api: Api<Node> = Api::all(client.clone());
-    let nodes = node_api.list(&ListParams::default()).await?;
-    /*for node in nodes {
-        println!("Candidate: {}", ResourceExt::name(&node));
-    }*/
-    Ok(nodes.items[0].clone())
+    let mut candidates = node_api.list(&ListParams::default()).await?;
+
+    let labels = ResourceExt::labels(vm);
+    let anti_affinity_group = labels.get("antiAffinity");
+    if let Some(anti_affinity_grouo) = anti_affinity_group {
+        let vm_api: Api<VirtualMachine> = Api::all(client.clone());
+        let list_params = ListParams {
+            label_selector: Some(format!("antiAffinity={}", anti_affinity_grouo)),
+            ..ListParams::default()
+        };
+        let conflicting_vms = vm_api.list(&list_params).await?;
+        let conflicting_nodes: Vec<String> = conflicting_vms
+            .iter()
+            .filter_map(|vm| vm.status.clone())
+            .filter_map(|status| status.node)
+            .collect();
+
+        for conflicting_node in conflicting_nodes {
+            candidates
+                .items
+                .retain(|candidate| candidate.metadata.name.as_ref().unwrap() != &conflicting_node);
+        }
+    }
+
+    if let Some(node) = candidates.items.choose(&mut rand::thread_rng()) {
+        Ok(node.clone())
+    } else {
+        Err(Error::ScheduleFailed(vm.metadata.name.clone().unwrap()))
+    }
 }
 
 async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {

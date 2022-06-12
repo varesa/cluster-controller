@@ -56,6 +56,8 @@ kind: VirtualMachine
 metadata:
   name: vm-1.mydomain.com
   namespace: test2
+  labels:
+    antiAffinity: 'test-vm-group'
 spec:
   cpus: 3
   memory: 2G
@@ -69,6 +71,8 @@ kind: VirtualMachine
 metadata:
   name: vm-2.mydomain.com
   namespace: test2
+  labels:
+    antiAffinity: 'test-vm-group'
 spec:
   cpus: 3
   memory: 2G
