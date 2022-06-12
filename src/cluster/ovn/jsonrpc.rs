@@ -55,7 +55,7 @@ impl JsonRpcConnection {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Params {
     ByPosition(Vec<serde_json::Value>),

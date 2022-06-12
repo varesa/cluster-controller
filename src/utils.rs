@@ -140,6 +140,7 @@ macro_rules! client_ensure_finalizer {
         let namespace = ResourceExt::namespace($resource).expect("Unable to get namespace");
         let api: Api<$resource_type> = Api::namespaced($client.clone(), &namespace);
 
+        #[allow(clippy::needless_borrow)]
         if !resource_has_finalizer!($resource, &finalizer_name) {
             let mut new_resource = $resource.to_owned();
             if let Some(finalizers) = new_resource.metadata.finalizers.as_mut() {
@@ -159,6 +160,7 @@ macro_rules! client_remove_finalizer {
         let namespace = ResourceExt::namespace($resource).expect("Unable to get namespace");
         let api: Api<$resource_type> = Api::namespaced($client.clone(), &namespace);
 
+        #[allow(clippy::needless_borrow)]
         if resource_has_finalizer!($resource, &finalizer_name) {
             let mut finalizers = $resource.metadata.finalizers.clone().unwrap();
             finalizers.retain(|f| f != &finalizer_name);
