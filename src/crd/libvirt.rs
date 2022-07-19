@@ -42,7 +42,8 @@ pub struct NetworkAttachment {
     derive = "PartialEq",
     derive = "Default",
     shortname = "vm",
-    namespaced
+    namespaced,
+    printcolumn = r#"{"name":"Node", "type":"string", "description":"Node the VM is scheduled to", "jsonPath":".status.node"}"#
 )]
 pub struct VirtualMachineSpec {
     pub cpus: usize,
