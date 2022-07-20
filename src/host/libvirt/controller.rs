@@ -137,56 +137,66 @@ fn refresh_domain(
     Ok(())
 }
 
-fn is_update_for_us(vm: &VirtualMachine, libvirt: &virt::connect::Connect) -> bool {
+enum Event {
+    MissingDomainName,
+    Unscheduled,
+    NoNode,
+    InboundMigration,
+    OutboundMigration,
+    NotOurs,
+    IsOurs,
+}
+
+fn get_event_type(vm: &VirtualMachine, libvirt: &virt::connect::Connect) -> Event {
     let my_node_name = env::var("NODE_NAME").expect("failed to read $NODE_NAME");
+    let k8s_vm_name = &vm.metadata.name.clone().expect("VM has no name");
 
-    println!(
-        "Received update to {} on {}",
-        &vm.metadata.name.clone().expect("VM has no name"),
-        my_node_name
-    );
+    println!("Received update to {} on {}", k8s_vm_name, my_node_name);
 
-    let vm_name = match get_domain_name(vm) {
-        None => return false,
-        Some(name) => name,
+    let libvirt_domain_name = if let Some(name) = get_domain_name(vm) {
+        name
+    } else {
+        return Event::MissingDomainName;
     };
 
-    let target_node = vm.status.as_ref().and_then(|status| status.node.as_ref());
+    let vm_status = vm.status.clone().expect("VM has no status");
 
-    // Check if VM has a target node set
-    if let Some(target_node_name) = target_node {
+    if !vm_status.scheduled {
+        return Event::Unscheduled;
+    }
 
-        // Check if target node matches us
-        if target_node_name != &my_node_name {
-
-            // Check if we are, however running said VM
-            if Domain::lookup_by_name(libvirt, &vm_name).is_ok() {
-                println!("VM {} running on us but belongs elsewhere", vm_name);
-                return true;
-            }
-
-            println!("Ignored VM {} for another host", vm_name);
-            return false;
-        }
+    let target_node = if let Some(name) = vm.status.as_ref().and_then(|status| status.node.as_ref()) {
+        name
     } else {
-        println!("Ignored unscheduled VM {}", vm_name);
-        return false;
+        return Event::NoNode;
+    };
+
+    let vm_runs_on_us = Domain::lookup_by_name(libvirt, &libvirt_domain_name).is_ok();
+    let target_node_is_us = target_node != &my_node_name;
+    let migration_pending = vm.status.as_ref().expect("VM has no status").migration_pending;
+
+    if target_node_is_us && migration_pending {
+        return Event::InboundMigration;
     }
 
-    if vm.status.as_ref().expect("VM has no status").migration_pending {
-        println!("Ignored VM {} pending inbound migration", vm_name);
-        return false;
+    if !target_node_is_us {
+        if vm_runs_on_us {
+            return Event::OutboundMigration;
+        } else {
+            return Event::NotOurs;
+        }
     }
 
-    true
+    Event::IsOurs
 }
 
 /// Handle updates to volumes in the cluster
 async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let client = ctx.get_ref().kube.clone();
 
-    if !is_update_for_us(&vm, &ctx.get_ref().libvirt.connection) {
-        return ok_no_requeue!();
+    match get_event_type(&vm, &ctx.get_ref().libvirt.connection) {
+        Event::IsOurs => {},
+        _ =>  { return ok_no_requeue!() },
     }
 
     let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
