@@ -65,7 +65,7 @@ macro_rules! create_controller {
 #[macro_export]
 macro_rules! create_set_status {
     ($resource_type:ident, $resource_status_type:ident, $fn_name:ident) => {
-        async fn $fn_name(resource: &$resource_type, status: $resource_status_type, client: Client) -> Result<(), Error> {
+        pub async fn $fn_name(resource: &$resource_type, status: $resource_status_type, client: Client) -> Result<(), Error> {
             let api: Api<$resource_type> = Api::namespaced(
                 client.clone(),
                 &ResourceExt::namespace(resource).expect("get resource namespace"),

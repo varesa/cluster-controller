@@ -15,7 +15,7 @@ use virt::{domain::Domain, secret::Secret as LibvirtSecret};
 use super::lowlevel::Libvirt;
 use super::templates::{DomainTemplate, SecretTemplate};
 use crate::crd::cluster::Cluster;
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::libvirt::{VirtualMachine,VirtualMachineStatus};
 use crate::errors::ClusterNotFound;
 use crate::errors::Error;
 use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
@@ -129,14 +129,6 @@ fn create_domain(
     Ok(())
 }
 
-fn refresh_domain(
-    _vm: &VirtualMachine,
-    _domain: &Domain,
-    _ctx: &Context<State>,
-) -> Result<(), Error> {
-    Ok(())
-}
-
 enum Event {
     MissingDomainName,
     Unscheduled,
@@ -144,12 +136,16 @@ enum Event {
     InboundMigration,
     OutboundMigration,
     NotOurs,
-    IsOurs,
+    Added,
+    Updated,
+    Deleted,
 }
 
-fn get_event_type(vm: &VirtualMachine, libvirt: &virt::connect::Connect) -> Event {
+fn get_event_type(vm: &VirtualMachine, ctx: &Context<State>) -> Event {
+    let libvirt = &ctx.get_ref().libvirt.connection;
     let my_node_name = env::var("NODE_NAME").expect("failed to read $NODE_NAME");
     let k8s_vm_name = &vm.metadata.name.clone().expect("VM has no name");
+    let is_deleted = &vm.metadata.deletion_timestamp.is_some();
 
     println!("Received update to {} on {}", k8s_vm_name, my_node_name);
 
@@ -187,60 +183,68 @@ fn get_event_type(vm: &VirtualMachine, libvirt: &virt::connect::Connect) -> Even
         }
     }
 
-    Event::IsOurs
+    match (vm_runs_on_us, is_deleted) {
+        (false, false) => Event::Added,
+        (true, false) => Event::Updated,
+        (true, true) => Event::Deleted,
+        (false, true) => panic!("We shouldn't see deletion of other node's VMs"),
+    }
 }
+
+
+async fn handle_delete(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+    let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
+    println!("VM {} waiting for deletion by host controller", vm_name);
+
+    match Domain::lookup_by_name(&ctx.get_ref().libvirt.connection, &vm_name) {
+        Ok(domain) => {
+            println!("Domain {vm_name} exists, destroying");
+            domain.destroy()?;
+            println!("Domain {vm_name} destroyed");
+        }
+        Err(_) => {
+            println!("Domain {vm_name} doesn't exist, ignoring");
+        }
+    };
+
+    client_remove_finalizer!(ctx.get_ref().kube.clone(), VirtualMachine, &vm, "libvirt-host");
+
+    ok_no_requeue!()
+}
+
+async fn handle_add(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+    let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
+    client_ensure_finalizer!(ctx.get_ref().kube.clone(), VirtualMachine, &vm, "libvirt-host");
+
+    // Get cluster capabilities / definition
+    let cluster = get_cluster(&ctx).await?;
+
+    create_domain(&vm, &cluster, &ctx)?;
+
+    /*
+    let status = VirtualMachineStatus {
+        running: true,
+        ..vm.status.expect("VM didn't have existing status")
+    };
+    set_status(&vm, status, ctx.get_ref().clone()).await?;
+    */
+
+    println!("Updated: {}", vm_name);
+
+    ok_and_requeue!(600)
+}
+
+async fn handle_migration(_vm: VirtualMachine, _ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+    ok_and_requeue!(10)
+}
+
 
 /// Handle updates to volumes in the cluster
 async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let client = ctx.get_ref().kube.clone();
-
-    match get_event_type(&vm, &ctx.get_ref().libvirt.connection) {
-        Event::IsOurs => {},
-        _ =>  { return ok_no_requeue!() },
-    }
-
-    let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
-    println!("Update for VM {} that has been scheduled to us", vm_name);
-
-    if vm.metadata.deletion_timestamp.is_some() {
-        println!("VM {} waiting for deletion by host controller", vm_name);
-
-        match Domain::lookup_by_name(&ctx.get_ref().libvirt.connection, &vm_name) {
-            Ok(domain) => {
-                println!("Domain {vm_name} exists, destroying");
-                domain.destroy()?;
-                println!("Domain {vm_name} destroyed");
-            }
-            Err(_) => {
-                println!("Domain {vm_name} doesn't exist, ignoring");
-            }
-        };
-
-        client_remove_finalizer!(client.clone(), VirtualMachine, &vm, "libvirt-host");
-
-        ok_no_requeue!()
-    } else {
-        client_ensure_finalizer!(client.clone(), VirtualMachine, &vm, "libvirt-host");
-
-        // Get cluster capabilities / definition
-        let cluster = get_cluster(&ctx).await?;
-
-        match Domain::lookup_by_name(&ctx.get_ref().libvirt.connection, &vm_name) {
-            Ok(domain) => refresh_domain(&vm, &domain, &ctx),
-            Err(_) => create_domain(&vm, &cluster, &ctx),
-        }?;
-
-        /*
-        let status = VirtualMachineStatus {
-            scheduled: false,
-            running: false,
-            node: None,
-        };
-        set_status(&vm, status, client.clone()).await?;*/
-
-        println!("Updated: {}", vm_name);
-
-        ok_and_requeue!(600)
+    match get_event_type(&vm, &ctx) {
+        Event::Deleted => handle_delete(vm, ctx).await,
+        Event::Added => handle_add(vm, ctx).await,
+        _ =>  { ok_no_requeue!() },
     }
 }
 
