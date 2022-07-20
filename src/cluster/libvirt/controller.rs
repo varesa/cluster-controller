@@ -5,16 +5,15 @@ use kube::{
     Client,
 };
 use lazy_static::lazy_static;
-use serde_json::json;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
 
 use crate::cluster::libvirt::{scheduling, utils::generate_mac_address};
-use crate::crd::libvirt::{VirtualMachine, VirtualMachineStatus};
+use crate::crd::libvirt::{VirtualMachine, VirtualMachineStatus, set_vm_status};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
 use crate::{
-    api_replace_resource, client_replace_resource, create_controller, create_set_status,
+    api_replace_resource, client_replace_resource, create_controller,
     ok_and_requeue,
 };
 use uuid::Uuid;
@@ -24,8 +23,6 @@ use uuid::Uuid;
 struct State {
     client: Client,
 }
-
-create_set_status!(VirtualMachine, VirtualMachineStatus);
 
 async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
     let vm_name = name_namespaced(vm);
@@ -110,7 +107,7 @@ async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<Reconc
             new_status.scheduled = true;
         }
 
-        set_status(&vm, new_status, client.clone()).await?;
+        set_vm_status(&vm, new_status, client.clone()).await?;
     }
 
     println!("libvirt: updated: {}", name);

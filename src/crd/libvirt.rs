@@ -1,10 +1,11 @@
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
-    api::{Patch, PatchParams},
-    Api, Client, CustomResource, CustomResourceExt,
+    api::{Patch, PatchParams, PostParams},
+    Api, Client, CustomResource, CustomResourceExt, ResourceExt,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::errors::Error;
 use crate::utils::wait_crd_ready;
@@ -73,3 +74,5 @@ pub async fn create(client: Client) -> Result<(), Error> {
     wait_crd_ready(&crds, CRD_NAME).await?;
     Ok(())
 }
+
+create_set_status!(VirtualMachine, VirtualMachineStatus, set_vm_status);

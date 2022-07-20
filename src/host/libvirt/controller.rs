@@ -15,7 +15,7 @@ use virt::{domain::Domain, secret::Secret as LibvirtSecret};
 use super::lowlevel::Libvirt;
 use super::templates::{DomainTemplate, SecretTemplate};
 use crate::crd::cluster::Cluster;
-use crate::crd::libvirt::{VirtualMachine,VirtualMachineStatus};
+use crate::crd::libvirt::{VirtualMachine, VirtualMachineStatus, set_vm_status};
 use crate::errors::ClusterNotFound;
 use crate::errors::Error;
 use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
@@ -221,16 +221,13 @@ async fn handle_add(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconcile
 
     create_domain(&vm, &cluster, &ctx)?;
 
-    /*
     let status = VirtualMachineStatus {
         running: true,
-        ..vm.status.expect("VM didn't have existing status")
+        ..vm.status.clone().expect("VM didn't have existing status")
     };
-    set_status(&vm, status, ctx.get_ref().clone()).await?;
-    */
+    set_vm_status(&vm, status, ctx.get_ref().kube.clone()).await?;
 
     println!("Updated: {}", vm_name);
-
     ok_and_requeue!(600)
 }
 
