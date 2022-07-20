@@ -137,7 +137,7 @@ fn refresh_domain(
     Ok(())
 }
 
-fn is_update_for_us(vm: &VirtualMachine) -> bool {
+fn is_update_for_us(vm: &VirtualMachine, libvirt: &virt::connect::Connect) -> bool {
     let my_node_name = env::var("NODE_NAME").expect("failed to read $NODE_NAME");
 
     println!(
@@ -152,13 +152,29 @@ fn is_update_for_us(vm: &VirtualMachine) -> bool {
     };
 
     let target_node = vm.status.as_ref().and_then(|status| status.node.as_ref());
+
+    // Check if VM has a target node set
     if let Some(target_node_name) = target_node {
+
+        // Check if target node matches us
         if target_node_name != &my_node_name {
+
+            // Check if we are, however running said VM
+            if Domain::lookup_by_name(libvirt, &vm_name).is_ok() {
+                println!("VM {} running on us but belongs elsewhere", vm_name);
+                return true;
+            }
+
             println!("Ignored VM {} for another host", vm_name);
             return false;
         }
     } else {
         println!("Ignored unscheduled VM {}", vm_name);
+        return false;
+    }
+
+    if vm.status.as_ref().expect("VM has no status").migration_pending {
+        println!("Ignored VM {} pending inbound migration", vm_name);
         return false;
     }
 
@@ -169,7 +185,7 @@ fn is_update_for_us(vm: &VirtualMachine) -> bool {
 async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let client = ctx.get_ref().kube.clone();
 
-    if !is_update_for_us(&vm) {
+    if !is_update_for_us(&vm, &ctx.get_ref().libvirt.connection) {
         return ok_no_requeue!();
     }
 

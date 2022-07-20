@@ -58,6 +58,7 @@ pub struct VirtualMachineSpec {
 pub struct VirtualMachineStatus {
     pub scheduled: bool,
     pub running: bool,
+    pub migration_pending: bool,
     pub node: Option<String>,
     pub domain_name: String,
 }

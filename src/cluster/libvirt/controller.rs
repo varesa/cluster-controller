@@ -88,6 +88,7 @@ async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<Reconc
             Some(VirtualMachineStatus {
                 scheduled: false,
                 running: false,
+                migration_pending: false,
                 node: None,
                 domain_name: String::new(),
             })
