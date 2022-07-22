@@ -15,7 +15,7 @@ use virt::{domain::Domain, secret::Secret as LibvirtSecret};
 use super::lowlevel::Libvirt;
 use super::templates::{DomainTemplate, SecretTemplate};
 use crate::crd::cluster::Cluster;
-use crate::crd::libvirt::{VirtualMachine, VirtualMachineStatus, set_vm_status};
+use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::errors::ClusterNotFound;
 use crate::errors::Error;
 use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
@@ -26,6 +26,7 @@ use crate::{
 
 const LIBVIRT_URI: &str = "qemu:///system";
 const CEPH_SECRET_UUID: &str = "8e22b0ac-b429-4ad1-8783-6d792db31349";
+const NO_BW_LIMIT: u64 = 0;
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -161,7 +162,8 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Context<State>) -> Event {
         return Event::Unscheduled;
     }
 
-    let target_node = if let Some(name) = vm.status.as_ref().and_then(|status| status.node.as_ref()) {
+    let target_node = if let Some(name) = vm.status.as_ref().and_then(|status| status.node.as_ref())
+    {
         name
     } else {
         return Event::NoNode;
@@ -169,7 +171,11 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Context<State>) -> Event {
 
     let vm_runs_on_us = Domain::lookup_by_name(libvirt, &libvirt_domain_name).is_ok();
     let target_node_is_us = target_node != &my_node_name;
-    let migration_pending = vm.status.as_ref().expect("VM has no status").migration_pending;
+    let migration_pending = vm
+        .status
+        .as_ref()
+        .expect("VM has no status")
+        .migration_pending;
 
     if target_node_is_us && migration_pending {
         return Event::InboundMigration;
@@ -191,7 +197,6 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Context<State>) -> Event {
     }
 }
 
-
 async fn handle_delete(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
     println!("VM {} waiting for deletion by host controller", vm_name);
@@ -207,14 +212,24 @@ async fn handle_delete(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconc
         }
     };
 
-    client_remove_finalizer!(ctx.get_ref().kube.clone(), VirtualMachine, &vm, "libvirt-host");
+    client_remove_finalizer!(
+        ctx.get_ref().kube.clone(),
+        VirtualMachine,
+        &vm,
+        "libvirt-host"
+    );
 
     ok_no_requeue!()
 }
 
 async fn handle_add(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
-    client_ensure_finalizer!(ctx.get_ref().kube.clone(), VirtualMachine, &vm, "libvirt-host");
+    client_ensure_finalizer!(
+        ctx.get_ref().kube.clone(),
+        VirtualMachine,
+        &vm,
+        "libvirt-host"
+    );
 
     // Get cluster capabilities / definition
     let cluster = get_cluster(&ctx).await?;
@@ -231,17 +246,36 @@ async fn handle_add(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconcile
     ok_and_requeue!(600)
 }
 
-async fn handle_migration(_vm: VirtualMachine, _ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+async fn handle_migration(
+    vm: VirtualMachine,
+    ctx: Context<State>,
+) -> Result<ReconcilerAction, Error> {
+    let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
+    let domain = Domain::lookup_by_name(&ctx.get_ref().libvirt.connection, &vm_name)
+        .expect("Domain not found");
+    let destination_node = vm
+        .status
+        .expect("VM has no status")
+        .node
+        .expect("No destination node");
+
+    domain.migrate_to_uri(
+        &destination_node,
+        virt::domain::VIR_MIGRATE_PEER2PEER,
+        NO_BW_LIMIT,
+    )?;
     ok_and_requeue!(10)
 }
-
 
 /// Handle updates to volumes in the cluster
 async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     match get_event_type(&vm, &ctx) {
         Event::Deleted => handle_delete(vm, ctx).await,
         Event::Added => handle_add(vm, ctx).await,
-        _ =>  { ok_no_requeue!() },
+        Event::OutboundMigration => handle_migration(vm, ctx).await,
+        _ => {
+            ok_no_requeue!()
+        }
     }
 }
 
