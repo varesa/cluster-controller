@@ -1,133 +1,26 @@
-use askama::Template;
 use futures::StreamExt;
-use k8s_openapi::api::core::v1::Secret;
 use kube::runtime::controller::{Context, Controller, ReconcilerAction};
 use kube::{
-    api::{Api, ListParams, PostParams, ResourceExt},
+    api::{Api, ListParams},
     Client,
 };
-use lazy_static::lazy_static;
-use regex::Regex;
-use std::{convert::TryInto, env};
+use std::env;
 use tokio::time::Duration;
-use virt::{domain::Domain, secret::Secret as LibvirtSecret};
+use virt::domain::Domain;
 
 use super::lowlevel::Libvirt;
-use super::templates::{DomainTemplate, SecretTemplate};
-use crate::crd::cluster::Cluster;
-use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
-use crate::errors::ClusterNotFound;
+use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
-use crate::host::libvirt::templates::{NetworkInterfaceTemplate, StorageTemplate};
-use crate::{
-    api_replace_resource, client_ensure_finalizer, client_remove_finalizer, create_controller,
-    ok_and_requeue, ok_no_requeue, resource_has_finalizer, GROUP_NAME, KEYRING_SECRET, NAMESPACE,
-};
-
-const LIBVIRT_URI: &str = "qemu:///system";
-const CEPH_SECRET_UUID: &str = "8e22b0ac-b429-4ad1-8783-6d792db31349";
-const NO_BW_LIMIT: u64 = 0;
+use crate::host::libvirt::handlers::LIBVIRT_URI;
+use crate::host::libvirt::utils::get_domain_name;
+use crate::host::libvirt::{handlers, secrets};
+use crate::{create_controller, ok_no_requeue};
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
-struct State {
-    kube: Client,
-    libvirt: Libvirt,
-}
-
-/// Construct the expected
-fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
-    let domain_name: Option<&str> = vm.status.as_ref().map(|status| status.domain_name.as_ref());
-    match domain_name {
-        Some(name) => Some(String::from(name)),
-        _ => {
-            let namespace = ResourceExt::namespace(vm)
-                .or_else(|| Some(String::from("<no namespace>")))
-                .unwrap();
-            println!(
-                "Ignored VM {}/{} with no domain name defined",
-                namespace,
-                ResourceExt::name(vm)
-            );
-            None
-        }
-    }
-}
-
-async fn get_cluster(ctx: &Context<State>) -> Result<Cluster, ClusterNotFound> {
-    let name: &str = "default";
-    let client = ctx.get_ref().kube.clone();
-    let clusters: Api<Cluster> = Api::all(client.clone());
-    let default = clusters.get(name).await;
-
-    match default {
-        Ok(cluster) => Ok(cluster),
-        Err(error) => Err(ClusterNotFound {
-            name: name.into(),
-            inner_error: error,
-        }),
-    }
-}
-
-fn parse_memory(input: &str) -> Result<(usize, String), Error> {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r"(\d+)\s*([a-zA-Z]+)").unwrap();
-    }
-    let captures = RE.captures(input).unwrap();
-    //println!("{captures:?}");
-    Ok((
-        captures.get(1).unwrap().as_str().parse().unwrap(),
-        captures.get(2).unwrap().as_str().to_string(),
-    ))
-}
-
-fn create_domain(
-    vm: &VirtualMachine,
-    cluster: &Cluster,
-    ctx: &Context<State>,
-) -> Result<(), Error> {
-    let namespace = ResourceExt::namespace(vm).expect("VM without namespace?");
-    let mut volumes = Vec::new();
-    for (index, volume) in vm.spec.volumes.iter().enumerate() {
-        let drive_index: u8 = index.try_into().expect("Volume index overflows u8");
-        volumes.push(StorageTemplate {
-            pool: String::from("volumes"),
-            image: format!("{}-{}", namespace, volume.name),
-            device: format!("vd{}", (b'a' + drive_index) as char),
-            bus_slot: drive_index,
-            bootdevice: volumes.is_empty(), // First device is the boot device
-        });
-    }
-    let mut nics = Vec::new();
-    for nic in &vm.spec.networks {
-        let bridge = match nic.ovn_id.clone() {
-            Some(_) => String::from("br-int"),
-            None => nic.bridge.clone().expect("bridge to be set"),
-        };
-        nics.push(NetworkInterfaceTemplate {
-            bridge,
-            mac: nic.mac_address.clone().expect("MAC to be set"),
-            ovn_id: nic.ovn_id.clone(),
-        })
-    }
-    println!("{:?}", &vm);
-    let (memory_amount, memory_unit) = parse_memory(&vm.spec.memory)?;
-    let xml = DomainTemplate {
-        name: get_domain_name(vm).expect("no domain name specified"),
-        uuid: vm.spec.uuid.clone().expect("VM has no UUID"),
-        machine_type: cluster.spec.machine_type.clone(),
-        cpu: cluster.spec.cpu.clone(),
-        cpus: vm.spec.cpus,
-        memory: memory_amount,
-        memory_unit,
-        network_interfaces: nics,
-        storage_devices: volumes,
-    }
-    .render()?;
-
-    println!("{}", xml);
-    Domain::create_xml(&ctx.get_ref().libvirt.connection, &xml, 0)?;
-    Ok(())
+pub struct State {
+    pub kube: Client,
+    pub libvirt: Libvirt,
 }
 
 enum Event {
@@ -197,82 +90,12 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Context<State>) -> Event {
     }
 }
 
-async fn handle_delete(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
-    println!("VM {} waiting for deletion by host controller", vm_name);
-
-    match Domain::lookup_by_name(&ctx.get_ref().libvirt.connection, &vm_name) {
-        Ok(domain) => {
-            println!("Domain {vm_name} exists, destroying");
-            domain.destroy()?;
-            println!("Domain {vm_name} destroyed");
-        }
-        Err(_) => {
-            println!("Domain {vm_name} doesn't exist, ignoring");
-        }
-    };
-
-    client_remove_finalizer!(
-        ctx.get_ref().kube.clone(),
-        VirtualMachine,
-        &vm,
-        "libvirt-host"
-    );
-
-    ok_no_requeue!()
-}
-
-async fn handle_add(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
-    client_ensure_finalizer!(
-        ctx.get_ref().kube.clone(),
-        VirtualMachine,
-        &vm,
-        "libvirt-host"
-    );
-
-    // Get cluster capabilities / definition
-    let cluster = get_cluster(&ctx).await?;
-
-    create_domain(&vm, &cluster, &ctx)?;
-
-    let status = VirtualMachineStatus {
-        running: true,
-        ..vm.status.clone().expect("VM didn't have existing status")
-    };
-    set_vm_status(&vm, status, ctx.get_ref().kube.clone()).await?;
-
-    println!("Updated: {}", vm_name);
-    ok_and_requeue!(600)
-}
-
-async fn handle_migration(
-    vm: VirtualMachine,
-    ctx: Context<State>,
-) -> Result<ReconcilerAction, Error> {
-    let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
-    let domain = Domain::lookup_by_name(&ctx.get_ref().libvirt.connection, &vm_name)
-        .expect("Domain not found");
-    let destination_node = vm
-        .status
-        .expect("VM has no status")
-        .node
-        .expect("No destination node");
-
-    domain.migrate_to_uri(
-        &destination_node,
-        virt::domain::VIR_MIGRATE_PEER2PEER,
-        NO_BW_LIMIT,
-    )?;
-    ok_and_requeue!(10)
-}
-
 /// Handle updates to volumes in the cluster
 async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
     match get_event_type(&vm, &ctx) {
-        Event::Deleted => handle_delete(vm, ctx).await,
-        Event::Added => handle_add(vm, ctx).await,
-        Event::OutboundMigration => handle_migration(vm, ctx).await,
+        Event::Deleted => handlers::handle_delete(vm, ctx).await,
+        Event::Added => handlers::handle_add(vm, ctx).await,
+        Event::OutboundMigration => handlers::handle_migration(vm, ctx).await,
         _ => {
             ok_no_requeue!()
         }
@@ -285,43 +108,9 @@ fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
     }
 }
 
-fn create_secret(key: &[u8], libvirt: &Libvirt) -> Result<(), Error> {
-    let xml = SecretTemplate {
-        uuid: CEPH_SECRET_UUID.into(),
-        name: "client.libvirt secret".into(),
-        usage: "ceph".into(),
-    }
-    .render()?;
-
-    let secret = LibvirtSecret::define_xml(&libvirt.connection, &xml, 0)?;
-    secret.set_value(key, 0)?;
-
-    Ok(())
-}
-
-async fn ensure_ceph_secret(kube: Client, libvirt: &Libvirt) -> Result<(), Error> {
-    if LibvirtSecret::lookup_by_uuid_string(&libvirt.connection, CEPH_SECRET_UUID).is_ok() {
-        println!("Secret found");
-        return Ok(());
-    }
-    println!("Secret missing");
-
-    let secrets: Api<Secret> = Api::namespaced(kube.clone(), NAMESPACE);
-    let secret = match secrets.get(KEYRING_SECRET).await {
-        Err(e) => return Err(e.into()),
-        Ok(secret) => secret,
-    };
-
-    let data = secret.data.unwrap();
-    let key = data.get("key").unwrap().0.clone();
-    create_secret(key.as_ref(), libvirt)?;
-    println!("Secret created");
-    Ok(())
-}
-
 pub async fn create(client: Client) -> Result<(), Error> {
     let libvirt = Libvirt::new(LIBVIRT_URI)?;
-    ensure_ceph_secret(client.clone(), &libvirt).await?;
+    secrets::ensure_ceph_secret(client.clone(), &libvirt).await?;
     let context = Context::new(State {
         kube: client.clone(),
         libvirt,
