@@ -1,6 +1,6 @@
 # Build
 
-FROM docker.io/library/rust:latest as builder
+FROM docker.io/library/rust:buster as builder
 
 WORKDIR /usr/src/cluster-controller
 
@@ -19,7 +19,7 @@ RUN cargo install --path .
 
 # Run
 
-FROM docker.io/library/rockylinux:9
+FROM docker.io/library/rockylinux:8
 
 RUN dnf update -y && \
     dnf install -y centos-release-ceph-pacific && \
