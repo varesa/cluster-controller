@@ -5,7 +5,7 @@ use kube::{
 };
 use rand::seq::SliceRandom;
 
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::libvirt::v1beta2::VirtualMachine;
 use crate::errors::Error;
 
 /// Find all VMs registered to the k8s apiserver with the given label set to the given value

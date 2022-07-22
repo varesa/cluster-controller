@@ -1,14 +1,15 @@
 use futures::StreamExt;
-use kube::runtime::controller::{Context, Controller, ReconcilerAction};
+use kube::runtime::controller::{Action, Controller};
 use kube::{
     api::{Api, ListParams, PostParams},
-    Client, ResourceExt,
+    Client, Resource, ResourceExt,
 };
 use serde_json::json;
+use std::sync::Arc;
 use tokio::time::Duration;
 
 use crate::cluster::ovn::lowlevel::Ovn;
-use crate::crd::libvirt::{NetworkAttachment, VirtualMachine};
+use crate::crd::libvirt::{v1beta2::VirtualMachine, NetworkAttachment};
 use crate::crd::ovn::{
     DhcpOptions, Network, NetworkStatus, Route, Router, RouterAttachment, RouterStatus,
 };
@@ -116,21 +117,18 @@ fn delete_router(name: &str) -> Result<(), Error> {
 }
 
 /// Handle updates to networks in the cluster
-async fn reconcile_network(
-    network: Network,
-    ctx: Context<State>,
-) -> Result<ReconcilerAction, Error> {
-    let client = ctx.get_ref().client.clone();
-    let name = name_namespaced(&network);
+async fn reconcile_network(network: Arc<Network>, ctx: Arc<State>) -> Result<Action, Error> {
+    let client = ctx.client.clone();
+    let name = name_namespaced(network.as_ref());
 
     if network.metadata.deletion_timestamp.is_some() {
         println!("ovn: Network {} waiting for deletion", name);
         delete_network(&name)?;
-        client_remove_finalizer!(client, Network, &network, "ovn");
+        client_remove_finalizer!(client, Network, network.as_ref(), "ovn");
         println!("ovn: Network {} deleted", name);
     } else {
         println!("ovn: update for network {name}");
-        client_ensure_finalizer!(client, Network, &network, "ovn");
+        client_ensure_finalizer!(client, Network, network.as_ref(), "ovn");
         ensure_network_exists(&name);
         if let Some(dhcp_options) = network.spec.dhcp.as_ref() {
             ensure_dhcp(&name, dhcp_options)?;
@@ -202,9 +200,9 @@ fn get_vm_ovn_nics(vm: &VirtualMachine) -> Vec<NetworkAttachment> {
 }
 
 /// Handle updates to VMs in the cluster
-async fn reconcile_vm(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let name = name_namespaced(&vm);
-    let client = ctx.get_ref().client.clone();
+async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, Error> {
+    let name = name_namespaced(vm.as_ref());
+    let client = ctx.client.clone();
 
     if vm.metadata.deletion_timestamp.is_some() {
         println!("ovn: VM {name} waiting for deletion");
@@ -212,11 +210,11 @@ async fn reconcile_vm(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconci
             println!("ovn: disconnecting NIC {index} for VM {name}");
             disconnect_vm_nic(&vm, nic)?;
         }
-        client_remove_finalizer!(client, VirtualMachine, &vm, "ovn");
+        client_remove_finalizer!(client, VirtualMachine, vm.as_ref(), "ovn");
         ok_no_requeue!()
     } else {
         println!("ovn: VM {name} updated");
-        client_ensure_finalizer!(client, VirtualMachine, &vm, "ovn");
+        client_ensure_finalizer!(client, VirtualMachine, vm.as_ref(), "ovn");
         for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
             println!("ovn: connecting NIC {index} for VM {name}");
             connect_vm_nic(client.clone(), &vm, nic).await?;
@@ -227,18 +225,18 @@ async fn reconcile_vm(vm: VirtualMachine, ctx: Context<State>) -> Result<Reconci
 }
 
 /// Handle updates to routers in the cluster
-async fn reconcile_router(router: Router, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let client = ctx.get_ref().client.clone();
-    let name = name_namespaced(&router);
+async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action, Error> {
+    let client = ctx.client.clone();
+    let name = name_namespaced(router.as_ref());
 
     if router.metadata.deletion_timestamp.is_some() {
         println!("ovn: Router {} waiting for deletion", name);
         delete_router(&name)?;
-        client_remove_finalizer!(client, Router, &router, "ovn");
+        client_remove_finalizer!(client, Router, router.as_ref(), "ovn");
         println!("ovn: Router {} deleted", name);
     } else {
         println!("ovn: update for router {name}");
-        client_ensure_finalizer!(client, Router, &router, "ovn");
+        client_ensure_finalizer!(client, Router, router.as_ref(), "ovn");
 
         ensure_router_exists(&name);
         if let Some(routes) = &router.spec.routes {
@@ -255,14 +253,12 @@ async fn reconcile_router(router: Router, ctx: Context<State>) -> Result<Reconci
     ok_and_requeue!(600)
 }
 
-fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(15)),
-    }
+fn error_policy(_error: &Error, _ctx: Arc<State>) -> Action {
+    Action::requeue(Duration::from_secs(15))
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
-    let context = Context::new(State {
+    let context = Arc::new(State {
         client: client.clone(),
     });
     println!("ovn: Starting controllers");

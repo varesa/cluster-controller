@@ -1,7 +1,7 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
-    api::{ListParams, Resource, ResourceExt, WatchEvent},
+    api::{ListParams, Resource, WatchEvent},
     Api,
 };
 
@@ -42,8 +42,12 @@ where
 {
     format!(
         "{}-{}",
-        ResourceExt::namespace(resource).expect("get resource namespace"),
-        ResourceExt::name(resource)
+        resource
+            .meta()
+            .namespace
+            .as_ref()
+            .expect("get resource namespace"),
+        resource.meta().name.as_ref().expect("get resource name")
     )
 }
 
@@ -68,20 +72,20 @@ macro_rules! create_set_status {
         pub async fn $fn_name(resource: &$resource_type, status: $resource_status_type, client: Client) -> Result<(), Error> {
             let api: Api<$resource_type> = Api::namespaced(
                 client.clone(),
-                &ResourceExt::namespace(resource).expect("get resource namespace"),
+                &resource.meta().namespace.as_ref().expect("get resource namespace"),
             );
             let status_update = json!({
-                "apiVersion": resource.api_version,
-                "kind": resource.kind,
+                "apiVersion": $resource_type::api_version(&()),
+                "kind": $resource_type::kind(&()),
                 "metadata": {
-                    "name": ResourceExt::name(resource),
+                    "name": resource.meta().name.as_ref().expect("get resource name"),
                     "resourceVersion": ResourceExt::resource_version(resource),
                 },
                 "status": status,
             });
             api
                 .replace_status(
-                    &ResourceExt::name(resource),
+                    &resource.metadata.name.as_ref().expect("get resource name"),
                     &PostParams::default(),
                     serde_json::to_vec(&status_update).expect("serialize status"),
                 )
@@ -98,7 +102,7 @@ macro_rules! create_set_status {
 macro_rules! api_replace_resource {
     ($api:expr, $resource:expr) => {
         $api.replace(
-            &ResourceExt::name($resource),
+            &$resource.metadata.name.as_ref().expect("get resource name"),
             &PostParams::default(),
             $resource,
         )
@@ -111,7 +115,11 @@ macro_rules! client_replace_resource {
     ($client:ident, $resource_type:ident, $resource:ident) => {
         let api: Api<$resource_type> = Api::namespaced(
             $client.clone(),
-            &ResourceExt::namespace($resource).expect("get resource namespace"),
+            &$resource
+                .metadata
+                .namespace
+                .as_ref()
+                .expect("get resource namespace"),
         );
         api_replace_resource!(api, $resource);
     };
@@ -137,7 +145,11 @@ macro_rules! resource_has_finalizer {
 macro_rules! client_ensure_finalizer {
     ($client:expr, $resource_type:ident, $resource:expr, $controller_name:expr) => {
         let finalizer_name = format!("{}/{}", GROUP_NAME, $controller_name);
-        let namespace = ResourceExt::namespace($resource).expect("Unable to get namespace");
+        let namespace = $resource
+            .metadata
+            .namespace
+            .as_ref()
+            .expect("Unable to get namespace");
         let api: Api<$resource_type> = Api::namespaced($client.clone(), &namespace);
 
         #[allow(clippy::needless_borrow)]
@@ -157,7 +169,11 @@ macro_rules! client_ensure_finalizer {
 macro_rules! client_remove_finalizer {
     ($client:expr, $resource_type:ident, $resource:expr, $controller_name:expr) => {
         let finalizer_name = format!("{}/{}", GROUP_NAME, $controller_name);
-        let namespace = ResourceExt::namespace($resource).expect("Unable to get namespace");
+        let namespace = $resource
+            .metadata
+            .namespace
+            .as_ref()
+            .expect("Unable to get namespace");
         let api: Api<$resource_type> = Api::namespaced($client.clone(), &namespace);
 
         #[allow(clippy::needless_borrow)]
@@ -174,18 +190,14 @@ macro_rules! client_remove_finalizer {
 #[macro_export]
 macro_rules! ok_and_requeue {
     ($duration:expr) => {
-        Ok(ReconcilerAction {
-            requeue_after: Some(Duration::from_secs($duration)),
-        })
+        Ok(Action::requeue(Duration::from_secs($duration)))
     };
 }
 
 #[macro_export]
 macro_rules! ok_no_requeue {
     () => {
-        Ok(ReconcilerAction {
-            requeue_after: None,
-        })
+        Ok(Action::await_change())
     };
 }
 

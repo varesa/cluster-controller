@@ -1,12 +1,12 @@
 use crate::crd::cluster::Cluster;
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::libvirt::v1beta2::VirtualMachine;
 use crate::errors::ClusterNotFound;
 use crate::host::libvirt::controller::State;
 use crate::Error;
-use kube::runtime::controller::Context;
 use kube::{Api, ResourceExt};
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::sync::Arc;
 
 /// Construct the expected
 pub fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
@@ -20,16 +20,16 @@ pub fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
             println!(
                 "Ignored VM {}/{} with no domain name defined",
                 namespace,
-                ResourceExt::name(vm)
+                vm.metadata.name.as_ref().expect("get VM name")
             );
             None
         }
     }
 }
 
-pub async fn get_cluster(ctx: &Context<State>) -> Result<Cluster, ClusterNotFound> {
+pub async fn get_cluster(ctx: &Arc<State>) -> Result<Cluster, ClusterNotFound> {
     let name: &str = "default";
-    let client = ctx.get_ref().kube.clone();
+    let client = ctx.kube.clone();
     let clusters: Api<Cluster> = Api::all(client.clone());
     let default = clusters.get(name).await;
 

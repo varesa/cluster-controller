@@ -50,6 +50,8 @@ pub enum Error {
     Kube(#[from] kube::Error),
     #[error("Resource watcher error {0}")]
     KubeWatcher(#[from] kube::runtime::watcher::Error),
+    #[error("CRD version merge error {0}")]
+    CrdMergeError(#[from] kube::core::crd::MergeError),
 
     // Ceph
     #[error("librados error {0}")]

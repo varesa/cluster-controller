@@ -1,21 +1,22 @@
 use futures::StreamExt;
-use kube::runtime::controller::{Context, Controller, ReconcilerAction};
+use kube::runtime::controller::{Action, Controller};
 use kube::{
-    api::{Api, ListParams, PostParams, ResourceExt},
+    api::{Api, ListParams, PostParams},
     Client,
 };
 use lazy_static::lazy_static;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
 
 use crate::cluster::libvirt::{scheduling, utils::generate_mac_address};
-use crate::crd::libvirt::{VirtualMachine, VirtualMachineStatus, set_vm_status};
+use crate::crd::libvirt::{
+    set_vm_status,
+    v1beta2::{VirtualMachine, VirtualMachineStatus},
+};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
-use crate::{
-    api_replace_resource, client_replace_resource, create_controller,
-    ok_and_requeue,
-};
+use crate::{api_replace_resource, client_replace_resource, create_controller, ok_and_requeue};
 use uuid::Uuid;
 
 /// State available for the reconcile and error_policy functions
@@ -65,8 +66,9 @@ lazy_static! {
 }
 
 /// Handle updates to volumes in the cluster
-async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let client = ctx.get_ref().client.clone();
+async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, Error> {
+    let client = ctx.client.clone();
+    let mut vm = vm.as_ref().to_owned();
     let name = name_namespaced(&vm);
     println!("libvirt: beginning to reconcile: {}", name);
 
@@ -114,14 +116,12 @@ async fn reconcile(mut vm: VirtualMachine, ctx: Context<State>) -> Result<Reconc
     ok_and_requeue!(600)
 }
 
-fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(15)),
-    }
+fn error_policy(_error: &Error, _ctx: Arc<State>) -> Action {
+    Action::requeue(Duration::from_secs(15))
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
-    let context = Context::new(State {
+    let context = Arc::new(State {
         client: client.clone(),
     });
     let vms: Api<VirtualMachine> = Api::all(client.clone());

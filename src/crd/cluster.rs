@@ -18,7 +18,6 @@ const CRD_NAME: &str = "clusters.cluster-virt.acl.fi";
     CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
 )]
 #[kube(
-    apiextensions = "v1",
     group = "cluster-virt.acl.fi",
     version = "v1beta",
     kind = "Cluster",

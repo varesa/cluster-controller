@@ -1,13 +1,14 @@
 use futures::StreamExt;
 use humanize_rs::bytes::Bytes;
 use k8s_openapi::api::core::v1::Secret;
-use kube::runtime::controller::{Context, Controller, ReconcilerAction};
+use kube::runtime::controller::{Action, Controller};
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, PostParams, ResourceExt},
+    api::{Api, ListParams, Patch, PatchParams, PostParams},
     error::ErrorResponse,
     Client,
 };
 use serde_json::json;
+use std::sync::Arc;
 use tokio::time::Duration;
 
 use crate::crd::ceph::Volume;
@@ -130,37 +131,33 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
 }
 
 /// Handle updates to volumes in the cluster
-async fn reconcile(volume: Volume, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
-    let name = name_namespaced(&volume);
+async fn reconcile(volume: Arc<Volume>, ctx: Arc<State>) -> Result<Action, Error> {
+    let name = name_namespaced(volume.as_ref());
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
     let template = volume.spec.template.clone();
 
     if volume.metadata.deletion_timestamp.is_some() {
         println!("ceph: Volume {name} waiting for deletion");
         ensure_removed(&name)?;
-        client_remove_finalizer!(ctx.get_ref().client.clone(), Volume, &volume, "ceph");
+        client_remove_finalizer!(ctx.client.clone(), Volume, volume.as_ref(), "ceph");
         println!("ceph: Volume {name} deleted");
     } else {
         println!("ceph: Volume {name} updated");
-        client_ensure_finalizer!(ctx.get_ref().client.clone(), Volume, &volume, "ceph");
+        client_ensure_finalizer!(ctx.client.clone(), Volume, volume.as_ref(), "ceph");
         ensure_exists(&name, bytes, template)?;
         println!("ceph: Volume {name} update success");
     }
 
-    Ok(ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(600)),
-    })
+    Ok(Action::requeue(Duration::from_secs(600)))
 }
 
-fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(15)),
-    }
+fn error_policy(_error: &Error, _ctx: Arc<State>) -> Action {
+    Action::requeue(Duration::from_secs(15))
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
     ensure_keyring(client.clone()).await?;
-    let context = Context::new(State {
+    let context = Arc::new(State {
         client: client.clone(),
     });
     let volumes: Api<Volume> = Api::all(client.clone());

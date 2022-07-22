@@ -1,15 +1,16 @@
 use futures::StreamExt;
-use kube::runtime::controller::{Context, Controller, ReconcilerAction};
+use kube::runtime::controller::{Action, Controller};
 use kube::{
     api::{Api, ListParams},
     Client,
 };
 use std::env;
+use std::sync::Arc;
 use tokio::time::Duration;
 use virt::domain::Domain;
 
 use super::lowlevel::Libvirt;
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::libvirt::v1beta2::VirtualMachine;
 use crate::errors::Error;
 use crate::host::libvirt::handlers::LIBVIRT_URI;
 use crate::host::libvirt::utils::get_domain_name;
@@ -35,8 +36,8 @@ enum Event {
     Deleted,
 }
 
-fn get_event_type(vm: &VirtualMachine, ctx: &Context<State>) -> Event {
-    let libvirt = &ctx.get_ref().libvirt.connection;
+fn get_event_type(vm: &VirtualMachine, ctx: &Arc<State>) -> Event {
+    let libvirt = &ctx.libvirt.connection;
     let my_node_name = env::var("NODE_NAME").expect("failed to read $NODE_NAME");
     let k8s_vm_name = &vm.metadata.name.clone().expect("VM has no name");
     let is_deleted = &vm.metadata.deletion_timestamp.is_some();
@@ -91,27 +92,25 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Context<State>) -> Event {
 }
 
 /// Handle updates to volumes in the cluster
-async fn reconcile(vm: VirtualMachine, ctx: Context<State>) -> Result<ReconcilerAction, Error> {
+async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, Error> {
     match get_event_type(&vm, &ctx) {
-        Event::Deleted => handlers::handle_delete(vm, ctx).await,
-        Event::Added => handlers::handle_add(vm, ctx).await,
-        Event::OutboundMigration => handlers::handle_migration(vm, ctx).await,
+        Event::Deleted => handlers::handle_delete(&vm, ctx).await,
+        Event::Added => handlers::handle_add(&vm, ctx).await,
+        Event::OutboundMigration => handlers::handle_migration(&vm, ctx).await,
         _ => {
             ok_no_requeue!()
         }
     }
 }
 
-fn error_policy(_error: &Error, _ctx: Context<State>) -> ReconcilerAction {
-    ReconcilerAction {
-        requeue_after: Some(Duration::from_secs(15)),
-    }
+fn error_policy(_error: &Error, _ctx: Arc<State>) -> Action {
+    Action::requeue(Duration::from_secs(15))
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
     let libvirt = Libvirt::new(LIBVIRT_URI)?;
     secrets::ensure_ceph_secret(client.clone(), &libvirt).await?;
-    let context = Context::new(State {
+    let context = Arc::new(State {
         kube: client.clone(),
         libvirt,
     });

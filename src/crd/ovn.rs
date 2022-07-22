@@ -34,7 +34,6 @@ pub struct RouterAttachment {
     CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
 )]
 #[kube(
-    apiextensions = "v1",
     group = "cluster-virt.acl.fi",
     version = "v1beta",
     kind = "Network",
@@ -64,7 +63,6 @@ pub struct Route {
     CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
 )]
 #[kube(
-    apiextensions = "v1",
     group = "cluster-virt.acl.fi",
     version = "v1beta",
     kind = "Router",
