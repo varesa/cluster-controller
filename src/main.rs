@@ -4,6 +4,7 @@ mod host;
 #[macro_use]
 mod utils;
 mod crd;
+mod shared;
 
 use crate::errors::Error;
 use crate::utils::get_version_string;

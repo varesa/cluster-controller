@@ -54,6 +54,8 @@ pub enum Error {
     // Ceph
     #[error("librados error {0}")]
     Rados(#[from] RadosError),
+    #[error("volume locked error")]
+    Volumelocked,
 
     // Libvirt
     #[error("libvirt error {0}")]

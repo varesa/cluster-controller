@@ -10,9 +10,9 @@ use kube::{
 use serde_json::json;
 use tokio::time::Duration;
 
-use super::lowlevel;
 use crate::crd::ceph::Volume;
 use crate::errors::Error;
+use crate::shared::ceph::lowlevel;
 use crate::utils::name_namespaced;
 use crate::{
     api_replace_resource, client_ensure_finalizer, resource_has_finalizer, GROUP_NAME,

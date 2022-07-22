@@ -1,4 +1,3 @@
-mod lowlevel;
 mod controller;
 
 use kube::Client;

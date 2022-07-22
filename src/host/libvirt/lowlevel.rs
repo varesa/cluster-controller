@@ -1,5 +1,6 @@
 use crate::crd::cluster::Cluster;
 use crate::crd::libvirt::VirtualMachine;
+use crate::Error::Volumelocked;
 use askama::Template;
 use kube::ResourceExt;
 use virt::connect::Connect;
@@ -8,6 +9,7 @@ use virt::domain::Domain;
 use crate::errors::Error;
 use crate::host::libvirt::templates::{DomainTemplate, NetworkInterfaceTemplate, StorageTemplate};
 use crate::host::libvirt::utils::{get_domain_name, parse_memory};
+use crate::shared::ceph;
 
 pub struct Libvirt {
     pub connection: Connect,
@@ -49,6 +51,11 @@ impl Libvirt {
                 bootdevice: volumes.is_empty(), // First device is the boot device
             });
         }
+
+        if volumes_locked(&volumes)? {
+            return Err(Volumelocked);
+        }
+
         let mut nics = Vec::new();
         for nic in &vm.spec.networks {
             let bridge = match nic.ovn_id.clone() {
@@ -80,4 +87,13 @@ impl Libvirt {
         Domain::create_xml(&self.connection, &xml, 0)?;
         Ok(())
     }
+}
+
+fn volumes_locked(volumes: &Vec<StorageTemplate>) -> Result<bool, Error> {
+    for volume in volumes {
+        if ceph::has_locks(&volume.pool, &volume.image)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }

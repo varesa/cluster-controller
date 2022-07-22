@@ -1,4 +1,4 @@
-use libc::c_char;
+use libc::{c_char, c_int, ERANGE};
 use serde_json::json;
 use std::{ffi::CString, ptr, str};
 
@@ -9,7 +9,8 @@ use librados_sys::{
 };
 
 use librbd_sys::{
-    rbd_clone, rbd_close, rbd_create, rbd_get_features, rbd_image_t, rbd_list, rbd_open, rbd_remove,
+    rbd_clone, rbd_close, rbd_create, rbd_get_features, rbd_image_t, rbd_list, rbd_list_lockers,
+    rbd_open, rbd_open_read_only, rbd_remove,
 };
 
 use crate::errors::{Error, RadosError};
@@ -280,6 +281,73 @@ pub fn auth_get_key(cluster: rados_t, key_name: String) -> Result<String, Error>
         None => Err(RadosError {
             operation: String::from("auth get-key"),
             code: 1,
+        }
+        .into()),
+    }
+}
+
+fn open_image(pool: rados_ioctx_t, image_name: &str) -> Result<rbd_image_t, Error> {
+    let mut image: rbd_image_t = 0 as rbd_image_t;
+
+    unsafe {
+        // Must be returned and freed at the end
+        let image_name_c = CString::new(image_name)
+            .expect("Failed to create CString")
+            .into_raw();
+
+        call!(
+            "rbd_open_read_only",
+            rbd_open_read_only(pool, image_name_c, &mut image, std::ptr::null())
+        );
+
+        // Take back control to free memory
+        drop(CString::from_raw(image_name_c));
+    }
+    Ok(image)
+}
+
+pub fn has_locks(pool: rados_ioctx_t, image_name: &str) -> Result<bool, Error> {
+    let image = open_image(pool, image_name)?;
+
+    let mut is_exclusive = 0;
+    let mut tag_len = 0;
+    let mut clients_len = 0;
+    let mut cookies_len = 0;
+    let mut addrs_len = 0;
+
+    /*
+    We can get away with supplying null buffers, if we also give 0 as the buffer length.
+    rbd_list_lockers will check if the data will fit in the buffers (it will not if there are any
+    locks) and return -ERANGE if it would not.
+     */
+
+    let code = unsafe {
+        rbd_list_lockers(
+            image,
+            &mut is_exclusive,
+            /* tag */
+            std::ptr::null_mut(),
+            &mut tag_len,
+            /* clients */
+            std::ptr::null_mut(),
+            &mut clients_len,
+            /* cookies */
+            std::ptr::null_mut(),
+            &mut cookies_len,
+            /* addresses */
+            std::ptr::null_mut(),
+            &mut addrs_len,
+        )
+    } as i32;
+
+    const NEG_ERANGE: c_int = -ERANGE;
+
+    match code {
+        0 => Ok(false),
+        NEG_ERANGE => Ok(true),
+        _ => Err(RadosError {
+            operation: String::from("rbd_list_lockers"),
+            code,
         }
         .into()),
     }
