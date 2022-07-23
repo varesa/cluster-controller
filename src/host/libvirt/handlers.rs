@@ -93,12 +93,9 @@ pub async fn handle_inbound_migration(
     }
 
     let is_active = {
-        Domain::lookup_by_name(
-            &ctx.libvirt.connection,
-            vm.metadata.name.as_ref().expect("VM has no name"),
-        )
-        .expect("Domain not found")
-        .is_active()?
+        Domain::lookup_by_name(&ctx.libvirt.connection, &libvirt_domain_name)
+            .expect("Domain not found")
+            .is_active()?
     };
 
     if !is_active {
