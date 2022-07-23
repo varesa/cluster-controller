@@ -70,7 +70,7 @@ pub async fn handle_migration(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Ac
         .expect("No destination node");
 
     domain.migrate_to_uri(
-        destination_node,
+        &format!("qemu+ssh://{destination_node}/system"),
         virt::domain::VIR_MIGRATE_PEER2PEER,
         NO_BW_LIMIT,
     )?;
