@@ -64,7 +64,7 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Arc<State>) -> Event {
     };
 
     let vm_runs_on_us = Domain::lookup_by_name(libvirt, &libvirt_domain_name).is_ok();
-    let target_node_is_us = target_node != &my_node_name;
+    let target_node_is_us = target_node == &my_node_name;
     let migration_pending = vm
         .status
         .as_ref()
