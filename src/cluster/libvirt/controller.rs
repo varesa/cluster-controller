@@ -100,15 +100,18 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
         new_status.domain_name = name.clone();
     }
 
-    {
+    if !old_status.scheduled {
         let _mutex = SCHEDULE_MUTEX.lock().await;
         println!("libvirt: Acquired mutex to schedule: {}", name);
-        if !old_status.scheduled {
-            let node = scheduling::schedule(&vm, client.clone()).await?;
-            new_status.node = Some(node.metadata.name.expect("Unknown node name"));
-            new_status.scheduled = true;
-        }
 
+        let node = scheduling::schedule(&vm, client.clone()).await?;
+        new_status.node = Some(node.metadata.name.expect("Unknown node name"));
+        new_status.scheduled = true;
+
+        // Status must be updated before we release the scheduling mutex
+        set_vm_status(&vm, new_status, client.clone()).await?;
+    } else {
+        // Just update the status without acquiring the mutex
         set_vm_status(&vm, new_status, client.clone()).await?;
     }
 
