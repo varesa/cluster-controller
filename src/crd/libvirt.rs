@@ -129,7 +129,7 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
 
     let status = vm_crd.status.expect("CRD has no status").clone();
 
-    for version in status.stored_versions.clone().unwrap_or(Vec::new()) {
+    for version in status.stored_versions.clone().unwrap_or_default() {
         if &version == "v1beta" {
             for namespace in get_namespace_names(client.clone()).await? {
                 let api_v1beta: Api<v1beta::VirtualMachine> =
@@ -146,7 +146,7 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
                     });
                     api_v1beta2
                         .patch_status(
-                            &vm.metadata.name.as_ref().expect("vm has no name"),
+                            vm.metadata.name.as_ref().expect("vm has no name"),
                             &patch_params,
                             &Patch::Merge(patch),
                         )

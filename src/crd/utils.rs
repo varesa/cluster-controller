@@ -15,7 +15,6 @@ pub async fn remove_crd_version(
         .status
         .expect("CRD has no status")
         .stored_versions
-        .clone()
         .expect("CRD has no stored versions");
 
     versions.retain(|v| v != crd_version);

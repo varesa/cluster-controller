@@ -19,7 +19,7 @@ pub const LIBVIRT_URI: &str = "qemu:///system";
 const NO_BW_LIMIT: u64 = 0;
 
 pub async fn handle_delete(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, Error> {
-    let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
+    let vm_name = get_domain_name(vm).expect("VM has a libvirt domain name");
     println!("VM {} waiting for deletion by host controller", vm_name);
 
     match Domain::lookup_by_name(&ctx.libvirt.connection, &vm_name) {
@@ -39,26 +39,26 @@ pub async fn handle_delete(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Actio
 }
 
 pub async fn handle_add(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, Error> {
-    let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
+    let vm_name = get_domain_name(vm).expect("VM has a libvirt domain name");
     client_ensure_finalizer!(ctx.kube.clone(), VirtualMachine, vm, "libvirt-host");
 
     // Get cluster capabilities / definition
     let cluster = get_cluster(&ctx).await?;
 
-    ctx.libvirt.create_domain(&vm, &cluster)?;
+    ctx.libvirt.create_domain(vm, &cluster)?;
 
     let status = VirtualMachineStatus {
         running: true,
         ..vm.status.clone().expect("VM didn't have existing status")
     };
-    set_vm_status(&vm, status, ctx.kube.clone()).await?;
+    set_vm_status(vm, status, ctx.kube.clone()).await?;
 
     println!("Updated: {}", vm_name);
     ok_and_requeue!(600)
 }
 
 pub async fn handle_migration(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, Error> {
-    let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
+    let vm_name = get_domain_name(vm).expect("VM has a libvirt domain name");
     let domain =
         Domain::lookup_by_name(&ctx.libvirt.connection, &vm_name).expect("Domain not found");
     let destination_node = vm
@@ -70,7 +70,7 @@ pub async fn handle_migration(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Ac
         .expect("No destination node");
 
     domain.migrate_to_uri(
-        &destination_node,
+        destination_node,
         virt::domain::VIR_MIGRATE_PEER2PEER,
         NO_BW_LIMIT,
     )?;
