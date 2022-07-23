@@ -15,6 +15,7 @@ spec:
       labels:
         app: cluster-controller
     spec:
+      dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       containers:
       - image: registry.acl.fi/public/virt-controller:latest
