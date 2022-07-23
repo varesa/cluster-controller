@@ -1720,8 +1720,8 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "virt"
-version = "0.2.11"
-source = "git+https://github.com/varesa/libvirt-rust.git#3b618049eb759890aaa03a302ec312769bdddf3f"
+version = "0.2.11-edit"
+source = "git+https://github.com/varesa/libvirt-rust.git?branch=hack#4158296f9cd7c05352e29cb8e67818fe12c548e6"
 dependencies = [
  "libc",
  "virt-sys",
@@ -1730,7 +1730,7 @@ dependencies = [
 [[package]]
 name = "virt-sys"
 version = "0.1.0"
-source = "git+https://github.com/varesa/libvirt-rust.git#3b618049eb759890aaa03a302ec312769bdddf3f"
+source = "git+https://github.com/varesa/libvirt-rust.git?branch=hack#4158296f9cd7c05352e29cb8e67818fe12c548e6"
 dependencies = [
  "bindgen",
  "libc",
