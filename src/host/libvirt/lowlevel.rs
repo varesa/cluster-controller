@@ -87,6 +87,13 @@ impl Libvirt {
         Domain::create_xml(&self.connection, &xml, 0)?;
         Ok(())
     }
+
+    pub fn has_domain(&self, name: &str) -> Result<bool, Error> {
+        let domains = self.connection.list_all_domains(0)?;
+        Ok(domains
+            .iter()
+            .any(|domain| domain.get_name().expect("Failed to get domain name") == name))
+    }
 }
 
 fn volumes_locked(volumes: &Vec<StorageTemplate>) -> Result<bool, Error> {

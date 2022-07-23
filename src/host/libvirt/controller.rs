@@ -7,7 +7,6 @@ use kube::{
 use std::env;
 use std::sync::Arc;
 use tokio::time::Duration;
-use virt::domain::Domain;
 
 use super::lowlevel::Libvirt;
 use crate::crd::libvirt::v1beta2::VirtualMachine;
@@ -36,8 +35,7 @@ enum Event {
     Deleted,
 }
 
-fn get_event_type(vm: &VirtualMachine, ctx: &Arc<State>) -> Event {
-    let libvirt = &ctx.libvirt.connection;
+fn get_event_type(vm: &VirtualMachine, ctx: &Arc<State>) -> Result<Event, Error> {
     let my_node_name = env::var("NODE_NAME").expect("failed to read $NODE_NAME");
     let k8s_vm_name = &vm.metadata.name.clone().expect("VM has no name");
     let is_deleted = &vm.metadata.deletion_timestamp.is_some();
@@ -47,23 +45,23 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Arc<State>) -> Event {
     let libvirt_domain_name = if let Some(name) = get_domain_name(vm) {
         name
     } else {
-        return Event::MissingDomainName;
+        return Ok(Event::MissingDomainName);
     };
 
     let vm_status = vm.status.clone().expect("VM has no status");
 
     if !vm_status.scheduled {
-        return Event::Unscheduled;
+        return Ok(Event::Unscheduled);
     }
 
     let target_node = if let Some(name) = vm.status.as_ref().and_then(|status| status.node.as_ref())
     {
         name
     } else {
-        return Event::NoNode;
+        return Ok(Event::NoNode);
     };
 
-    let vm_runs_on_us = Domain::lookup_by_name(libvirt, &libvirt_domain_name).is_ok();
+    let vm_runs_on_us = ctx.libvirt.has_domain(&libvirt_domain_name)?;
     let target_node_is_us = target_node == &my_node_name;
     let migration_pending = vm
         .status
@@ -72,28 +70,28 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Arc<State>) -> Event {
         .migration_pending;
 
     if target_node_is_us && migration_pending {
-        return Event::InboundMigration;
+        return Ok(Event::InboundMigration);
     }
 
     if !target_node_is_us {
         if vm_runs_on_us {
-            return Event::OutboundMigration;
+            return Ok(Event::OutboundMigration);
         } else {
-            return Event::NotOurs;
+            return Ok(Event::NotOurs);
         }
     }
 
     match (vm_runs_on_us, is_deleted) {
-        (false, false) => Event::Added,
-        (true, false) => Event::Updated,
-        (true, true) => Event::Deleted,
+        (false, false) => Ok(Event::Added),
+        (true, false) => Ok(Event::Updated),
+        (true, true) => Ok(Event::Deleted),
         (false, true) => panic!("We shouldn't see deletion of other node's VMs"),
     }
 }
 
 /// Handle updates to volumes in the cluster
 async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, Error> {
-    match get_event_type(&vm, &ctx) {
+    match get_event_type(&vm, &ctx)? {
         Event::Deleted => handlers::handle_delete(&vm, ctx).await,
         Event::Added => handlers::handle_add(&vm, ctx).await,
         Event::OutboundMigration => handlers::handle_migration(&vm, ctx).await,
