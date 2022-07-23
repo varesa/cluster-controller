@@ -43,4 +43,4 @@ librados-sys = "0.1.0"
 librbd-sys = "0.1.0"
 
 # libvirt
-virt = "0.2.11"
+virt = {  git = "https://github.com/varesa/libvirt-rust.git" }

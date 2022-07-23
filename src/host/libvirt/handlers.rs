@@ -71,7 +71,9 @@ pub async fn handle_migration(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Ac
 
     domain.migrate_to_uri(
         &format!("qemu+ssh://{destination_node}/system"),
-        virt::domain::VIR_MIGRATE_PEER2PEER,
+        virt::sys::VIR_MIGRATE_PEER2PEER
+            | virt::sys::VIR_MIGRATE_LIVE
+            | virt::sys::VIR_MIGRATE_AUTO_CONVERGE,
         NO_BW_LIMIT,
     )?;
     ok_and_requeue!(10)
