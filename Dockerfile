@@ -4,8 +4,9 @@ FROM docker.io/library/rust:buster as builder
 
 WORKDIR /usr/src/cluster-controller
 
+# Clang is required for virt-sys bindgen
 RUN apt-get update && \
-    apt-get install -y librados-dev librbd-dev libvirt-dev && \
+    apt-get install -y clang llvm libclang-dev librados-dev librbd-dev libvirt-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Only install dependencies
