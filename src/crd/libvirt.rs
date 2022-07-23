@@ -1,4 +1,6 @@
+use k8s_openapi::api::core::v1::Namespace;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+use kube::api::ListParams;
 use kube::core::crd::merge_crds;
 use kube::{
     api::{Patch, PatchParams, PostParams},
@@ -115,6 +117,76 @@ pub async fn create(client: Client) -> Result<(), Error> {
     crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&crd))
         .await?;
     wait_crd_ready(&crds, CRD_NAME).await?;
+    run_migrations(client.clone()).await?;
+    Ok(())
+}
+
+pub async fn run_migrations(client: Client) -> Result<(), Error> {
+    let patch_params = PatchParams::apply("cluster-manager.libvirt");
+    let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+    let namespaces: Api<Namespace> = Api::all(client.clone());
+    let vm_crd = crds.get("virtualmachines.cluster-virt.acl.fi").await?;
+
+    let mut new_status = vm_crd
+        .status
+        .expect("CRD has no status subresource")
+        .clone();
+
+    for version in new_status.stored_versions.clone().unwrap_or(Vec::new()) {
+        if &version == "v1beta" {
+            for namespace in namespaces.list(&ListParams::default()).await? {
+                let api_v1beta: Api<v1beta::VirtualMachine> = Api::namespaced(
+                    client.clone(),
+                    &namespace
+                        .metadata
+                        .name
+                        .as_ref()
+                        .expect("namespace has no name"),
+                );
+                let api_v1beta2: Api<v1beta2::VirtualMachine> = Api::namespaced(
+                    client.clone(),
+                    &namespace
+                        .metadata
+                        .name
+                        .as_ref()
+                        .expect("namespace has no name"),
+                );
+
+                let vms_v1beta = api_v1beta.list(&ListParams::default()).await?;
+                for vm in vms_v1beta {
+                    let patch = json!({
+                        "status": {
+                            "migration_pending": false,
+                        }
+                    });
+                    api_v1beta2
+                        .patch_status(
+                            &vm.metadata.name.as_ref().expect("vm has no name"),
+                            &patch_params,
+                            &Patch::Merge(patch),
+                        )
+                        .await?;
+                }
+            }
+            new_status
+                .stored_versions
+                .as_mut()
+                .unwrap()
+                .retain(|v| v != "v1beta");
+            let patch = json!({
+                "status": {
+                    "storedVersions": new_status.stored_versions
+                }
+            });
+            crds.patch_status(
+                "virtualmachines.cluster-virt.acl.fi",
+                &patch_params,
+                &Patch::Merge(patch),
+            )
+            .await?;
+        }
+    }
+
     Ok(())
 }
 
