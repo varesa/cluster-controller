@@ -94,7 +94,8 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
     match get_event_type(&vm, &ctx)? {
         Event::Deleted => handlers::handle_delete(&vm, ctx).await,
         Event::Added => handlers::handle_add(&vm, ctx).await,
-        Event::OutboundMigration => handlers::handle_migration(&vm, ctx).await,
+        Event::OutboundMigration => handlers::handle_outbound_migration(&vm, ctx).await,
+        Event::InboundMigration => handlers::handle_inbound_migration(&vm, ctx).await,
         _ => {
             ok_no_requeue!()
         }

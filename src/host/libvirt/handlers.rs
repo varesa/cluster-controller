@@ -57,7 +57,10 @@ pub async fn handle_add(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, 
     ok_and_requeue!(600)
 }
 
-pub async fn handle_migration(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, Error> {
+pub async fn handle_outbound_migration(
+    vm: &VirtualMachine,
+    ctx: Arc<State>,
+) -> Result<Action, Error> {
     let vm_name = get_domain_name(vm).expect("VM has a libvirt domain name");
     let domain =
         Domain::lookup_by_name(&ctx.libvirt.connection, &vm_name).expect("Domain not found");
@@ -77,4 +80,34 @@ pub async fn handle_migration(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Ac
         NO_BW_LIMIT,
     )?;
     ok_and_requeue!(10)
+}
+
+pub async fn handle_inbound_migration(
+    vm: &VirtualMachine,
+    ctx: Arc<State>,
+) -> Result<Action, Error> {
+    let libvirt_domain_name = get_domain_name(vm).expect("failed to get domain name");
+    let vm_runs_on_us = ctx.libvirt.has_domain(&libvirt_domain_name)?;
+    if !vm_runs_on_us {
+        return ok_and_requeue!(5);
+    }
+
+    let is_active = {
+        Domain::lookup_by_name(
+            &ctx.libvirt.connection,
+            vm.metadata.name.as_ref().expect("VM has no name"),
+        )
+        .expect("Domain not found")
+        .is_active()?
+    };
+
+    if !is_active {
+        return ok_and_requeue!(5);
+    }
+
+    let mut new_status = vm.status.clone().expect("VM has no status");
+    new_status.migration_pending = false;
+    set_vm_status(vm, new_status, ctx.kube.clone()).await?;
+
+    ok_and_requeue!(600)
 }
