@@ -1,4 +1,3 @@
-use k8s_openapi::api::core::v1::Namespace;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::api::ListParams;
 use kube::core::crd::merge_crds;
@@ -10,8 +9,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::crd::utils;
 use crate::errors::Error;
-use crate::utils::wait_crd_ready;
+use crate::utils::{get_namespace_names, wait_crd_ready};
 
 #[derive(Debug, PartialEq, Eq, Clone, JsonSchema, Serialize, Deserialize, Default)]
 pub struct Quantity(String);
@@ -122,35 +122,20 @@ pub async fn create(client: Client) -> Result<(), Error> {
 }
 
 pub async fn run_migrations(client: Client) -> Result<(), Error> {
+    const CRD_NAME: &str = "virtualmachines.cluster-virt.acl.fi";
     let patch_params = PatchParams::apply("cluster-manager.libvirt");
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-    let namespaces: Api<Namespace> = Api::all(client.clone());
-    let vm_crd = crds.get("virtualmachines.cluster-virt.acl.fi").await?;
+    let vm_crd = crds.get(CRD_NAME).await?;
 
-    let mut new_status = vm_crd
-        .status
-        .expect("CRD has no status subresource")
-        .clone();
+    let status = vm_crd.status.expect("CRD has no status").clone();
 
-    for version in new_status.stored_versions.clone().unwrap_or(Vec::new()) {
+    for version in status.stored_versions.clone().unwrap_or(Vec::new()) {
         if &version == "v1beta" {
-            for namespace in namespaces.list(&ListParams::default()).await? {
-                let api_v1beta: Api<v1beta::VirtualMachine> = Api::namespaced(
-                    client.clone(),
-                    &namespace
-                        .metadata
-                        .name
-                        .as_ref()
-                        .expect("namespace has no name"),
-                );
-                let api_v1beta2: Api<v1beta2::VirtualMachine> = Api::namespaced(
-                    client.clone(),
-                    &namespace
-                        .metadata
-                        .name
-                        .as_ref()
-                        .expect("namespace has no name"),
-                );
+            for namespace in get_namespace_names(client.clone()).await? {
+                let api_v1beta: Api<v1beta::VirtualMachine> =
+                    Api::namespaced(client.clone(), &namespace);
+                let api_v1beta2: Api<v1beta2::VirtualMachine> =
+                    Api::namespaced(client.clone(), &namespace);
 
                 let vms_v1beta = api_v1beta.list(&ListParams::default()).await?;
                 for vm in vms_v1beta {
@@ -168,22 +153,7 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
                         .await?;
                 }
             }
-            new_status
-                .stored_versions
-                .as_mut()
-                .unwrap()
-                .retain(|v| v != "v1beta");
-            let patch = json!({
-                "status": {
-                    "storedVersions": new_status.stored_versions
-                }
-            });
-            crds.patch_status(
-                "virtualmachines.cluster-virt.acl.fi",
-                &patch_params,
-                &Patch::Merge(patch),
-            )
-            .await?;
+            utils::remove_crd_version(CRD_NAME, "v1beta", client.clone()).await?;
         }
     }
 

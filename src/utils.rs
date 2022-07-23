@@ -1,8 +1,9 @@
 use futures::{StreamExt, TryStreamExt};
+use k8s_openapi::api::core::v1::Namespace;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
     api::{ListParams, Resource, WatchEvent},
-    Api,
+    Api, Client,
 };
 
 use crate::errors::Error;
@@ -49,6 +50,23 @@ where
             .expect("get resource namespace"),
         resource.meta().name.as_ref().expect("get resource name")
     )
+}
+
+pub async fn get_namespace_names(client: Client) -> Result<Vec<String>, Error> {
+    let ns_api: Api<Namespace> = Api::all(client);
+    let namespaces = ns_api
+        .list(&ListParams::default())
+        .await?
+        .iter()
+        .map(|ns| {
+            ns.metadata
+                .name
+                .as_ref()
+                .expect("namespace has no name")
+                .to_owned()
+        })
+        .collect();
+    Ok(namespaces)
 }
 
 #[macro_export]
