@@ -1,4 +1,5 @@
 use std::net::IpAddr;
+use std::sync::Mutex;
 
 use ipnet::IpNet;
 use serde_json::{json, Map, Value};
@@ -24,7 +25,7 @@ const TYPE_LOGICAL_ROUTER_STATIC_ROUTE: &str = "Logical_Router_Static_Route";
 const TYPE_DHCP_OPTIONS: &str = "DHCP_Options";
 
 pub struct Ovn {
-    connection: JsonRpcConnection,
+    connection: Mutex<JsonRpcConnection>,
 }
 
 macro_rules! generate_list_fn {
@@ -84,15 +85,17 @@ macro_rules! generate_all_fn {
 impl Ovn {
     pub fn new(host: &str, port: u16) -> Self {
         Ovn {
-            connection: JsonRpcConnection::new(host, port),
+            connection: Mutex::new(JsonRpcConnection::new(host, port)),
         }
     }
 
-    fn transact(&mut self, operations: &[Value]) -> Vec<Value> {
+    fn transact(&self, operations: &[Value]) -> Vec<Value> {
         let mut params = vec![Value::String("OVN_Northbound".to_string())];
         params.append(&mut operations.to_owned());
         let response = self
             .connection
+            .lock()
+            .expect("Lock poisoned")
             .request("transact", &Params::from_json(json!(params)));
         match response {
             Message::Response { error, result, .. } => {
@@ -111,7 +114,7 @@ impl Ovn {
         }
     }
 
-    pub fn list_objects(&mut self, object_type: &str) -> Vec<Value> {
+    pub fn list_objects(&self, object_type: &str) -> Vec<Value> {
         let columns = match object_type {
             TYPE_DHCP_OPTIONS => json!(["_uuid", "cidr"]),
             TYPE_LOGICAL_ROUTER => json!(["_uuid", "name", "static_routes"]),
@@ -134,7 +137,7 @@ impl Ovn {
             .to_owned()
     }
 
-    pub(crate) fn insert(&mut self, object_type: &str, params: Map<String, Value>) {
+    pub fn insert(&self, object_type: &str, params: Map<String, Value>) {
         let operation = json!({
             "op": "insert",
             "table": object_type,
@@ -143,7 +146,7 @@ impl Ovn {
         self.transact(&[operation]);
     }
 
-    pub(crate) fn delete_by_uuid(&mut self, object_type: &str, uuid: &str) {
+    pub fn delete_by_uuid(&self, object_type: &str, uuid: &str) {
         let operation = json!({
             "op": "delete",
             "table": object_type,
