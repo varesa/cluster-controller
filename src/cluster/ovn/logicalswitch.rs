@@ -103,7 +103,12 @@ impl OvnCommon for LogicalSwitch {
 
         Ok(LogicalSwitch {
             ovn,
-            uuid: try_deserialize!(object.get("_uuid").and_then(|u| u.as_str())).to_owned(),
+            uuid: try_deserialize!(object
+                .get("_uuid")
+                .and_then(|a| a.as_array())
+                .and_then(|a| a.get(0))
+                .and_then(|u| u.as_str()))
+            .to_owned(),
             name: try_deserialize!(object.get("name").and_then(|u| u.as_str())).to_owned(),
         })
     }
