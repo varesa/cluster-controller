@@ -1,18 +1,22 @@
 use std::net::IpAddr;
 
-use super::jsonrpc::{JsonRpcConnection, Message};
+use ipnet::IpNet;
+use serde_json::{json, Map, Value};
+
+use crate::cluster::ovn::common::OvnCommon;
+use crate::cluster::ovn::common::OvnNamedGetters;
 use crate::cluster::ovn::jsonrpc::Params;
+use crate::cluster::ovn::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::types::{
-    DhcpOptions, LogicalRouter, LogicalRouterPort, LogicalRouterStaticRoute, LogicalSwitch,
-    LogicalSwitchPort,
+    DhcpOptions, LogicalRouter, LogicalRouterPort, LogicalRouterStaticRoute, LogicalSwitchPort,
 };
 use crate::crd::ovn::DhcpOptions as DhcpOptionsCrd;
 use crate::crd::ovn::Route as RouteCrd;
 use crate::Error;
-use ipnet::IpNet;
-use serde_json::{json, Map, Value};
 
-const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
+use super::jsonrpc::{JsonRpcConnection, Message};
+
+pub const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
 const TYPE_LOGICAL_SWITCH_PORT: &str = "Logical_Switch_Port";
 const TYPE_LOGICAL_ROUTER: &str = "Logical_Router";
 const TYPE_LOGICAL_ROUTER_PORT: &str = "Logical_Router_Port";
@@ -107,7 +111,7 @@ impl Ovn {
         }
     }
 
-    fn list_objects(&mut self, object_type: &str) -> Vec<Value> {
+    pub fn list_objects(&mut self, object_type: &str) -> Vec<Value> {
         let columns = match object_type {
             TYPE_DHCP_OPTIONS => json!(["_uuid", "cidr"]),
             TYPE_LOGICAL_ROUTER => json!(["_uuid", "name", "static_routes"]),
@@ -130,7 +134,7 @@ impl Ovn {
             .to_owned()
     }
 
-    fn insert(&mut self, object_type: &str, params: Map<String, Value>) {
+    pub(crate) fn insert(&mut self, object_type: &str, params: Map<String, Value>) {
         let operation = json!({
             "op": "insert",
             "table": object_type,
@@ -139,7 +143,7 @@ impl Ovn {
         self.transact(&[operation]);
     }
 
-    fn delete_by_uuid(&mut self, object_type: &str, uuid: &str) {
+    pub(crate) fn delete_by_uuid(&mut self, object_type: &str, uuid: &str) {
         let operation = json!({
             "op": "delete",
             "table": object_type,
@@ -150,14 +154,15 @@ impl Ovn {
         self.transact(&[operation]);
     }
 
-    generate_all_fn!(
+    /*generate_all_fn!(
         TYPE_LOGICAL_SWITCH,
         LogicalSwitch,
         add_ls,
         list_ls,
         get_ls,
         del_ls_by_name
-    );
+    );*/
+
     generate_all_fn!(
         TYPE_LOGICAL_ROUTER,
         LogicalRouter,
@@ -203,7 +208,7 @@ impl Ovn {
         lsp_name: &str,
         extra_params: Option<&Map<String, Value>>,
     ) -> Result<(), Error> {
-        let ls = self.get_ls(ls_name)?;
+        let ls = LogicalSwitch::get_by_name(self, ls_name)?;
 
         let mut params = if let Some(extra_params) = extra_params {
             extra_params.clone()
@@ -280,7 +285,7 @@ impl Ovn {
     }
 
     pub fn del_lsp(&mut self, ls_name: &str, lsp_id: &str) -> Result<(), Error> {
-        let ls = self.get_ls(ls_name)?;
+        let ls = LogicalSwitch::get_by_name(self, ls_name)?;
 
         let lsp = self.get_lsp(lsp_id)?;
 
@@ -495,7 +500,7 @@ impl Ovn {
     }
 
     pub fn set_ls_cidr(&mut self, ls_name: &str, cidr: &str) -> Result<(), Error> {
-        let ls = self.get_ls(ls_name)?;
+        let ls = LogicalSwitch::get_by_name(self, ls_name)?;
 
         let set_cidr = json!({
             "op": "update",

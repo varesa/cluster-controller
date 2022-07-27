@@ -68,6 +68,8 @@ pub enum Error {
     // OVN
     #[error("Object {1} of type {0} not found")]
     OvnNotFound(String, String),
+    #[error("Deserialization failed")]
+    OvnDeserializationFailed,
 
     // Misc libs
     #[error("JSON error {0}")]

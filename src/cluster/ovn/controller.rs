@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use futures::StreamExt;
 use kube::runtime::controller::{Action, Controller};
 use kube::{
@@ -5,9 +7,10 @@ use kube::{
     Client, Resource, ResourceExt,
 };
 use serde_json::json;
-use std::sync::Arc;
 use tokio::time::Duration;
 
+use crate::cluster::ovn::common::OvnBasicActions;
+use crate::cluster::ovn::common::OvnNamedGetters;
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::crd::libvirt::{v1beta2::VirtualMachine, NetworkAttachment};
 use crate::crd::ovn::{
@@ -20,6 +23,8 @@ use crate::{
     create_set_status, ok_and_requeue, ok_no_requeue, resource_has_finalizer, GROUP_NAME,
 };
 
+use super::logicalswitch::LogicalSwitch;
+
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
 struct State {
@@ -29,11 +34,15 @@ struct State {
 create_set_status!(Network, NetworkStatus, set_network_status);
 create_set_status!(Router, RouterStatus, set_router_status);
 
-fn ensure_network_exists(name: &str) {
+fn ensure_network_exists(name: &str) -> Result<LogicalSwitch, Error> {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
-    if ovn.get_ls(name).is_err() {
-        println!("ovn: Sw {name} doesn't exist, creating");
-        ovn.add_ls(name);
+    match LogicalSwitch::get_by_name(&mut ovn, name) {
+        Ok(ls) => Ok(ls),
+        Err(Error::OvnNotFound(_, _)) => {
+            println!("ovn: Sw {name} doesn't exist, creating");
+            LogicalSwitch::create(&mut ovn, name)
+        }
+        Err(e) => Err(e),
     }
 }
 
@@ -83,7 +92,7 @@ fn ensure_router_attachment(
     let lr = ovn.get_lr(&format!("{}-{}", &namespace, &name))?;
 
     let ls_name = name_namespaced(network);
-    ovn.get_ls(&ls_name)?;
+    LogicalSwitch::get_by_name(&mut ovn, &ls_name)?;
 
     let lrp_name = format!("lr_{}-{}_ls_{}", namespace, name, name_namespaced(network));
     if ovn.get_lrp(&lrp_name).is_err() {
@@ -106,7 +115,7 @@ fn ensure_router_attachment(
 
 fn delete_network(name: &str) -> Result<(), Error> {
     let mut ovn = Ovn::new("10.4.3.1", 6641);
-    ovn.del_ls_by_name(name)?;
+    LogicalSwitch::get_by_name(&mut ovn, name)?.delete(&mut ovn)?;
     Ok(())
 }
 
@@ -129,7 +138,7 @@ async fn reconcile_network(network: Arc<Network>, ctx: Arc<State>) -> Result<Act
     } else {
         println!("ovn: update for network {name}");
         client_ensure_finalizer!(client, Network, network.as_ref(), "ovn");
-        ensure_network_exists(&name);
+        ensure_network_exists(&name)?;
         if let Some(dhcp_options) = network.spec.dhcp.as_ref() {
             ensure_dhcp(&name, dhcp_options)?;
         }
