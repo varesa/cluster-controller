@@ -35,12 +35,12 @@ create_set_status!(Network, NetworkStatus, set_network_status);
 create_set_status!(Router, RouterStatus, set_router_status);
 
 fn ensure_network_exists(name: &str) -> Result<LogicalSwitch, Error> {
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
-    match LogicalSwitch::get_by_name(&mut ovn, name) {
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    match LogicalSwitch::get_by_name(ovn.clone(), name) {
         Ok(ls) => Ok(ls),
         Err(Error::OvnNotFound(_, _)) => {
             println!("ovn: Sw {name} doesn't exist, creating");
-            LogicalSwitch::create(&mut ovn, name)
+            LogicalSwitch::create(ovn, name)
         }
         Err(e) => Err(e),
     }
@@ -67,7 +67,9 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
     }
     // Lazily try to always update, effectively noop if current value are already correct
     ovn.set_dhcp_option_set_options(dhcp)?;
-    ovn.set_ls_cidr(name, &dhcp.cidr)?;
+
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    LogicalSwitch::get_by_name(ovn, name)?.set_cidr(&dhcp.cidr)?;
     Ok(())
 }
 
@@ -88,12 +90,13 @@ fn ensure_router_attachment(
         _ => panic!("Malformed router name (todo: error)"),
     };
 
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let lr = ovn.get_lr(&format!("{}-{}", &namespace, &name))?;
 
     let ls_name = name_namespaced(network);
-    LogicalSwitch::get_by_name(&mut ovn, &ls_name)?;
+    let mut ls = LogicalSwitch::get_by_name(ovn, &ls_name)?;
 
+    let mut ovn = Ovn::new("10.4.3.1", 6641);
     let lrp_name = format!("lr_{}-{}_ls_{}", namespace, name, name_namespaced(network));
     if ovn.get_lrp(&lrp_name).is_err() {
         ovn.add_lrp(&lr.name, &lrp_name, &router_attachment.address)?;
@@ -108,14 +111,14 @@ fn ensure_router_attachment(
         "options": ["map", [ ["router-port", lrp_name] ]]
     });
     if ovn.get_lsp(&lsp_name).is_err() {
-        ovn.add_lsp(&ls_name, &lsp_name, Some(params.as_object().unwrap()))?;
+        ls.add_lsp(&lsp_name, Some(params.as_object().unwrap()))?;
     }
     Ok(())
 }
 
 fn delete_network(name: &str) -> Result<(), Error> {
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
-    LogicalSwitch::get_by_name(&mut ovn, name)?.delete(&mut ovn)?;
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    LogicalSwitch::get_by_name(ovn, name)?.delete()?;
     Ok(())
 }
 
@@ -163,14 +166,16 @@ async fn connect_vm_nic(
     vm: &VirtualMachine,
     nic: &NetworkAttachment,
 ) -> Result<(), Error> {
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let namespace = ResourceExt::namespace(vm).expect("Failed to get VM namespace");
     let network_name = nic.name.as_ref().expect("No network name set");
     let ls_name = format!("{}-{}", &namespace, &network_name);
+    let mut ls = LogicalSwitch::get_by_name(ovn, &ls_name)?;
+    let mut ovn = Ovn::new("10.4.3.1", 6641);
     if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_err() {
         println!("ovn: lsp missing for NIC, creating");
         let lsp_id = nic.ovn_id.as_ref().unwrap();
-        ovn.add_lsp(&ls_name, lsp_id, None)?;
+        ls.add_lsp(lsp_id, None)?;
         ovn.set_lsp_address(
             lsp_id,
             nic.mac_address.as_ref().expect("MAC address missing"),
@@ -186,7 +191,7 @@ async fn connect_vm_nic(
 }
 
 fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), Error> {
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    let ovn = Ovn::new("10.4.3.1", 6641);
     let ls_name = format!(
         "{}-{}",
         ResourceExt::namespace(vm).expect("Failed to get VM namespace"),
@@ -194,7 +199,8 @@ fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(),
     );
     if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_ok() {
         println!("ovn: lsp exists for NIC, removing");
-        ovn.del_lsp(&ls_name, nic.ovn_id.as_ref().unwrap())?;
+        let mut ls = LogicalSwitch::get_by_name(Arc::new(ovn), &ls_name)?;
+        ls.del_lsp(nic.ovn_id.as_ref().unwrap())?;
     }
     Ok(())
 }

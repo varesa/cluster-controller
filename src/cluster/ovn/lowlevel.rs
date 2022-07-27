@@ -4,10 +4,7 @@ use std::sync::Mutex;
 use ipnet::IpNet;
 use serde_json::{json, Map, Value};
 
-use crate::cluster::ovn::common::OvnCommon;
-use crate::cluster::ovn::common::OvnNamedGetters;
 use crate::cluster::ovn::jsonrpc::Params;
-use crate::cluster::ovn::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::types::{
     DhcpOptions, LogicalRouter, LogicalRouterPort, LogicalRouterStaticRoute, LogicalSwitchPort,
 };
@@ -18,7 +15,7 @@ use crate::Error;
 use super::jsonrpc::{JsonRpcConnection, Message};
 
 pub const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
-const TYPE_LOGICAL_SWITCH_PORT: &str = "Logical_Switch_Port";
+pub const TYPE_LOGICAL_SWITCH_PORT: &str = "Logical_Switch_Port";
 const TYPE_LOGICAL_ROUTER: &str = "Logical_Router";
 const TYPE_LOGICAL_ROUTER_PORT: &str = "Logical_Router_Port";
 const TYPE_LOGICAL_ROUTER_STATIC_ROUTE: &str = "Logical_Router_Static_Route";
@@ -30,7 +27,7 @@ pub struct Ovn {
 
 macro_rules! generate_list_fn {
     ($name:ident, $type:ident, $type_name:ident) => {
-        pub fn $name(&mut self) -> Vec<$type> {
+        pub fn $name(&self) -> Vec<$type> {
             let response = self.list_objects($type_name);
             let mut objects = Vec::new();
             for row in response {
@@ -43,7 +40,7 @@ macro_rules! generate_list_fn {
 
 macro_rules! generate_get_fn {
     ($name:ident, $type:ident, $type_name:ident, $list_fn:ident) => {
-        pub fn $name(&mut self, name: &str) -> Result<$type, Error> {
+        pub fn $name(&self, name: &str) -> Result<$type, Error> {
             let objects = self.$list_fn();
             objects
                 .into_iter()
@@ -89,7 +86,7 @@ impl Ovn {
         }
     }
 
-    fn transact(&self, operations: &[Value]) -> Vec<Value> {
+    pub(crate) fn transact(&self, operations: &[Value]) -> Vec<Value> {
         let mut params = vec![Value::String("OVN_Northbound".to_string())];
         params.append(&mut operations.to_owned());
         let response = self
@@ -205,42 +202,6 @@ impl Ovn {
             .find(|option_set| option_set.cidr == cidr)
     }
 
-    pub fn add_lsp(
-        &mut self,
-        ls_name: &str,
-        lsp_name: &str,
-        extra_params: Option<&Map<String, Value>>,
-    ) -> Result<(), Error> {
-        let ls = LogicalSwitch::get_by_name(self, ls_name)?;
-
-        let mut params = if let Some(extra_params) = extra_params {
-            extra_params.clone()
-        } else {
-            Map::new()
-        };
-        params.insert("name".to_string(), Value::String(lsp_name.to_string()));
-
-        let add_lsp = json!({
-            "op": "insert",
-            "table": TYPE_LOGICAL_SWITCH_PORT,
-            "row": params,
-            "uuid-name": "new_lsp"
-        });
-
-        let add_lsp_to_ls = json!({
-            "op": "mutate",
-            "table": TYPE_LOGICAL_SWITCH,
-            "where": [
-                ["_uuid", "==", ["uuid", ls.uuid()]]
-            ],
-            "mutations": [
-                ["ports", "insert", ["set", [["named-uuid", "new_lsp"]]]]
-            ]
-        });
-        self.transact(&[add_lsp, add_lsp_to_ls]);
-        Ok(())
-    }
-
     pub fn add_lrp(&mut self, lr_name: &str, lrp_name: &str, networks: &str) -> Result<(), Error> {
         let lr = self.get_lr(lr_name)?;
 
@@ -284,29 +245,6 @@ impl Ovn {
             }
         });
         self.transact(&[update_lrp]);
-        Ok(())
-    }
-
-    pub fn del_lsp(&mut self, ls_name: &str, lsp_id: &str) -> Result<(), Error> {
-        let ls = LogicalSwitch::get_by_name(self, ls_name)?;
-
-        let lsp = self.get_lsp(lsp_id)?;
-
-        let del_lsp = json!({
-          "op": "mutate",
-          "table": TYPE_LOGICAL_SWITCH,
-          "mutations": [[
-              "ports",
-              "delete",
-              [
-                "set", [[ "uuid", lsp.uuid() ]]
-              ]
-          ]],
-          "where": [[
-              "_uuid", "==", ["uuid", ls.uuid()]
-          ]]
-        });
-        self.transact(&[del_lsp]);
         Ok(())
     }
 
@@ -499,19 +437,6 @@ impl Ovn {
         operations.push(update);
 
         self.transact(&operations);
-        Ok(())
-    }
-
-    pub fn set_ls_cidr(&mut self, ls_name: &str, cidr: &str) -> Result<(), Error> {
-        let ls = LogicalSwitch::get_by_name(self, ls_name)?;
-
-        let set_cidr = json!({
-            "op": "update",
-            "table": "Logical_Switch",
-            "where": [["_uuid", "==", ["uuid", ls.uuid()]]],
-            "row": {"other_config": ["map", [["subnet", cidr]]]}
-        });
-        self.transact(&[set_cidr]);
         Ok(())
     }
 
