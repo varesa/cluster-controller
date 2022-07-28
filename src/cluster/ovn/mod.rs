@@ -13,7 +13,6 @@ mod logicalswitch;
 mod logicalswitchport;
 mod lowlevel;
 mod staticroute;
-mod types;
 
 pub async fn run(client: Client) -> Result<(), Error> {
     crd::ovn::create(client.clone()).await?;
