@@ -6,20 +6,19 @@ use serde_json::{json, Map, Value};
 
 use crate::cluster::ovn::jsonrpc::Params;
 use crate::cluster::ovn::types::{
-    DhcpOptions, LogicalRouter, LogicalRouterPort, LogicalRouterStaticRoute, LogicalSwitchPort,
+    DhcpOptions, LogicalRouterPort, LogicalRouterStaticRoute, LogicalSwitchPort,
 };
 use crate::crd::ovn::DhcpOptions as DhcpOptionsCrd;
-use crate::crd::ovn::Route as RouteCrd;
 use crate::Error;
 
 use super::jsonrpc::{JsonRpcConnection, Message};
 
 pub const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
 pub const TYPE_LOGICAL_SWITCH_PORT: &str = "Logical_Switch_Port";
-const TYPE_LOGICAL_ROUTER: &str = "Logical_Router";
-const TYPE_LOGICAL_ROUTER_PORT: &str = "Logical_Router_Port";
-const TYPE_LOGICAL_ROUTER_STATIC_ROUTE: &str = "Logical_Router_Static_Route";
-const TYPE_DHCP_OPTIONS: &str = "DHCP_Options";
+pub const TYPE_LOGICAL_ROUTER: &str = "Logical_Router";
+pub const TYPE_LOGICAL_ROUTER_PORT: &str = "Logical_Router_Port";
+pub const TYPE_LOGICAL_ROUTER_STATIC_ROUTE: &str = "Logical_Router_Static_Route";
+pub const TYPE_DHCP_OPTIONS: &str = "DHCP_Options";
 
 pub struct Ovn {
     connection: Mutex<JsonRpcConnection>,
@@ -47,35 +46,6 @@ macro_rules! generate_get_fn {
                 .find(|o| o.name == name)
                 .ok_or_else(|| Error::OvnNotFound($type_name.to_string(), name.to_string()))
         }
-    };
-}
-
-macro_rules! generate_delete_fn {
-    ($name:ident, $type:ident, $type_name:ident, $get_fn:ident) => {
-        pub fn $name(&mut self, name: &str) -> Result<(), Error> {
-            let object = self.$get_fn(name)?;
-            self.delete_by_uuid($type_name, &object.uuid());
-            Ok(())
-        }
-    };
-}
-
-macro_rules! generate_add_fn {
-    ($name:ident, $type_name:ident) => {
-        pub fn $name(&mut self, name: &str) {
-            let mut params = Map::new();
-            params.insert("name".to_string(), Value::String(name.to_string()));
-            self.insert($type_name, params);
-        }
-    };
-}
-
-macro_rules! generate_all_fn {
-    ($type_name:ident, $type:ident, $add_fn:ident, $list_fn:ident, $get_fn:ident, $delete_fn:ident) => {
-        generate_add_fn!($add_fn, $type_name);
-        generate_list_fn!($list_fn, $type, $type_name);
-        generate_get_fn!($get_fn, $type, $type_name, $list_fn);
-        generate_delete_fn!($delete_fn, $type, $type_name, $get_fn);
     };
 }
 
@@ -154,24 +124,6 @@ impl Ovn {
         self.transact(&[operation]);
     }
 
-    /*generate_all_fn!(
-        TYPE_LOGICAL_SWITCH,
-        LogicalSwitch,
-        add_ls,
-        list_ls,
-        get_ls,
-        del_ls_by_name
-    );*/
-
-    generate_all_fn!(
-        TYPE_LOGICAL_ROUTER,
-        LogicalRouter,
-        add_lr,
-        list_lr,
-        get_lr,
-        del_lr_by_name
-    );
-
     generate_list_fn!(list_lsp, LogicalSwitchPort, TYPE_LOGICAL_SWITCH_PORT);
     generate_get_fn!(
         get_lsp,
@@ -202,34 +154,7 @@ impl Ovn {
             .find(|option_set| option_set.cidr == cidr)
     }
 
-    pub fn add_lrp(&mut self, lr_name: &str, lrp_name: &str, networks: &str) -> Result<(), Error> {
-        let lr = self.get_lr(lr_name)?;
-
-        let add_lrp = json!({
-            "op": "insert",
-            "table": TYPE_LOGICAL_ROUTER_PORT,
-            "row": {
-                "name": lrp_name,
-                "mac": "02:00:00:00:00:01",
-                "networks": networks,
-            },
-            "uuid-name": "new_lrp"
-        });
-        let add_lrp_to_lr = json!({
-            "op": "mutate",
-            "table": TYPE_LOGICAL_ROUTER,
-            "where": [
-                ["_uuid", "==", ["uuid", lr.uuid()]]
-            ],
-            "mutations": [
-                ["ports", "insert", ["set", [["named-uuid", "new_lrp"]]]]
-            ]
-        });
-        self.transact(&[add_lrp, add_lrp_to_lr]);
-        Ok(())
-    }
-
-    pub fn update_lrp(&mut self, lrp_name: &str, networks: &str) -> Result<(), Error> {
+    pub fn update_lrp(&self, lrp_name: &str, networks: &str) -> Result<(), Error> {
         let lrp = self.get_lrp(lrp_name)?;
 
         let update_lrp = json!({
@@ -320,10 +245,7 @@ impl Ovn {
         Ok(())
     }
 
-    pub fn get_lr_routes(
-        &mut self,
-        router_name: &str,
-    ) -> Result<Vec<LogicalRouterStaticRoute>, Error> {
+    pub fn get_lr_routes(&self, router_name: &str) -> Result<Vec<LogicalRouterStaticRoute>, Error> {
         let select = json!({
             "op": "select",
             "table": TYPE_LOGICAL_ROUTER,
@@ -384,60 +306,6 @@ impl Ovn {
             })
             .collect::<Vec<LogicalRouterStaticRoute>>();
         Ok(routes)
-    }
-
-    pub fn set_lr_routes(
-        &mut self,
-        router_name: &str,
-        new_routes: &[RouteCrd],
-    ) -> Result<(), Error> {
-        let router = self.get_lr(router_name)?;
-        let old_routes = self.get_lr_routes(router_name)?;
-
-        let mut operations = Vec::new();
-        let mut to_add = Vec::new();
-        let mut to_remove = Vec::new();
-
-        let mut i = 0u8;
-
-        for new_route in new_routes {
-            if !old_routes.iter().any(|old_route| {
-                old_route.ip_prefix == new_route.cidr && old_route.nexthop == new_route.nexthop
-            }) {
-                let id = format!("new_route_{}", i);
-                i += 1;
-                let create_op = json!({
-                    "op": "insert",
-                    "table": TYPE_LOGICAL_ROUTER_STATIC_ROUTE,
-                    "row": {"ip_prefix": new_route.cidr, "nexthop": new_route.nexthop},
-                    "uuid-name": id
-                });
-                operations.push(create_op);
-                to_add.push(json!(["named-uuid", id]));
-            }
-        }
-        for old_route in old_routes {
-            if !new_routes.iter().any(|new_route| {
-                new_route.cidr == old_route.ip_prefix && new_route.nexthop == old_route.nexthop
-            }) {
-                to_remove.push(json!(["uuid", old_route.uuid()]));
-            }
-        }
-
-        let update = json!({
-            "mutations":[
-                ["static_routes","insert",["set", to_add]],
-                ["static_routes","delete",["set", to_remove]]
-            ],
-            "where":[[
-                "_uuid","==",["uuid",router.uuid()]
-            ]],
-            "op":"mutate","table":"Logical_Router"
-        });
-        operations.push(update);
-
-        self.transact(&operations);
-        Ok(())
     }
 
     pub fn set_lsp_dhcp_options(&mut self, lsp_id: &str, cidr: &str) -> Result<(), Error> {

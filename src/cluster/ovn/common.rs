@@ -5,6 +5,13 @@ use serde_json::{Map, Value};
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::Error;
 
+#[macro_export]
+macro_rules! try_deserialize {
+    ($e:expr) => {
+        $e.ok_or_else(|| Error::OvnDeserializationFailed)?
+    };
+}
+
 /// Base properties that are required by most OVN methods
 pub trait OvnCommon: Sized {
     fn uuid(&self) -> String;

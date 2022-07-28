@@ -4,18 +4,12 @@ use serde_json::{json, Map, Value};
 
 use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnNamed};
 use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH, TYPE_LOGICAL_SWITCH_PORT};
-use crate::Error;
+use crate::{try_deserialize, Error};
 
 pub struct LogicalSwitch {
     ovn: Arc<Ovn>,
     uuid: String,
     name: String,
-}
-
-macro_rules! try_deserialize {
-    ($e:expr) => {
-        $e.ok_or_else(|| Error::OvnDeserializationFailed)?
-    };
 }
 
 impl LogicalSwitch {

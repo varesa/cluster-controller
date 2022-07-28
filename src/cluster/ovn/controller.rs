@@ -11,6 +11,7 @@ use tokio::time::Duration;
 
 use crate::cluster::ovn::common::OvnBasicActions;
 use crate::cluster::ovn::common::OvnNamedGetters;
+use crate::cluster::ovn::logicalrouter::LogicalRouter;
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::crd::libvirt::{v1beta2::VirtualMachine, NetworkAttachment};
 use crate::crd::ovn::{
@@ -46,18 +47,21 @@ fn ensure_network_exists(name: &str) -> Result<LogicalSwitch, Error> {
     }
 }
 
-fn ensure_router_exists(name: &str) {
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
-    if ovn.get_lr(name).is_err() {
-        println!("ovn: Router {name} doesn't exist, creating");
-        ovn.add_lr(name);
+fn ensure_router_exists(name: &str) -> Result<LogicalRouter, Error> {
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    match LogicalRouter::get_by_name(ovn.clone(), name) {
+        Ok(lr) => Ok(lr),
+        Err(Error::OvnNotFound(_, _)) => {
+            println!("ovn: Router {name} doesn't exist, creating");
+            LogicalRouter::create(ovn, name)
+        }
+        Err(e) => Err(e),
     }
 }
 
 fn ensure_router_routes(router: &str, routes: &[Route]) -> Result<(), Error> {
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
-    ovn.set_lr_routes(router, routes)?;
-    Ok(())
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    LogicalRouter::get_by_name(ovn, router)?.set_routes(routes)
 }
 
 fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
@@ -91,17 +95,18 @@ fn ensure_router_attachment(
     };
 
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
-    let lr = ovn.get_lr(&format!("{}-{}", &namespace, &name))?;
+    let lr_name = format!("{}-{}", &namespace, &name);
+    let mut lr = LogicalRouter::get_by_name(ovn.clone(), &lr_name)?;
 
     let ls_name = name_namespaced(network);
-    let mut ls = LogicalSwitch::get_by_name(ovn, &ls_name)?;
+    let mut ls = LogicalSwitch::get_by_name(ovn.clone(), &ls_name)?;
 
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
+    let ovn_ = Ovn::new("10.4.3.1", 6641);
     let lrp_name = format!("lr_{}-{}_ls_{}", namespace, name, name_namespaced(network));
-    if ovn.get_lrp(&lrp_name).is_err() {
-        ovn.add_lrp(&lr.name, &lrp_name, &router_attachment.address)?;
+    if ovn_.get_lrp(&lrp_name).is_err() {
+        lr.add_lrp(&lrp_name, &router_attachment.address)?;
     } else {
-        ovn.update_lrp(&lrp_name, &router_attachment.address)?;
+        ovn_.update_lrp(&lrp_name, &router_attachment.address)?;
     }
 
     let lsp_name = format!("ls_{}_lr_{}-{}", ls_name, namespace, name);
@@ -118,14 +123,12 @@ fn ensure_router_attachment(
 
 fn delete_network(name: &str) -> Result<(), Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
-    LogicalSwitch::get_by_name(ovn, name)?.delete()?;
-    Ok(())
+    LogicalSwitch::get_by_name(ovn, name)?.delete()
 }
 
 fn delete_router(name: &str) -> Result<(), Error> {
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
-    ovn.del_lr_by_name(name)?;
-    Ok(())
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    LogicalRouter::get_by_name(ovn, name)?.delete()
 }
 
 /// Handle updates to networks in the cluster
@@ -253,7 +256,7 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
         println!("ovn: update for router {name}");
         client_ensure_finalizer!(client, Router, router.as_ref(), "ovn");
 
-        ensure_router_exists(&name);
+        ensure_router_exists(&name)?;
         if let Some(routes) = &router.spec.routes {
             ensure_router_routes(&name, routes)?;
         } else {

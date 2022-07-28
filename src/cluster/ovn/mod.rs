@@ -6,6 +6,7 @@ use crate::errors::Error;
 mod common;
 mod controller;
 mod jsonrpc;
+mod logicalrouter;
 mod logicalswitch;
 mod lowlevel;
 mod types;
