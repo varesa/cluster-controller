@@ -3,9 +3,12 @@ use std::sync::Arc;
 use serde_json::{json, Map, Value};
 
 use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnNamed, OvnNamedGetters};
+use crate::cluster::ovn::deserialization::{
+    deserialize_object, deserialize_string, deserialize_uuid,
+};
 use crate::cluster::ovn::logicalswitchport::LogicalSwitchPort;
 use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH, TYPE_LOGICAL_SWITCH_PORT};
-use crate::{try_deserialize, Error};
+use crate::Error;
 
 pub struct LogicalSwitch {
     ovn: Arc<Ovn>,
@@ -94,17 +97,12 @@ impl OvnCommon for LogicalSwitch {
     }
 
     fn deserialize(ovn: Arc<Ovn>, value: &Value) -> Result<LogicalSwitch, Error> {
-        let object = try_deserialize!(value.as_object());
+        let object = deserialize_object(value)?;
 
         Ok(LogicalSwitch {
             ovn,
-            uuid: try_deserialize!(object
-                .get("_uuid")
-                .and_then(|a| a.as_array())
-                .and_then(|a| a.get(1))
-                .and_then(|u| u.as_str()))
-            .to_owned(),
-            name: try_deserialize!(object.get("name").and_then(|u| u.as_str())).to_owned(),
+            uuid: deserialize_uuid(object)?,
+            name: deserialize_string(object, "name")?,
         })
     }
 }

@@ -5,9 +5,12 @@ use ipnet::IpNet;
 use serde_json::{json, Value};
 
 use crate::cluster::ovn::common::{OvnCommon, OvnGetters};
+use crate::cluster::ovn::deserialization::{
+    deserialize_object, deserialize_string, deserialize_uuid,
+};
 use crate::cluster::ovn::lowlevel::{Ovn, TYPE_DHCP_OPTIONS};
 use crate::crd::ovn::DhcpOptions as DhcpOptionsCrd;
-use crate::{try_deserialize, Error};
+use crate::Error;
 
 pub struct DhcpOptions {
     ovn: Arc<Ovn>,
@@ -86,17 +89,12 @@ impl OvnCommon for DhcpOptions {
     }
 
     fn deserialize(ovn: Arc<Ovn>, value: &Value) -> Result<Self, Error> {
-        let object = try_deserialize!(value.as_object());
+        let object = deserialize_object(value)?;
 
         Ok(DhcpOptions {
             ovn,
-            uuid: try_deserialize!(object
-                .get("_uuid")
-                .and_then(|a| a.as_array())
-                .and_then(|a| a.get(1))
-                .and_then(|u| u.as_str()))
-            .to_owned(),
-            cidr: try_deserialize!(object.get("cidr").and_then(|u| u.as_str())).to_owned(),
+            uuid: deserialize_uuid(object)?,
+            cidr: deserialize_string(object, "cidr")?,
         })
     }
 }

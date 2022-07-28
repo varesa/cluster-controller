@@ -3,13 +3,16 @@ use std::sync::Arc;
 use serde_json::{json, Value};
 
 use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters};
+use crate::cluster::ovn::deserialization::{
+    deserialize_object, deserialize_string, deserialize_uuid,
+};
 use crate::cluster::ovn::logicalrouterport::LogicalRouterPort;
 use crate::cluster::ovn::lowlevel::{
     Ovn, TYPE_LOGICAL_ROUTER, TYPE_LOGICAL_ROUTER_PORT, TYPE_LOGICAL_ROUTER_STATIC_ROUTE,
 };
 use crate::cluster::ovn::staticroute::StaticRoute;
 use crate::crd::ovn::Route as RouteCrd;
-use crate::{try_deserialize, Error};
+use crate::Error;
 
 pub struct LogicalRouter {
     ovn: Arc<Ovn>,
@@ -126,12 +129,13 @@ impl OvnCommon for LogicalRouter {
     }
 
     fn deserialize(ovn: Arc<Ovn>, value: &Value) -> Result<LogicalRouter, Error> {
-        let object = try_deserialize!(value.as_object());
+        let object = deserialize_object(value)?;
 
-        let route_set = try_deserialize!(object
+        let route_set = object
             .get("static_routes")
             .and_then(|a| a.as_array())
-            .and_then(|a| a.get(1)));
+            .and_then(|a| a.get(1))
+            .ok_or(Error::OvnDeserializationFailed)?;
         let route_uuids: Vec<String> = match route_set {
             Value::String(uuid) => vec![uuid.clone()],
             Value::Array(uuids_arrays) => uuids_arrays
@@ -149,13 +153,8 @@ impl OvnCommon for LogicalRouter {
 
         Ok(LogicalRouter {
             ovn,
-            uuid: try_deserialize!(object
-                .get("_uuid")
-                .and_then(|a| a.as_array())
-                .and_then(|a| a.get(1))
-                .and_then(|u| u.as_str()))
-            .to_owned(),
-            name: try_deserialize!(object.get("name").and_then(|u| u.as_str())).to_owned(),
+            uuid: deserialize_uuid(object)?,
+            name: deserialize_string(object, "name")?,
             static_route_uuids: route_uuids,
         })
     }
