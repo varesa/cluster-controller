@@ -12,6 +12,8 @@ use tokio::time::Duration;
 use crate::cluster::ovn::common::OvnBasicActions;
 use crate::cluster::ovn::common::OvnNamedGetters;
 use crate::cluster::ovn::logicalrouter::LogicalRouter;
+use crate::cluster::ovn::logicalrouterport::LogicalRouterPort;
+use crate::cluster::ovn::logicalswitchport::LogicalSwitchPort;
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::crd::libvirt::{v1beta2::VirtualMachine, NetworkAttachment};
 use crate::crd::ovn::{
@@ -101,13 +103,18 @@ fn ensure_router_attachment(
     let ls_name = name_namespaced(network);
     let mut ls = LogicalSwitch::get_by_name(ovn.clone(), &ls_name)?;
 
-    let ovn_ = Ovn::new("10.4.3.1", 6641);
     let lrp_name = format!("lr_{}-{}_ls_{}", namespace, name, name_namespaced(network));
-    if ovn_.get_lrp(&lrp_name).is_err() {
-        lr.add_lrp(&lrp_name, &router_attachment.address)?;
-    } else {
-        ovn_.update_lrp(&lrp_name, &router_attachment.address)?;
-    }
+    match LogicalRouterPort::get_by_name(ovn.clone(), &lrp_name) {
+        Ok(lrp) => {
+            lrp.update(&router_attachment.address)?;
+            Ok(())
+        }
+        Err(Error::OvnNotFound(_, _)) => {
+            lr.add_lrp(&lrp_name, &router_attachment.address)?;
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }?;
 
     let lsp_name = format!("ls_{}_lr_{}-{}", ls_name, namespace, name);
     let params = json!({
@@ -115,9 +122,11 @@ fn ensure_router_attachment(
         "addresses": "router",
         "options": ["map", [ ["router-port", lrp_name] ]]
     });
-    if ovn.get_lsp(&lsp_name).is_err() {
-        ls.add_lsp(&lsp_name, Some(params.as_object().unwrap()))?;
-    }
+    match LogicalSwitchPort::get_by_name(ovn, &lsp_name) {
+        Ok(lsp) => Ok(lsp),
+        Err(Error::OvnNotFound(_, _)) => ls.add_lsp(&lsp_name, Some(params.as_object().unwrap())),
+        Err(e) => Err(e),
+    }?;
     Ok(())
 }
 
@@ -173,36 +182,38 @@ async fn connect_vm_nic(
     let namespace = ResourceExt::namespace(vm).expect("Failed to get VM namespace");
     let network_name = nic.name.as_ref().expect("No network name set");
     let ls_name = format!("{}-{}", &namespace, &network_name);
-    let mut ls = LogicalSwitch::get_by_name(ovn, &ls_name)?;
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
-    if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_err() {
-        println!("ovn: lsp missing for NIC, creating");
-        let lsp_id = nic.ovn_id.as_ref().unwrap();
-        ls.add_lsp(lsp_id, None)?;
-        ovn.set_lsp_address(
-            lsp_id,
-            nic.mac_address.as_ref().expect("MAC address missing"),
-        )?;
+    let mut ls = LogicalSwitch::get_by_name(ovn.clone(), &ls_name)?;
 
-        let api: Api<Network> = Api::namespaced(client.clone(), &namespace);
-        let network = api.get(network_name).await?;
-        if let Some(dhcp) = network.spec.dhcp {
-            ovn.set_lsp_dhcp_options(lsp_id, &dhcp.cidr)?;
+    match LogicalSwitchPort::get_by_name(ovn, nic.ovn_id.as_ref().unwrap()) {
+        Ok(_lsp) => Ok(()),
+        Err(Error::OvnNotFound(_, _)) => {
+            println!("ovn: lsp missing for NIC, creating");
+            let lsp_id = nic.ovn_id.as_ref().unwrap();
+            let mut lsp = ls.add_lsp(lsp_id, None)?;
+
+            lsp.set_address(nic.mac_address.as_ref().expect("MAC address missing"))?;
+
+            let api: Api<Network> = Api::namespaced(client.clone(), &namespace);
+            let network = api.get(network_name).await?;
+            if let Some(dhcp) = network.spec.dhcp {
+                lsp.set_dhcp_options(&dhcp.cidr)?;
+            }
+            Ok(())
         }
+        Err(e) => Err(e),
     }
-    Ok(())
 }
 
 fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), Error> {
-    let ovn = Ovn::new("10.4.3.1", 6641);
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let ls_name = format!(
         "{}-{}",
         ResourceExt::namespace(vm).expect("Failed to get VM namespace"),
         nic.name.as_ref().expect("No network name set")
     );
-    if ovn.get_lsp(nic.ovn_id.as_ref().unwrap()).is_ok() {
+    if LogicalSwitchPort::get_by_name(ovn.clone(), nic.ovn_id.as_ref().unwrap()).is_ok() {
         println!("ovn: lsp exists for NIC, removing");
-        let mut ls = LogicalSwitch::get_by_name(Arc::new(ovn), &ls_name)?;
+        let mut ls = LogicalSwitch::get_by_name(ovn, &ls_name)?;
         ls.del_lsp(nic.ovn_id.as_ref().unwrap())?;
     }
     Ok(())

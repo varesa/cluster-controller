@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use serde_json::{json, Value};
 
-use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnNamed};
+use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnNamed, OvnNamedGetters};
+use crate::cluster::ovn::logicalrouterport::LogicalRouterPort;
 use crate::cluster::ovn::lowlevel::{
     Ovn, TYPE_LOGICAL_ROUTER, TYPE_LOGICAL_ROUTER_PORT, TYPE_LOGICAL_ROUTER_STATIC_ROUTE,
 };
@@ -16,7 +17,7 @@ pub struct LogicalRouter {
 }
 
 impl LogicalRouter {
-    pub fn add_lrp(&mut self, lrp_name: &str, networks: &str) -> Result<(), Error> {
+    pub fn add_lrp(&mut self, lrp_name: &str, networks: &str) -> Result<LogicalRouterPort, Error> {
         let add_lrp = json!({
             "op": "insert",
             "table": TYPE_LOGICAL_ROUTER_PORT,
@@ -38,7 +39,7 @@ impl LogicalRouter {
             ]
         });
         self.ovn.transact(&[add_lrp, add_lrp_to_lr]);
-        Ok(())
+        LogicalRouterPort::get_by_name(self.ovn.clone(), lrp_name)
     }
 
     pub fn set_routes(&mut self, new_routes: &[RouteCrd]) -> Result<(), Error> {

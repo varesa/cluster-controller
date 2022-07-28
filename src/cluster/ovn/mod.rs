@@ -7,7 +7,9 @@ mod common;
 mod controller;
 mod jsonrpc;
 mod logicalrouter;
+mod logicalrouterport;
 mod logicalswitch;
+mod logicalswitchport;
 mod lowlevel;
 mod types;
 

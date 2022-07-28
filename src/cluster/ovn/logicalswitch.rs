@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use serde_json::{json, Map, Value};
 
-use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnNamed};
+use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnNamed, OvnNamedGetters};
+use crate::cluster::ovn::logicalswitchport::LogicalSwitchPort;
 use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH, TYPE_LOGICAL_SWITCH_PORT};
 use crate::{try_deserialize, Error};
 
@@ -28,7 +29,7 @@ impl LogicalSwitch {
         &mut self,
         lsp_name: &str,
         extra_params: Option<&Map<String, Value>>,
-    ) -> Result<(), Error> {
+    ) -> Result<LogicalSwitchPort, Error> {
         let mut params = if let Some(extra_params) = extra_params {
             extra_params.clone()
         } else {
@@ -54,11 +55,11 @@ impl LogicalSwitch {
             ]
         });
         self.ovn.transact(&[add_lsp, add_lsp_to_ls]);
-        Ok(())
+        LogicalSwitchPort::get_by_name(self.ovn.clone(), lsp_name)
     }
 
     pub fn del_lsp(&mut self, lsp_id: &str) -> Result<(), Error> {
-        let lsp = self.ovn.get_lsp(lsp_id)?;
+        let lsp = LogicalSwitchPort::get_by_name(self.ovn.clone(), lsp_id)?;
 
         let del_lsp = json!({
           "op": "mutate",

@@ -5,9 +5,7 @@ use ipnet::IpNet;
 use serde_json::{json, Map, Value};
 
 use crate::cluster::ovn::jsonrpc::Params;
-use crate::cluster::ovn::types::{
-    DhcpOptions, LogicalRouterPort, LogicalRouterStaticRoute, LogicalSwitchPort,
-};
+use crate::cluster::ovn::types::{DhcpOptions, LogicalRouterStaticRoute};
 use crate::crd::ovn::DhcpOptions as DhcpOptionsCrd;
 use crate::Error;
 
@@ -33,18 +31,6 @@ macro_rules! generate_list_fn {
                 objects.push(serde_json::from_value(row).expect("deserialization failure"));
             }
             objects
-        }
-    };
-}
-
-macro_rules! generate_get_fn {
-    ($name:ident, $type:ident, $type_name:ident, $list_fn:ident) => {
-        pub fn $name(&self, name: &str) -> Result<$type, Error> {
-            let objects = self.$list_fn();
-            objects
-                .into_iter()
-                .find(|o| o.name == name)
-                .ok_or_else(|| Error::OvnNotFound($type_name.to_string(), name.to_string()))
         }
     };
 }
@@ -124,22 +110,6 @@ impl Ovn {
         self.transact(&[operation]);
     }
 
-    generate_list_fn!(list_lsp, LogicalSwitchPort, TYPE_LOGICAL_SWITCH_PORT);
-    generate_get_fn!(
-        get_lsp,
-        LogicalSwitchPort,
-        TYPE_LOGICAL_SWITCH_PORT,
-        list_lsp
-    );
-
-    generate_list_fn!(list_lrp, LogicalRouterPort, TYPE_LOGICAL_ROUTER_PORT);
-    generate_get_fn!(
-        get_lrp,
-        LogicalRouterPort,
-        TYPE_LOGICAL_ROUTER_PORT,
-        list_lrp
-    );
-
     generate_list_fn!(list_dhcp_options, DhcpOptions, TYPE_DHCP_OPTIONS);
     generate_list_fn!(
         list_lr_static_routes,
@@ -147,45 +117,11 @@ impl Ovn {
         TYPE_LOGICAL_ROUTER_STATIC_ROUTE
     );
 
-    pub fn get_dhcp_options(&mut self, cidr: &str) -> Option<DhcpOptions> {
+    pub fn get_dhcp_options(&self, cidr: &str) -> Option<DhcpOptions> {
         let option_sets = self.list_dhcp_options();
         option_sets
             .into_iter()
             .find(|option_set| option_set.cidr == cidr)
-    }
-
-    pub fn update_lrp(&self, lrp_name: &str, networks: &str) -> Result<(), Error> {
-        let lrp = self.get_lrp(lrp_name)?;
-
-        let update_lrp = json!({
-            "op": "update",
-            "table": TYPE_LOGICAL_ROUTER_PORT,
-            "where": [
-                ["_uuid", "==", ["uuid", lrp.uuid()]]
-            ],
-            "row": {
-                "name": lrp_name,
-                "mac": "02:00:00:00:00:01",
-                "networks": networks,
-            }
-        });
-        self.transact(&[update_lrp]);
-        Ok(())
-    }
-
-    pub fn set_lsp_address(&mut self, lsp_id: &str, mac_address: &str) -> Result<(), Error> {
-        let lsp = self.get_lsp(lsp_id)?;
-
-        let set_address = json!({
-            "op": "update",
-            "table": TYPE_LOGICAL_SWITCH_PORT,
-            "where": [
-                [ "_uuid", "==", [ "uuid", lsp.uuid() ] ]
-            ],
-            "row": { "addresses": format!("{mac_address} dynamic") }
-        });
-        self.transact(&[set_address]);
-        Ok(())
     }
 
     pub fn create_dhcp_option_set(&mut self, dhcp_options: &DhcpOptionsCrd) -> Result<(), Error> {
@@ -306,23 +242,5 @@ impl Ovn {
             })
             .collect::<Vec<LogicalRouterStaticRoute>>();
         Ok(routes)
-    }
-
-    pub fn set_lsp_dhcp_options(&mut self, lsp_id: &str, cidr: &str) -> Result<(), Error> {
-        let lsp = self.get_lsp(lsp_id)?;
-
-        let dhcp_options = self
-            .get_dhcp_options(cidr)
-            .ok_or_else(|| Error::OvnNotFound(TYPE_DHCP_OPTIONS.to_string(), cidr.to_string()))?;
-
-        let set_dhcp_options = json!({
-            "op": "update",
-            "table": "Logical_Switch_Port",
-            "where": [["_uuid", "==", ["uuid", lsp.uuid()]]],
-            "row": {"dhcpv4_options":["uuid", dhcp_options.uuid()]}
-        });
-
-        self.transact(&[set_dhcp_options]);
-        Ok(())
     }
 }
