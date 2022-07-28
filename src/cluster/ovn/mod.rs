@@ -5,6 +5,7 @@ use crate::errors::Error;
 
 mod common;
 mod controller;
+mod dhcpoptions;
 mod jsonrpc;
 mod logicalrouter;
 mod logicalrouterport;

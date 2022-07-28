@@ -3,7 +3,8 @@ use std::sync::Arc;
 use serde_json::{json, Value};
 
 use crate::cluster::ovn::common::{OvnCommon, OvnNamed};
-use crate::cluster::ovn::lowlevel::{Ovn, TYPE_DHCP_OPTIONS, TYPE_LOGICAL_SWITCH_PORT};
+use crate::cluster::ovn::dhcpoptions::DhcpOptions;
+use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH_PORT};
 use crate::{try_deserialize, Error};
 
 pub struct LogicalSwitchPort {
@@ -27,11 +28,7 @@ impl LogicalSwitchPort {
     }
 
     pub fn set_dhcp_options(&mut self, cidr: &str) -> Result<(), Error> {
-        let dhcp_options = self
-            .ovn
-            .get_dhcp_options(cidr)
-            .ok_or_else(|| Error::OvnNotFound(TYPE_DHCP_OPTIONS.to_string(), cidr.to_string()))?;
-
+        let dhcp_options = DhcpOptions::get_by_cidr(self.ovn.clone(), cidr)?;
         let set_dhcp_options = json!({
             "op": "update",
             "table": "Logical_Switch_Port",

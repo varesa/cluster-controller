@@ -1,12 +1,9 @@
-use std::net::IpAddr;
 use std::sync::Mutex;
 
-use ipnet::IpNet;
 use serde_json::{json, Map, Value};
 
 use crate::cluster::ovn::jsonrpc::Params;
-use crate::cluster::ovn::types::{DhcpOptions, LogicalRouterStaticRoute};
-use crate::crd::ovn::DhcpOptions as DhcpOptionsCrd;
+use crate::cluster::ovn::types::LogicalRouterStaticRoute;
 use crate::Error;
 
 use super::jsonrpc::{JsonRpcConnection, Message};
@@ -110,76 +107,11 @@ impl Ovn {
         self.transact(&[operation]);
     }
 
-    generate_list_fn!(list_dhcp_options, DhcpOptions, TYPE_DHCP_OPTIONS);
     generate_list_fn!(
         list_lr_static_routes,
         LogicalRouterStaticRoute,
         TYPE_LOGICAL_ROUTER_STATIC_ROUTE
     );
-
-    pub fn get_dhcp_options(&self, cidr: &str) -> Option<DhcpOptions> {
-        let option_sets = self.list_dhcp_options();
-        option_sets
-            .into_iter()
-            .find(|option_set| option_set.cidr == cidr)
-    }
-
-    pub fn create_dhcp_option_set(&mut self, dhcp_options: &DhcpOptionsCrd) -> Result<(), Error> {
-        let cidr = dhcp_options.cidr.clone();
-        let create_options = json!({
-            "op": "insert",
-            "table": TYPE_DHCP_OPTIONS,
-            "row": {"cidr": cidr},
-            "uuid-name": "new_dhcp_options"
-        });
-        self.transact(&[create_options]);
-        Ok(())
-    }
-
-    pub fn set_dhcp_option_set_options(
-        &mut self,
-        dhcp_options: &DhcpOptionsCrd,
-    ) -> Result<(), Error> {
-        let cidr = dhcp_options.cidr.clone();
-        let option_set = self
-            .get_dhcp_options(&cidr)
-            .ok_or_else(|| Error::OvnNotFound(TYPE_DHCP_OPTIONS.to_string(), cidr.to_string()))?;
-
-        let net: IpNet = cidr.parse()?;
-        let hosts: Vec<IpAddr> = net.hosts().collect();
-        let mut options = vec![
-            [String::from("server_id"), hosts[1].to_string()],
-            [
-                String::from("server_mac"),
-                String::from("c0:ff:ee:00:00:01"),
-            ],
-        ];
-
-        // Copy values from CRD to above vector
-        macro_rules! push_dhcp_opts {
-            ($source:ident, $destination:ident, [$($name:ident),+]) => {
-                $(
-                if let Some(value) = $source.$name.clone() {
-                    $destination.push([String::from(stringify!($name)), value.to_string()]);
-                }
-                )+
-            }
-        }
-        push_dhcp_opts!(
-            dhcp_options,
-            options,
-            [lease_time, dns_server, domain_name, router]
-        );
-
-        let set_options = json!({
-            "op": "update",
-            "table": TYPE_DHCP_OPTIONS,
-            "where": [["_uuid", "==", ["uuid", option_set.uuid()]]],
-            "row": {"options": ["map", options]}
-        });
-        self.transact(&[set_options]);
-        Ok(())
-    }
 
     pub fn get_lr_routes(&self, router_name: &str) -> Result<Vec<LogicalRouterStaticRoute>, Error> {
         let select = json!({

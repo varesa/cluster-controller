@@ -11,13 +11,15 @@ use tokio::time::Duration;
 
 use crate::cluster::ovn::common::OvnBasicActions;
 use crate::cluster::ovn::common::OvnNamedGetters;
+use crate::cluster::ovn::dhcpoptions::DhcpOptions;
 use crate::cluster::ovn::logicalrouter::LogicalRouter;
 use crate::cluster::ovn::logicalrouterport::LogicalRouterPort;
 use crate::cluster::ovn::logicalswitchport::LogicalSwitchPort;
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::crd::libvirt::{v1beta2::VirtualMachine, NetworkAttachment};
 use crate::crd::ovn::{
-    DhcpOptions, Network, NetworkStatus, Route, Router, RouterAttachment, RouterStatus,
+    DhcpOptions as DhcpOptionsCrd, Network, NetworkStatus, Route, Router, RouterAttachment,
+    RouterStatus,
 };
 use crate::errors::Error;
 use crate::utils::name_namespaced;
@@ -66,13 +68,16 @@ fn ensure_router_routes(router: &str, routes: &[Route]) -> Result<(), Error> {
     LogicalRouter::get_by_name(ovn, router)?.set_routes(routes)
 }
 
-fn ensure_dhcp(name: &str, dhcp: &DhcpOptions) -> Result<(), Error> {
-    let mut ovn = Ovn::new("10.4.3.1", 6641);
-    if ovn.get_dhcp_options(&dhcp.cidr).is_none() {
-        ovn.create_dhcp_option_set(dhcp)?;
-    }
+fn ensure_dhcp(name: &str, dhcp: &DhcpOptionsCrd) -> Result<(), Error> {
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    let mut dhcp_opts = match DhcpOptions::get_by_cidr(ovn.clone(), &dhcp.cidr) {
+        Ok(opts) => Ok(opts),
+        Err(Error::OvnNotFound(_, _)) => DhcpOptions::create(ovn, &dhcp.cidr),
+        Err(e) => Err(e),
+    }?;
+
     // Lazily try to always update, effectively noop if current value are already correct
-    ovn.set_dhcp_option_set_options(dhcp)?;
+    dhcp_opts.set_options(dhcp)?;
 
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     LogicalSwitch::get_by_name(ovn, name)?.set_cidr(&dhcp.cidr)?;
