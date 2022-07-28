@@ -3,8 +3,6 @@ use std::sync::Mutex;
 use serde_json::{json, Map, Value};
 
 use crate::cluster::ovn::jsonrpc::Params;
-use crate::cluster::ovn::types::LogicalRouterStaticRoute;
-use crate::Error;
 
 use super::jsonrpc::{JsonRpcConnection, Message};
 
@@ -19,19 +17,6 @@ pub struct Ovn {
     connection: Mutex<JsonRpcConnection>,
 }
 
-macro_rules! generate_list_fn {
-    ($name:ident, $type:ident, $type_name:ident) => {
-        pub fn $name(&self) -> Vec<$type> {
-            let response = self.list_objects($type_name);
-            let mut objects = Vec::new();
-            for row in response {
-                objects.push(serde_json::from_value(row).expect("deserialization failure"));
-            }
-            objects
-        }
-    };
-}
-
 impl Ovn {
     pub fn new(host: &str, port: u16) -> Self {
         Ovn {
@@ -39,7 +24,7 @@ impl Ovn {
         }
     }
 
-    pub(crate) fn transact(&self, operations: &[Value]) -> Vec<Value> {
+    pub fn transact(&self, operations: &[Value]) -> Vec<Value> {
         let mut params = vec![Value::String("OVN_Northbound".to_string())];
         params.append(&mut operations.to_owned());
         let response = self
@@ -105,74 +90,5 @@ impl Ovn {
             ]
         });
         self.transact(&[operation]);
-    }
-
-    generate_list_fn!(
-        list_lr_static_routes,
-        LogicalRouterStaticRoute,
-        TYPE_LOGICAL_ROUTER_STATIC_ROUTE
-    );
-
-    pub fn get_lr_routes(&self, router_name: &str) -> Result<Vec<LogicalRouterStaticRoute>, Error> {
-        let select = json!({
-            "op": "select",
-            "table": TYPE_LOGICAL_ROUTER,
-            "where": [["name", "==", router_name]],
-            "columns": ["static_routes"],
-        });
-
-        let rows = self.transact(&[select])[0]
-            .as_object()
-            .expect("Transaction result not an object")
-            .get("rows")
-            .expect("Transaction didn't return rows")
-            .as_array()
-            .expect("Rows is not an array")
-            .to_owned();
-
-        let router = rows
-            .get(0)
-            .ok_or_else(|| Error::OvnNotFound("LogicalRouter".into(), router_name.into()))?
-            .as_object()
-            .expect("Table row was not an object");
-
-        let all_routes = self.list_lr_static_routes();
-
-        let set = router
-            .get("static_routes")
-            .expect("Router doesn't have static_routes column")
-            .as_array()
-            .expect("static_routes was not an array")
-            .get(1)
-            .expect("static_routes was not in format ['set', [...]]");
-
-        let uuids: Vec<String> = match set {
-            Value::String(uuid) => vec![uuid.clone()],
-            Value::Array(uuids_arrays) => uuids_arrays
-                .iter()
-                .map(|item| {
-                    item.as_array()
-                        .expect("Row was not an array like ['uuid', uuid]")[1]
-                        .as_str()
-                        .expect("UUID was not a string")
-                        .to_string()
-                })
-                .collect(),
-            _ => panic!("Unexpected data type"),
-        };
-
-        let routes = uuids
-            .iter()
-            .map(|uuid| {
-                all_routes
-                    .iter()
-                    .find(|item| &item.uuid() == uuid)
-                    .unwrap_or_else(|| {
-                        panic!("Unable to find static route {} for {}", uuid, router_name)
-                    })
-                    .clone()
-            })
-            .collect::<Vec<LogicalRouterStaticRoute>>();
-        Ok(routes)
     }
 }

@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use serde_json::{json, Value};
 
-use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnNamed, OvnNamedGetters};
+use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters};
 use crate::cluster::ovn::logicalrouterport::LogicalRouterPort;
 use crate::cluster::ovn::lowlevel::{
     Ovn, TYPE_LOGICAL_ROUTER, TYPE_LOGICAL_ROUTER_PORT, TYPE_LOGICAL_ROUTER_STATIC_ROUTE,
 };
+use crate::cluster::ovn::staticroute::StaticRoute;
 use crate::crd::ovn::Route as RouteCrd;
 use crate::{try_deserialize, Error};
 
@@ -14,6 +15,7 @@ pub struct LogicalRouter {
     ovn: Arc<Ovn>,
     uuid: String,
     name: String,
+    static_route_uuids: Vec<String>,
 }
 
 impl LogicalRouter {
@@ -43,7 +45,7 @@ impl LogicalRouter {
     }
 
     pub fn set_routes(&mut self, new_routes: &[RouteCrd]) -> Result<(), Error> {
-        let old_routes = self.ovn.get_lr_routes(&self.name())?;
+        let old_routes = self.get_routes()?;
 
         let mut operations = Vec::new();
         let mut to_add = Vec::new();
@@ -90,6 +92,24 @@ impl LogicalRouter {
         self.ovn.transact(&operations);
         Ok(())
     }
+
+    pub fn get_routes(&self) -> Result<Vec<StaticRoute>, Error> {
+        let all_routes = StaticRoute::list(self.ovn.clone())?;
+        let routes = self
+            .static_route_uuids
+            .iter()
+            .map(|uuid| {
+                all_routes
+                    .iter()
+                    .find(|item| &item.uuid() == uuid)
+                    .unwrap_or_else(|| {
+                        panic!("Unable to find static route {} for {}", uuid, self.name())
+                    })
+                    .clone()
+            })
+            .collect::<Vec<StaticRoute>>();
+        Ok(routes)
+    }
 }
 
 impl OvnCommon for LogicalRouter {
@@ -108,6 +128,25 @@ impl OvnCommon for LogicalRouter {
     fn deserialize(ovn: Arc<Ovn>, value: &Value) -> Result<LogicalRouter, Error> {
         let object = try_deserialize!(value.as_object());
 
+        let route_set = try_deserialize!(object
+            .get("static_routes")
+            .and_then(|a| a.as_array())
+            .and_then(|a| a.get(1)));
+        let route_uuids: Vec<String> = match route_set {
+            Value::String(uuid) => vec![uuid.clone()],
+            Value::Array(uuids_arrays) => uuids_arrays
+                .iter()
+                .map(|item| {
+                    item.as_array()
+                        .expect("Row was not an array like ['uuid', uuid]")[1]
+                        .as_str()
+                        .expect("UUID was not a string")
+                        .to_string()
+                })
+                .collect(),
+            _ => panic!("Unexpected data type"),
+        };
+
         Ok(LogicalRouter {
             ovn,
             uuid: try_deserialize!(object
@@ -117,6 +156,7 @@ impl OvnCommon for LogicalRouter {
                 .and_then(|u| u.as_str()))
             .to_owned(),
             name: try_deserialize!(object.get("name").and_then(|u| u.as_str())).to_owned(),
+            static_route_uuids: route_uuids,
         })
     }
 }

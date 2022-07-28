@@ -12,6 +12,7 @@ mod logicalrouterport;
 mod logicalswitch;
 mod logicalswitchport;
 mod lowlevel;
+mod staticroute;
 mod types;
 
 pub async fn run(client: Client) -> Result<(), Error> {
