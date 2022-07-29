@@ -1,6 +1,7 @@
-use libc::{c_int, strerror};
 use std::ffi::CStr;
 use std::fmt::Formatter;
+
+use libc::{c_int, strerror};
 
 fn c_error_name(n: c_int) -> String {
     unsafe {
@@ -16,6 +17,7 @@ pub struct RadosError {
 }
 
 impl std::error::Error for RadosError {}
+
 impl std::fmt::Display for RadosError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
@@ -34,6 +36,7 @@ pub struct ClusterNotFound {
 }
 
 impl std::error::Error for ClusterNotFound {}
+
 impl std::fmt::Display for ClusterNotFound {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
@@ -80,6 +83,12 @@ pub enum Error {
     Template(#[from] askama::Error),
     #[error("Error parsing CIDR: {0}")]
     ParseNetwork(#[from] ipnet::AddrParseError),
+
+    // Metadata proxy
+    #[error("Failed to send between threads")]
+    ChannelSendError(#[from] futures::channel::mpsc::SendError),
+    #[error("Failed to change network namespace")]
+    NetnsChangeFailed,
 
     // Custom/generic
     #[error("Timed out waiting for operation: {0}")]

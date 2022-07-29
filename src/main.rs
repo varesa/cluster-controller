@@ -1,15 +1,18 @@
+use std::env;
+
+use kube::Client;
+
+use crate::errors::Error;
+use crate::utils::get_version_string;
+
 mod cluster;
 mod errors;
 mod host;
 #[macro_use]
 mod utils;
 mod crd;
+mod metadataservice;
 mod shared;
-
-use crate::errors::Error;
-use crate::utils::get_version_string;
-use kube::Client;
-use std::env;
 
 const NAMESPACE: &str = "virt-controller";
 const GROUP_NAME: &str = "cluster-virt.acl.fi";
@@ -21,14 +24,21 @@ async fn main() -> Result<(), Error> {
 
     if args.contains(&String::from("--version")) {
         println!("{}", get_version_string());
-    } else if args.contains(&String::from("--host")) {
+        return Ok(());
+    }
+
+    let client = Client::try_default().await?;
+
+    if args.contains(&String::from("--host")) {
         println!("Starting host-mode");
-        let client = Client::try_default().await?;
         host::libvirt::run(client).await?;
+    } else if args.contains(&String::from("--metadata-service")) {
+        println!("Staring metadata service mode");
+        metadataservice::run(args, client).await?;
     } else {
         println!("Starting cluster-mode");
-        let client = Client::try_default().await?;
         cluster::run(client, NAMESPACE).await?;
     }
+
     Ok(())
 }

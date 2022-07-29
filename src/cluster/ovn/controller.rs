@@ -278,6 +278,7 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
         } else {
             ensure_router_routes(&name, &[])?;
         }
+
         println!("ovn: update for router {name} successful");
 
         let status = RouterStatus { is_created: true };

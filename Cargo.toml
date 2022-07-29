@@ -43,4 +43,7 @@ librados-sys = "0.1.0"
 librbd-sys = "0.1.0"
 
 # libvirt
-virt = {  git = "https://github.com/varesa/libvirt-rust.git", branch = "hack" }
+virt = { git = "https://github.com/varesa/libvirt-rust.git", branch = "hack" }
+
+# metadata proxy
+nix = "0.24.2"

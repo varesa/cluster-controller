@@ -74,6 +74,7 @@ pub struct Route {
 )]
 pub struct RouterSpec {
     pub routes: Option<Vec<Route>>,
+    pub metadata_service: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
