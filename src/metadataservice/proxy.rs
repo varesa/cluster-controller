@@ -11,7 +11,7 @@ use crate::metadataservice::bidirectional_channel::ChannelEndpoint;
 use crate::metadataservice::protocol::{ChannelProtocol, MetadataRequest};
 use crate::Error;
 
-fn get_ns_fd(ns_name: &str) -> Result<RawFd, Error> {
+fn get_ns(ns_name: &str) -> Result<File, Error> {
     let ns_path_str = format!("/var/run/netns/{}", ns_name);
     let ns_path = Path::new(&ns_path_str);
 
@@ -35,7 +35,7 @@ fn get_ns_fd(ns_name: &str) -> Result<RawFd, Error> {
         }
     };
 
-    Ok(file.as_raw_fd())
+    Ok(file)
 }
 
 pub struct MetadataProxy {
@@ -48,8 +48,8 @@ impl MetadataProxy {
         namespace: &str,
     ) -> Result<(), Error> {
         println!("proxy: Starting metadata proxy");
-        let ns_fd = get_ns_fd(namespace)?;
-        setns(ns_fd, CloneFlags::CLONE_NEWNET).map_err(Error::NetnsChangeFailed)?;
+        let ns = get_ns(namespace)?;
+        setns(ns.as_raw_fd(), CloneFlags::CLONE_NEWNET).map_err(Error::NetnsChangeFailed)?;
 
         let debug = Command::new("/usr/sbin/ip")
             .arg("addr")
