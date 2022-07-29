@@ -46,8 +46,8 @@ fn create_ns(ns_name: &str) -> Result<File, Error> {
 }
 
 fn create_interface(ns_name: &str) -> Result<(), Error> {
-    let if_host = format!("{ns_name}-host");
-    let if_ns = format!("{ns_name}-ns");
+    let if_host = format!("todo-host");
+    let if_ns = format!("todo-ns");
 
     ip_command(vec![
         "link", "add", &if_host, "type", "veth", "peer", &if_ns,
