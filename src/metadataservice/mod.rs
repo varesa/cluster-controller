@@ -29,10 +29,14 @@ pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
     let (ch_backend, ch_proxy) = bidirectional_channel::<ChannelProtocol>();
 
     let proxy_thread = std::thread::spawn(move || MetadataProxy::run(ch_proxy, &ns_name));
-    let proxy_task =
-        tokio::task::spawn_blocking(|| proxy_thread.join().expect("Failed to join thread"));
+    let proxy_task = tokio::task::spawn_blocking(|| {
+        let res = proxy_thread.join().expect("Failed to join thread");
+        println!("proxy thread terminated: {:?}", &res);
+        res
+    });
     let backend_task = tokio::task::spawn(MetadataBackend::run(ch_backend, client));
 
+    println!("supervisor: keeping a watch on the threads");
     let _ = tokio::try_join!(proxy_task, backend_task);
     panic!("One of the threads exited");
 }
