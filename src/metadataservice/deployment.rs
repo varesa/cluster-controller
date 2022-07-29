@@ -17,6 +17,9 @@ pub fn make_deployment(image: &str, namespace: &str, router: &str) -> Result<Dep
             "name": format!("metadata-{}-{}", namespace, router)
           }
         },
+        "strategy": {
+          "type": "Recreate"
+        },
         "template": {
           "metadata": {
             "labels": {
