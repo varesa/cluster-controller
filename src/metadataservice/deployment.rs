@@ -46,10 +46,6 @@ pub fn make_deployment(image: &str, namespace: &str, router: &str) -> Result<Dep
                   {
                     "name": "var-run-netns",
                     "mountPath": "/var/run/netns"
-                  },
-                  {
-                    "name": "sys",
-                    "mountPath": "/sys"
                   }
                 ]
               }
@@ -59,11 +55,6 @@ pub fn make_deployment(image: &str, namespace: &str, router: &str) -> Result<Dep
                 "name": "var-run-netns",
                 "hostPath": {
                   "path": "/var/run/netns"
-                }
-              },{
-                "name": "sys",
-                "hostPath": {
-                  "path": "/sys"
                 }
               }
             ]
