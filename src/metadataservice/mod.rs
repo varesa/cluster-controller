@@ -32,7 +32,7 @@ pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
         let proxy_thread = std::thread::spawn(move || MetadataProxy::run(ch_proxy, &ns_name));
         panic!(
             "proxy thread exited: {:?}",
-            tokio::task::spawn_blocking(|| { proxy_thread.join() })
+            tokio::task::spawn_blocking(|| { proxy_thread.join() }).await
         );
     });
 
