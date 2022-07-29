@@ -24,7 +24,7 @@ FROM docker.io/library/rockylinux:8
 
 RUN dnf update -y && \
     dnf install -y centos-release-ceph-pacific && \
-    dnf install -y libvirt-libs librbd1 librados2
+    dnf install -y libvirt-libs librbd1 librados2 iproute
 
 COPY --from=builder /usr/local/cargo/bin/cluster-controller /usr/local/bin/cluster-controller
 
