@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
@@ -11,31 +11,55 @@ use crate::metadataservice::bidirectional_channel::ChannelEndpoint;
 use crate::metadataservice::protocol::{ChannelProtocol, MetadataRequest};
 use crate::Error;
 
-fn get_ns(ns_name: &str) -> Result<File, Error> {
+fn ip_command(args: Vec<&str>) -> Result<(), Error> {
+    let output = Command::new("/usr/sbin/ip")
+        .args(&args)
+        .output()
+        .expect("failed to run command");
+
+    if !output.status.success() {
+        return Err(Error::CommandError(
+            args.into_iter().map(|s| s.to_owned()).collect(),
+            String::from_utf8(output.stderr).expect("stderr not valid UTF-8"),
+        ));
+    }
+    Ok(())
+}
+
+fn ip_command_netns(netns: &str, args: Vec<&str>) -> Result<(), Error> {
+    let mut command = vec!["netns", "exec", netns, "ip"];
+    command.append(&mut args.clone());
+    ip_command(command)
+}
+
+fn create_ns(ns_name: &str) -> Result<File, Error> {
     let ns_path_str = format!("/var/run/netns/{}", ns_name);
     let ns_path = Path::new(&ns_path_str);
 
     println!("proxy: Trying to open {}", &ns_path_str);
-    let file = match File::open(ns_path) {
-        Ok(file) => file,
-        Err(_) => {
-            println!("proxy: Open failed, trying to create");
-            let output = Command::new("/usr/sbin/ip")
-                .arg("netns")
-                .arg("add")
-                .arg(ns_name)
-                .output()
-                .expect("Failed to create netns");
-            if !output.status.success() {
-                return Err(Error::NetnsCreateFailed(
-                    String::from_utf8(output.stderr).expect("stderr not valid UTF-8"),
-                ));
-            }
-            File::open(ns_path).expect("Failed to open netns")
-        }
-    };
 
-    Ok(file)
+    ip_command(vec!["netns", "add", ns_name]).map_err(|e| match e {
+        Error::CommandError(_cmd, msg) => Error::NetnsCreateFailed(msg),
+        e => e,
+    })?;
+    File::open(ns_path).map_err(Error::NetnsOpenFailed)
+}
+
+fn create_interface(ns_name: &str) -> Result<(), Error> {
+    let if_host = format!("{ns_name}-host");
+    let if_ns = format!("{ns_name}-ns");
+
+    ip_command(vec![
+        "link", "add", &if_host, "type", "veth", "peer", &if_ns,
+    ])?;
+    ip_command(vec!["link", "set", &if_ns, "netns", ns_name])?;
+    ip_command_netns(
+        ns_name,
+        vec!["addr", "add", "169.254.169.254/30", "dev", &if_ns],
+    )?;
+    ip_command_netns(ns_name, vec!["link", "set", &if_ns, "up"])?;
+    ip_command(vec!["link", "set", &if_host, "up"])?;
+    Ok(())
 }
 
 pub struct MetadataProxy {
@@ -48,7 +72,8 @@ impl MetadataProxy {
         namespace: &str,
     ) -> Result<(), Error> {
         println!("proxy: Starting metadata proxy");
-        let ns = get_ns(namespace)?;
+        let ns = create_ns(namespace)?;
+        create_interface(namespace)?;
         setns(ns.as_raw_fd(), CloneFlags::CLONE_NEWNET).map_err(Error::NetnsChangeFailed)?;
 
         let debug = Command::new("/usr/sbin/ip")

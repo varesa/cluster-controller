@@ -89,8 +89,12 @@ pub enum Error {
     ChannelSendError(#[from] futures::channel::mpsc::SendError),
     #[error("Failed to create network namespace: {0}")]
     NetnsCreateFailed(String),
+    #[error("Failed to open network namespace: {0}")]
+    NetnsOpenFailed(std::io::Error),
     #[error("Failed to change network namespace: {0}")]
     NetnsChangeFailed(#[from] nix::errno::Errno),
+    #[error("Command {0:?} failed: {1}")]
+    CommandError(Vec<String>, String),
 
     // Custom/generic
     #[error("Timed out waiting for operation: {0}")]
