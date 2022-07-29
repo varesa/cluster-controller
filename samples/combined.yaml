@@ -3,7 +3,8 @@ kind: Router
 metadata:
   name: testrouter
   namespace: test2
-spec: {}
+spec:
+  metadata_service: true
 ---
 apiVersion: cluster-virt.acl.fi/v1beta
 kind: Network
