@@ -11,24 +11,29 @@ use crate::metadataservice::bidirectional_channel::ChannelEndpoint;
 use crate::metadataservice::protocol::{ChannelProtocol, MetadataRequest};
 use crate::Error;
 
-fn get_ns_fd(ns_name: &str) -> RawFd {
+fn get_ns_fd(ns_name: &str) -> Result<RawFd, Error> {
     let ns_path_str = format!("/var/run/netns/{}", ns_name);
     let ns_path = Path::new(&ns_path_str);
 
     let file = match File::open(ns_path) {
         Ok(file) => file,
         Err(_) => {
-            Command::new("/usr/sbin/ip")
+            let output = Command::new("/usr/sbin/ip")
                 .arg("netns")
                 .arg("add")
                 .arg(ns_name)
                 .output()
                 .expect("Failed to create netns");
+            if !output.status.success() {
+                return Err(Error::NetnsCreateFailed(
+                    String::from_utf8(output.stderr).expect("stderr not valid UTF-8"),
+                ));
+            }
             File::open(ns_path).expect("Failed to open netns")
         }
     };
 
-    file.as_raw_fd()
+    Ok(file.as_raw_fd())
 }
 
 pub struct MetadataProxy {
@@ -40,7 +45,7 @@ impl MetadataProxy {
         channel_endpoint: ChannelEndpoint<ChannelProtocol>,
         namespace: &str,
     ) -> Result<(), Error> {
-        let ns_fd = get_ns_fd(namespace);
+        let ns_fd = get_ns_fd(namespace)?;
         setns(ns_fd, CloneFlags::CLONE_NEWNET).or(Err(Error::NetnsChangeFailed))?;
 
         let debug = Command::new("/usr/sbin/ip")

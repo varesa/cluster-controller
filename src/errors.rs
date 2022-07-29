@@ -87,6 +87,8 @@ pub enum Error {
     // Metadata proxy
     #[error("Failed to send between threads")]
     ChannelSendError(#[from] futures::channel::mpsc::SendError),
+    #[error("Failed to create network namespace: {0}")]
+    NetnsCreateFailed(String),
     #[error("Failed to change network namespace")]
     NetnsChangeFailed,
 
