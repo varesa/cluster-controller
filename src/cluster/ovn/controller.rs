@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
+use k8s_openapi::api::apps::v1::Deployment;
+use kube::api::{Patch, PatchParams};
 use kube::runtime::controller::{Action, Controller};
 use kube::{
     api::{Api, ListParams, PostParams},
@@ -9,19 +11,19 @@ use kube::{
 use serde_json::json;
 use tokio::time::Duration;
 
-use crate::cluster::ovn::common::OvnBasicActions;
-use crate::cluster::ovn::common::OvnNamedGetters;
-use crate::cluster::ovn::dhcpoptions::DhcpOptions;
-use crate::cluster::ovn::logicalrouter::LogicalRouter;
-use crate::cluster::ovn::logicalrouterport::LogicalRouterPort;
-use crate::cluster::ovn::logicalswitchport::LogicalSwitchPort;
-use crate::cluster::ovn::lowlevel::Ovn;
+use crate::cluster::get_running_image;
+use crate::cluster::ovn::{
+    common::OvnBasicActions, common::OvnNamedGetters, dhcpoptions::DhcpOptions,
+    logicalrouter::LogicalRouter, logicalrouterport::LogicalRouterPort,
+    logicalswitchport::LogicalSwitchPort, lowlevel::Ovn,
+};
 use crate::crd::libvirt::{v1beta2::VirtualMachine, NetworkAttachment};
 use crate::crd::ovn::{
     DhcpOptions as DhcpOptionsCrd, Network, NetworkStatus, Route, Router, RouterAttachment,
     RouterStatus,
 };
 use crate::errors::Error;
+use crate::metadataservice::deployment::make_deployment;
 use crate::utils::name_namespaced;
 use crate::{
     api_replace_resource, client_ensure_finalizer, client_remove_finalizer, create_controller,
@@ -261,6 +263,12 @@ async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action
 /// Handle updates to routers in the cluster
 async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action, Error> {
     let client = ctx.client.clone();
+    let namespace = router
+        .metadata
+        .namespace
+        .as_ref()
+        .expect("get router namespace");
+    let deployments: Api<Deployment> = Api::namespaced(client.clone(), namespace);
     let name = name_namespaced(router.as_ref());
 
     if router.metadata.deletion_timestamp.is_some() {
@@ -277,6 +285,21 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
             ensure_router_routes(&name, routes)?;
         } else {
             ensure_router_routes(&name, &[])?;
+        }
+
+        if let Some(true) = &router.spec.metadata_service {
+            let metadataservice_deploy = make_deployment(
+                &get_running_image(client.clone()).await?,
+                namespace,
+                router.metadata.name.as_ref().expect("get router name"),
+            )?;
+            deployments
+                .patch(
+                    metadataservice_deploy.metadata.name.as_ref().unwrap(),
+                    &PatchParams::apply("ovn-cluster-controller"),
+                    &Patch::Apply(&metadataservice_deploy),
+                )
+                .await?;
         }
 
         println!("ovn: update for router {name} successful");

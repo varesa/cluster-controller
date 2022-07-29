@@ -1,6 +1,7 @@
-use crate::errors::Error;
 use k8s_openapi::api::apps::v1::DaemonSet;
 use serde_json::json;
+
+use crate::errors::Error;
 
 pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
     let ds: DaemonSet = serde_json::from_value(json!({

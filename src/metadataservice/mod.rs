@@ -8,6 +8,7 @@ use crate::Error;
 
 mod backend;
 mod bidirectional_channel;
+pub mod deployment;
 mod protocol;
 mod proxy;
 
