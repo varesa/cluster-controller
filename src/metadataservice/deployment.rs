@@ -41,20 +41,6 @@ pub fn make_deployment(image: &str, namespace: &str, router: &str) -> Result<Dep
                 ],
                 "securityContext": {
                   "privileged": true
-                },
-                "volumeMounts": [
-                  {
-                    "name": "var-run-netns",
-                    "mountPath": "/var/run/netns"
-                  }
-                ]
-              }
-            ],
-            "volumes": [
-              {
-                "name": "var-run-netns",
-                "hostPath": {
-                  "path": "/var/run/netns"
                 }
               }
             ]
