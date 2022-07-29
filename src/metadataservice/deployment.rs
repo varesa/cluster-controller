@@ -38,7 +38,10 @@ pub fn make_deployment(image: &str, namespace: &str, router: &str) -> Result<Dep
                       "fieldRef": { "fieldPath": "spec.nodeName" }
                     }
                   }
-                ]
+                ],
+                "securityContext": {
+                  "privileged": true
+                }
               }
             ]
           }
