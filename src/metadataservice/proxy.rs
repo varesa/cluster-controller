@@ -49,7 +49,7 @@ impl MetadataProxy {
     ) -> Result<(), Error> {
         println!("proxy: Starting metadata proxy");
         let ns_fd = get_ns_fd(namespace)?;
-        setns(ns_fd, CloneFlags::CLONE_NEWNET).or(Err(Error::NetnsChangeFailed))?;
+        setns(ns_fd, CloneFlags::CLONE_NEWNET).map_err(Error::NetnsChangeFailed)?;
 
         let debug = Command::new("/usr/sbin/ip")
             .arg("addr")

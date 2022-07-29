@@ -89,8 +89,8 @@ pub enum Error {
     ChannelSendError(#[from] futures::channel::mpsc::SendError),
     #[error("Failed to create network namespace: {0}")]
     NetnsCreateFailed(String),
-    #[error("Failed to change network namespace")]
-    NetnsChangeFailed,
+    #[error("Failed to change network namespace: {0}")]
+    NetnsChangeFailed(#[from] nix::errno::Errno),
 
     // Custom/generic
     #[error("Timed out waiting for operation: {0}")]
