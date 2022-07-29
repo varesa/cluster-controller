@@ -15,6 +15,7 @@ impl MetadataBackend {
         channel_endpoint: ChannelEndpoint<ChannelProtocol>,
         client: Client,
     ) -> Result<(), Error> {
+        println!("backend: Starting metadata backend");
         let mut mb = MetadataBackend {
             channel_endpoint,
             client,

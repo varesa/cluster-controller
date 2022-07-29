@@ -15,9 +15,11 @@ fn get_ns_fd(ns_name: &str) -> Result<RawFd, Error> {
     let ns_path_str = format!("/var/run/netns/{}", ns_name);
     let ns_path = Path::new(&ns_path_str);
 
+    println!("proxy: Trying to open {}", &ns_path_str);
     let file = match File::open(ns_path) {
         Ok(file) => file,
         Err(_) => {
+            println!("proxy: Open failed, trying to create");
             let output = Command::new("/usr/sbin/ip")
                 .arg("netns")
                 .arg("add")
@@ -45,6 +47,7 @@ impl MetadataProxy {
         channel_endpoint: ChannelEndpoint<ChannelProtocol>,
         namespace: &str,
     ) -> Result<(), Error> {
+        println!("proxy: Starting metadata proxy");
         let ns_fd = get_ns_fd(namespace)?;
         setns(ns_fd, CloneFlags::CLONE_NEWNET).or(Err(Error::NetnsChangeFailed))?;
 
