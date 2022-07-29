@@ -30,11 +30,15 @@ pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
 
     let proxy_thread = std::thread::spawn(move || MetadataProxy::run(ch_proxy, &ns_name));
     let proxy_task = tokio::task::spawn_blocking(|| {
-        let res = proxy_thread.join().expect("Failed to join thread");
-        println!("proxy thread terminated: {:?}", &res);
-        res
+        panic!("metadata proxy thread exited: {:?}", proxy_thread.join());
     });
-    let backend_task = tokio::task::spawn(MetadataBackend::run(ch_backend, client));
+
+    let backend_task = tokio::task::spawn(async {
+        panic!(
+            "metadata backend task exited: {:?}",
+            MetadataBackend::run(ch_backend, client).await
+        );
+    });
 
     println!("supervisor: keeping a watch on the threads");
     let _ = tokio::try_join!(proxy_task, backend_task);
