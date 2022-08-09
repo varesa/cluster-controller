@@ -345,11 +345,8 @@ pub fn has_locks(pool: rados_ioctx_t, image_name: &str) -> Result<bool, Error> {
     match code {
         0 => Ok(false),
         NEG_ERANGE => { 
-            if clients_len > 0 || cookies_len > 0 || addrs_len > 0 {
-                Ok(true)
-            } else {
-                Ok(false)
-            }
+            let locks = clients_len > 0 || cookies_len > 0 || addrs_len > 0;
+            Ok(locks)
         },
         _ => Err(RadosError {
             operation: String::from("rbd_list_lockers"),
