@@ -1,17 +1,17 @@
 use kube::Client;
+use tokio::sync::mpsc::Receiver;
 
-use crate::metadataservice::bidirectional_channel::ChannelEndpoint;
-use crate::metadataservice::protocol::{ChannelProtocol, MetadataResponse};
+use crate::metadataservice::protocol::{MetadataRequest, MetadataResponse};
 use crate::Error;
 
 pub struct MetadataBackend {
-    channel_endpoint: ChannelEndpoint<ChannelProtocol>,
+    channel_endpoint: Receiver<MetadataRequest>,
     client: Client,
 }
 
 impl MetadataBackend {
     pub async fn run(
-        channel_endpoint: ChannelEndpoint<ChannelProtocol>,
+        channel_endpoint: Receiver<MetadataRequest>,
         client: Client,
     ) -> Result<(), Error> {
         println!("backend: Starting metadata backend");
@@ -24,20 +24,13 @@ impl MetadataBackend {
 
     async fn main(&mut self) -> Result<(), Error> {
         loop {
-            if let Some(msg) = self.channel_endpoint.rx.recv().await {
-                match msg {
-                    ChannelProtocol::MetadataRequest(req) => {
-                        let ip = req.ip;
-                        self.channel_endpoint
-                            .tx
-                            .send(ChannelProtocol::MetadataResponse(MetadataResponse {
-                                ip,
-                                metadata: String::from("Hello world"),
-                            }))
-                            .await?;
-                    }
-                    _ => panic!("Bad message type"),
-                }
+            if let Some(msg) = self.channel_endpoint.recv().await {
+                msg.return_channel
+                    .send(MetadataResponse {
+                        ip: msg.ip.clone(),
+                        metadata: format!("Metadata for {}\n", &msg.ip),
+                    })
+                    .await?;
             }
         }
     }

@@ -1,16 +1,16 @@
 use kube::Client;
+use tokio::sync::mpsc::channel;
 
 use crate::metadataservice::backend::MetadataBackend;
-use crate::metadataservice::bidirectional_channel::bidirectional_channel;
-use crate::metadataservice::protocol::ChannelProtocol;
 use crate::metadataservice::proxy::MetadataProxy;
 use crate::Error;
 
 mod backend;
-mod bidirectional_channel;
 pub mod deployment;
 pub mod protocol;
 mod proxy;
+
+const REQUEST_CHANNEL_BUFFER_SIZE: usize = 16;
 
 pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
     let mode_index = args
@@ -26,10 +26,11 @@ pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
     let router = split.get(1).unwrap();
     let router_name = format!("{}-{}", namespace, router);
 
-    let (ch_backend, ch_proxy) = bidirectional_channel::<ChannelProtocol>();
+    let (request_sender, request_receiver) = channel(REQUEST_CHANNEL_BUFFER_SIZE);
 
     let proxy_task = tokio::task::spawn(async move {
-        let proxy_thread = std::thread::spawn(move || MetadataProxy::run(ch_proxy, &router_name));
+        let proxy_thread =
+            std::thread::spawn(move || MetadataProxy::run(request_sender, &router_name));
         panic!(
             "proxy thread exited: {:?}",
             tokio::task::spawn_blocking(|| { proxy_thread.join() }).await
@@ -39,7 +40,7 @@ pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
     let backend_task = tokio::task::spawn(async {
         panic!(
             "metadata backend task exited: {:?}",
-            MetadataBackend::run(ch_backend, client).await
+            MetadataBackend::run(request_receiver, client).await
         );
     });
 

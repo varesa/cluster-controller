@@ -4,13 +4,12 @@ use std::net::SocketAddr;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::process::Command;
-use std::sync::Arc;
 
 use nix::sched::{setns, CloneFlags};
+use tokio::sync::mpsc::{channel, Sender};
 use warp::Filter;
 
-use crate::metadataservice::bidirectional_channel::ChannelEndpoint;
-use crate::metadataservice::protocol::{ChannelProtocol, MetadataRequest};
+use crate::metadataservice::protocol::MetadataRequest;
 use crate::utils::get_version_string;
 use crate::Error;
 
@@ -98,14 +97,11 @@ fn create_interface(ns_name: &str, router_name: &str) -> Result<(), Error> {
 }
 
 pub struct MetadataProxy {
-    channel_endpoint: Arc<ChannelEndpoint<ChannelProtocol>>,
+    channel_endpoint: Sender<MetadataRequest>,
 }
 
 impl MetadataProxy {
-    pub fn run(
-        channel_endpoint: ChannelEndpoint<ChannelProtocol>,
-        router_name: &str,
-    ) -> Result<(), Error> {
+    pub fn run(channel_endpoint: Sender<MetadataRequest>, router_name: &str) -> Result<(), Error> {
         if env::var_os("RUST_LOG").is_none() {
             // Set `RUST_LOG=todos=debug` to see debug logs,
             // this only shows access logs.
@@ -121,9 +117,7 @@ impl MetadataProxy {
         setns(ns.as_raw_fd(), CloneFlags::CLONE_NEWNET).map_err(Error::NetnsChangeFailed)?;
 
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let mut mp = MetadataProxy {
-            channel_endpoint: Arc::new(channel_endpoint),
-        };
+        let mut mp = MetadataProxy { channel_endpoint };
         rt.block_on(mp.main())?;
         Err(Error::UnexpectedExit(String::from(
             "metadata proxy HTTP API (async main) died",
@@ -136,24 +130,31 @@ impl MetadataProxy {
             .and_then(|addr: Option<SocketAddr>| async move {
                 match addr {
                     Some(SocketAddr::V4(addr4)) => Ok(addr4.ip().to_string()),
-                    _ => return Err(warp::reject::not_found()),
+                    _ => Err(warp::reject::not_found()),
                 }
             })
             .then({
-                let channel = self.channel_endpoint.clone();
+                let request_channel = self.channel_endpoint.clone();
                 move |addr: String| {
-                    let channel = channel.clone();
+                    let request_channel = request_channel.clone();
                     async move {
-                        channel
-                            .tx
-                            .send(ChannelProtocol::MetadataRequest(MetadataRequest {
+                        let (return_sender, mut return_receiver) = channel(1);
+                        request_channel
+                            .send(MetadataRequest {
                                 ip: addr.clone(),
-                            }))
-                            .await;
+                                return_channel: return_sender,
+                            })
+                            .await
+                            .expect("Failed to send metadata request");
+                        let response = return_receiver
+                            .recv()
+                            .await
+                            .expect("Failed to get metadata response");
                         let resp = format!(
-                            "Metadata proxy from {}\nClient IP: {}\n",
+                            "Metadata proxy from {}\nClient IP: {}\nMetadata: {}\n",
                             get_version_string(),
-                            addr
+                            addr,
+                            response.metadata
                         );
                         Ok(resp)
                     }
