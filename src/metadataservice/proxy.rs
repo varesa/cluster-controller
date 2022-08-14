@@ -50,6 +50,8 @@ fn create_interface(ns_name: &str) -> Result<(), Error> {
     let if_host = format!("todo-host");
     let if_ns = format!("todo-ns");
 
+    ip_command_netns(ns_name, vec!["link", "set", "lo", "up"])?;
+
     ip_command(vec![
         "link", "add", &if_host, "type", "veth", "peer", &if_ns,
     ])?;
