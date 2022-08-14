@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 
 use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnNamed, OvnNamedGetters};
 use crate::cluster::ovn::deserialization::{

@@ -8,7 +8,7 @@ use crate::cluster::ovn::deserialization::{
 };
 use crate::cluster::ovn::dhcpoptions::DhcpOptions;
 use crate::cluster::ovn::logicalswitch::LogicalSwitch;
-use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH_PORT, TYPE_LOGICAL_SWITCH};
+use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH, TYPE_LOGICAL_SWITCH_PORT};
 use crate::Error;
 
 pub struct LogicalSwitchPortBuilder<'a> {
@@ -58,7 +58,11 @@ impl LogicalSwitchPortBuilder<'_> {
         match LogicalSwitchPort::get_by_name(self.ovn.clone(), lsp_name) {
             Ok(ls) => Ok(ls),
             Err(Error::OvnNotFound(_, _)) => {
-                println!("ovn: {} {} doesn't exist, creating", LogicalSwitchPort::ovn_type(), lsp_name);
+                println!(
+                    "ovn: {} {} doesn't exist, creating",
+                    LogicalSwitchPort::ovn_type(),
+                    lsp_name
+                );
                 self.create(lsp_name, extra_params)
             }
             Err(e) => Err(e),
