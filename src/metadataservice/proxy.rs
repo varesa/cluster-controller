@@ -1,19 +1,19 @@
+use std::env;
 use std::fs::File;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::process::Command;
-use std::env;
 
 use nix::sched::{setns, CloneFlags};
 use warp::Filter;
 
 use crate::metadataservice::bidirectional_channel::ChannelEndpoint;
 use crate::metadataservice::protocol::{ChannelProtocol, MetadataRequest};
-use crate::Error;
 use crate::utils::get_version_string;
+use crate::Error;
 
-fn ip_command(args: Vec<&str>) -> Result<(), Error> {
-    let output = Command::new("/usr/sbin/ip")
+fn command(executable: &str, args: Vec<&str>) -> Result<(), Error> {
+    let output = Command::new(executable)
         .args(&args)
         .output()
         .expect("failed to run command");
@@ -25,6 +25,10 @@ fn ip_command(args: Vec<&str>) -> Result<(), Error> {
         ));
     }
     Ok(())
+}
+
+fn ip_command(args: Vec<&str>) -> Result<(), Error> {
+    command("/usr/sbin/ip", args)
 }
 
 fn ip_command_netns(netns: &str, args: Vec<&str>) -> Result<(), Error> {
@@ -62,6 +66,16 @@ fn create_interface(ns_name: &str) -> Result<(), Error> {
     )?;
     ip_command_netns(ns_name, vec!["link", "set", &if_ns, "up"])?;
     ip_command(vec!["link", "set", &if_host, "up"])?;
+
+    command("/usr/bin/ovs-vsctl", vec!["add-port", "br-int", &if_host]).or_else(|err| {
+        if let Error::CommandError(_cmd, msg) = &err {
+            if msg == &format!("ovs-vsctl: cannot create a port named todo-host because a port named {} already exists on bridge br-int", if_host) {
+                return Ok(())
+            }
+        }
+        Err(err)
+    })?;
+    command("/usr/bin/ovs-vsctl", vec!["set", "Interface", &if_host, &format!("external_ids:iface-id=metadataservice-{}", &if_host)])?;
     Ok(())
 }
 
@@ -96,15 +110,20 @@ impl MetadataProxy {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let mut mp = MetadataProxy { channel_endpoint };
         rt.block_on(mp.main())?;
-        Err(Error::UnexpectedExit(String::from("metadata proxy HTTP API (async main) died")))
+        Err(Error::UnexpectedExit(String::from(
+            "metadata proxy HTTP API (async main) died",
+        )))
     }
 
     pub async fn main(&mut self) -> Result<(), Error> {
-        let root = warp::path::end().map(|| {
-            format!("Metadata proxy from {}", get_version_string())
-        });
+        let root =
+            warp::path::end().map(|| format!("Metadata proxy from {}", get_version_string()));
 
-        warp::serve(root.with(warp::log("api"))).run(([0,0,0,0], 80)).await;
-        Err(Error::UnexpectedExit(String::from("metadata proxy HTTP API (warp) died")))
+        warp::serve(root.with(warp::log("api")))
+            .run(([0, 0, 0, 0], 80))
+            .await;
+        Err(Error::UnexpectedExit(String::from(
+            "metadata proxy HTTP API (warp) died",
+        )))
     }
 }
