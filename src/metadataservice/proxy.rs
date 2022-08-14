@@ -2,7 +2,7 @@ use std::fs::File;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::process::Command;
-use std::time::Duration;
+use std::env;
 
 use nix::sched::{setns, CloneFlags};
 use warp::Filter;
@@ -72,6 +72,13 @@ impl MetadataProxy {
         channel_endpoint: ChannelEndpoint<ChannelProtocol>,
         namespace: &str,
     ) -> Result<(), Error> {
+        if env::var_os("RUST_LOG").is_none() {
+            // Set `RUST_LOG=todos=debug` to see debug logs,
+            // this only shows access logs.
+            env::set_var("RUST_LOG", "todos=info");
+        }
+        pretty_env_logger::init();
+
         println!("proxy: Starting metadata proxy");
         let ns = create_ns(namespace)?;
         create_interface(namespace)?;
@@ -95,7 +102,7 @@ impl MetadataProxy {
             format!("Metadata proxy from {}", get_version_string())
         });
 
-        warp::serve(root).run(([0,0,0,0], 80)).await;
+        warp::serve(root.with(warp::log("api"))).run(([0,0,0,0], 80)).await;
         Err(Error::UnexpectedExit(String::from("metadata proxy HTTP API (warp) died")))
     }
 }
