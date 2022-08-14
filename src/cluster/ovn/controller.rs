@@ -109,7 +109,7 @@ fn ensure_router_attachment(
     let mut lr = LogicalRouter::get_by_name(ovn.clone(), &lr_name)?;
 
     let ls_name = name_namespaced(network);
-    let mut ls = LogicalSwitch::get_by_name(ovn.clone(), &ls_name)?;
+    let mut ls = LogicalSwitch::get_by_name(ovn, &ls_name)?;
 
     connect_router_to_ls(&mut lr, &mut ls, &router_attachment.address)?;
 
@@ -289,7 +289,7 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
 async fn connect_metadataservice(lr: &mut LogicalRouter) -> Result<(), Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mds_name = format!("mds-{}", lr.name());
-    let mut ls = LogicalSwitch::create_if_missing(ovn.clone(), &mds_name)?;
+    let mut ls = LogicalSwitch::create_if_missing(ovn, &mds_name)?;
     connect_router_to_ls(lr, &mut ls, "169.254.169.253/30")?;
 
     ls.lsp()

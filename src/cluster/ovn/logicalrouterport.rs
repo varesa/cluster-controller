@@ -38,7 +38,7 @@ impl LogicalRouterPortBuilder<'_> {
             ]
         });
         self.ovn.transact(&[add_lrp, add_lrp_to_lr]);
-        LogicalRouterPort::get_by_name(self.ovn.clone(), lrp_name)
+        LogicalRouterPort::get_by_name(self.ovn, lrp_name)
     }
 
     pub fn create_if_missing(
