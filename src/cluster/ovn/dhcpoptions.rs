@@ -41,7 +41,7 @@ impl DhcpOptions {
         let net: IpNet = self.cidr.parse()?;
         let hosts: Vec<IpAddr> = net.hosts().collect();
         let mut options = vec![
-            [String::from("server_id"), hosts[1].to_string()],
+            [String::from("server_id"), hosts[0].to_string()],
             [
                 String::from("server_mac"),
                 String::from("c0:ff:ee:00:00:01"),
