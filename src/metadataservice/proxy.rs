@@ -135,7 +135,7 @@ impl MetadataProxy {
             .and(warp::path::end())
             .and_then(|addr: Option<SocketAddr>| async move {
                 match addr {
-                    Some(SocketAddr::V4(addr4)) => Ok(addr4.to_string()),
+                    Some(SocketAddr::V4(addr4)) => Ok(addr4.ip().to_string()),
                     _ => return Err(warp::reject::not_found()),
                 }
             })
