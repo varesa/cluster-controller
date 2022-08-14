@@ -81,7 +81,7 @@ pub fn create_interface(ns_name: &str, router_name: &str) -> Result<(), Error> {
 
     command("/usr/bin/ovs-vsctl", vec!["add-port", "br-int", &if_host]).or_else(|err| {
         if let Error::CommandError(_cmd, msg) = &err {
-            if msg == &format!("ovs-vsctl: cannot create a port named todo-host because a port named {} already exists on bridge br-int\n", if_host) {
+            if msg == &format!("ovs-vsctl: cannot create a port named {} because a port named {} already exists on bridge br-int\n", if_host, if_host) {
                 return Ok(())
             }
         }
