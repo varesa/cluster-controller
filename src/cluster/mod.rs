@@ -63,5 +63,6 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     });
 
     let _ = tokio::try_join!(ceph_task, libvirt_task, ovn_task);
-    panic!("One of the controllers exited");
+    eprintln!("supervisor: ERROR: One of the controllers died, killing the rest of the application");
+    std::process::exit(1);
 }

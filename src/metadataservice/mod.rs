@@ -45,5 +45,7 @@ pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
 
     println!("supervisor: keeping a watch on the threads");
     let _ = tokio::try_join!(proxy_task, backend_task);
-    panic!("One of the threads exited");
+
+    eprintln!("supervisor: ERROR: One of the threads died, killing the rest of the application");
+    std::process::exit(1);
 }
