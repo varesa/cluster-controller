@@ -1,4 +1,3 @@
-use futures::{SinkExt, StreamExt};
 use kube::Client;
 
 use crate::metadataservice::bidirectional_channel::ChannelEndpoint;
@@ -25,7 +24,7 @@ impl MetadataBackend {
 
     async fn main(&mut self) -> Result<(), Error> {
         loop {
-            if let Some(msg) = self.channel_endpoint.rx.next().await {
+            if let Some(msg) = self.channel_endpoint.rx.recv().await {
                 match msg {
                     ChannelProtocol::MetadataRequest(req) => {
                         let ip = req.ip;

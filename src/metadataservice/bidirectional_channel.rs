@@ -1,6 +1,6 @@
-use futures::channel::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
-const BUF_SIZE: usize = 128;
+const BUF_SIZE: usize = 32;
 
 pub struct ChannelEndpoint<T> {
     pub tx: Sender<T>,

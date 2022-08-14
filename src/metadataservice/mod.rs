@@ -9,7 +9,7 @@ use crate::Error;
 mod backend;
 mod bidirectional_channel;
 pub mod deployment;
-mod protocol;
+pub mod protocol;
 mod proxy;
 
 pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {

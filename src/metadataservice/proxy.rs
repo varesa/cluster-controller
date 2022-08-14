@@ -4,7 +4,6 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
-use futures::SinkExt;
 use nix::sched::{setns, CloneFlags};
 
 use crate::metadataservice::bidirectional_channel::ChannelEndpoint;

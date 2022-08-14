@@ -86,7 +86,7 @@ pub enum Error {
 
     // Metadata proxy
     #[error("Failed to send between threads")]
-    ChannelSendError(#[from] futures::channel::mpsc::SendError),
+    ChannelSendError(#[from] tokio::sync::mpsc::error::SendError<crate::metadataservice::protocol::ChannelProtocol>),
     #[error("Failed to create network namespace: {0}")]
     NetnsCreateFailed(String),
     #[error("Failed to open network namespace: {0}")]
