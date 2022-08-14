@@ -2,14 +2,12 @@ use std::sync::Arc;
 
 use serde_json::{json, Value};
 
-use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters};
+use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnGetters, OvnNamed};
 use crate::cluster::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
 };
-use crate::cluster::ovn::logicalrouterport::LogicalRouterPort;
-use crate::cluster::ovn::lowlevel::{
-    Ovn, TYPE_LOGICAL_ROUTER, TYPE_LOGICAL_ROUTER_PORT, TYPE_LOGICAL_ROUTER_STATIC_ROUTE,
-};
+use crate::cluster::ovn::logicalrouterport::LogicalRouterPortBuilder;
+use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_ROUTER, TYPE_LOGICAL_ROUTER_STATIC_ROUTE};
 use crate::cluster::ovn::staticroute::StaticRoute;
 use crate::crd::ovn::Route as RouteCrd;
 use crate::Error;
@@ -22,29 +20,11 @@ pub struct LogicalRouter {
 }
 
 impl LogicalRouter {
-    pub fn add_lrp(&mut self, lrp_name: &str, networks: &str) -> Result<LogicalRouterPort, Error> {
-        let add_lrp = json!({
-            "op": "insert",
-            "table": TYPE_LOGICAL_ROUTER_PORT,
-            "row": {
-                "name": lrp_name,
-                "mac": "02:00:00:00:00:01",
-                "networks": networks,
-            },
-            "uuid-name": "new_lrp"
-        });
-        let add_lrp_to_lr = json!({
-            "op": "mutate",
-            "table": TYPE_LOGICAL_ROUTER,
-            "where": [
-                ["_uuid", "==", ["uuid", self.uuid()]]
-            ],
-            "mutations": [
-                ["ports", "insert", ["set", [["named-uuid", "new_lrp"]]]]
-            ]
-        });
-        self.ovn.transact(&[add_lrp, add_lrp_to_lr]);
-        LogicalRouterPort::get_by_name(self.ovn.clone(), lrp_name)
+    pub fn lrp(&mut self) -> LogicalRouterPortBuilder {
+        LogicalRouterPortBuilder {
+            ovn: self.ovn.clone(),
+            lr: self,
+        }
     }
 
     pub fn set_routes(&mut self, new_routes: &[RouteCrd]) -> Result<(), Error> {

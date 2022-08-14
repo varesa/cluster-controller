@@ -64,23 +64,13 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptionsCrd) -> Result<(), Error> {
 }
 
 fn connect_router_to_ls(
-    ovn: Arc<Ovn>,
     router: &mut LogicalRouter,
     switch: &mut LogicalSwitch,
     address: &str,
 ) -> Result<(), Error> {
     let lrp_name = format!("lr_{}_ls_{}", router.name(), switch.name());
-    match LogicalRouterPort::get_by_name(ovn.clone(), &lrp_name) {
-        Ok(lrp) => {
-            lrp.update(address)?;
-            Ok(())
-        }
-        Err(Error::OvnNotFound(_, _)) => {
-            router.add_lrp(&lrp_name, address)?;
-            Ok(())
-        }
-        Err(e) => Err(e),
-    }?;
+
+    router.lrp().create_if_missing(&lrp_name, address)?;
 
     let lsp_name = format!("ls_{}_lr_{}", switch.name(), router.name());
     let params = json!({
@@ -118,7 +108,7 @@ fn ensure_router_attachment(
     let ls_name = name_namespaced(network);
     let mut ls = LogicalSwitch::get_by_name(ovn.clone(), &ls_name)?;
 
-    connect_router_to_ls(ovn, &mut lr, &mut ls, &router_attachment.address)?;
+    connect_router_to_ls(&mut lr, &mut ls, &router_attachment.address)?;
 
     Ok(())
 }
@@ -297,7 +287,7 @@ async fn connect_metadataservice(lr: &mut LogicalRouter) -> Result<(), Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mds_name = format!("mds-{}", lr.name());
     let mut ls = LogicalSwitch::create_if_missing(ovn.clone(), &mds_name)?;
-    connect_router_to_ls(ovn.clone(), lr, &mut ls, "169.254.169.253/30")?;
+    connect_router_to_ls(lr, &mut ls, "169.254.169.253/30")?;
 
     ls.lsp()
         .create_if_missing(&mds_name, None)?
