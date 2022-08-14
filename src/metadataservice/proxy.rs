@@ -5,10 +5,12 @@ use std::process::Command;
 use std::time::Duration;
 
 use nix::sched::{setns, CloneFlags};
+use warp::Filter;
 
 use crate::metadataservice::bidirectional_channel::ChannelEndpoint;
 use crate::metadataservice::protocol::{ChannelProtocol, MetadataRequest};
 use crate::Error;
+use crate::utils::get_version_string;
 
 fn ip_command(args: Vec<&str>) -> Result<(), Error> {
     let output = Command::new("/usr/sbin/ip")
@@ -85,19 +87,15 @@ impl MetadataProxy {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let mut mp = MetadataProxy { channel_endpoint };
         rt.block_on(mp.main())?;
-        Ok(())
+        Err(Error::UnexpectedExit(String::from("metadata proxy HTTP API (async main) died")))
     }
 
     pub async fn main(&mut self) -> Result<(), Error> {
-        self.channel_endpoint
-            .tx
-            .send(ChannelProtocol::MetadataRequest(MetadataRequest {
-                ip: String::from("127.0.0.1"),
-            }))
-            .await?;
+        let root = warp::path::end().map(|| {
+            format!("Metadata proxy from {}", get_version_string())
+        });
 
-        loop {
-            std::thread::sleep(Duration::from_secs(1));
-        }
+        warp::serve(root).run(([0,0,0,0], 80)).await;
+        Err(Error::UnexpectedExit(String::from("metadata proxy HTTP API (warp) died")))
     }
 }

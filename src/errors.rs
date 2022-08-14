@@ -101,4 +101,6 @@ pub enum Error {
     Timeout(String),
     #[error("{0}")]
     ClusterNotFound(#[from] ClusterNotFound),
+    #[error("Task ended unexpectedly: {0}")]
+    UnexpectedExit(String)
 }
