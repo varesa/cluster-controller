@@ -64,7 +64,15 @@ fn create_interface(ns_name: &str, router_name: &str) -> Result<(), Error> {
         ns_name,
         vec!["addr", "add", "169.254.169.254/30", "dev", &if_ns],
     )?;
+    ip_command_netns(
+        ns_name,
+        vec!["link", "set", "dev", &if_ns, "address", "02:00:00:00:00:02"],
+    )?;
     ip_command_netns(ns_name, vec!["link", "set", &if_ns, "up"])?;
+    ip_command_netns(
+        ns_name,
+        vec!["route", "add", "default", "via", "169.254.169.253"],
+    )?;
     ip_command(vec!["link", "set", &if_host, "up"])?;
 
     command("/usr/bin/ovs-vsctl", vec!["add-port", "br-int", &if_host]).or_else(|err| {
