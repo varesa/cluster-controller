@@ -23,7 +23,7 @@ pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
         .expect("Target router should follow mode");
 
     let split: Vec<&str> = target.split('/').collect();
-    let namespace = split.get(0).unwrap();
+    let namespace = split.first().unwrap();
     let router = split.get(1).unwrap();
     let router_name = format!("{}-{}", namespace, router);
 

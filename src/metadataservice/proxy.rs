@@ -1,5 +1,5 @@
 use std::env;
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::os::unix::io::AsRawFd;
 
 use nix::sched::{setns, CloneFlags};
@@ -44,19 +44,19 @@ impl MetadataProxy {
             .and(warp::path::end())
             .and_then(|addr: Option<SocketAddr>| async move {
                 match addr {
-                    Some(SocketAddr::V4(addr4)) => Ok(addr4.ip().to_string()),
+                    Some(SocketAddr::V4(addr4)) => Ok(*addr4.ip()),
                     _ => Err(warp::reject::not_found()),
                 }
             })
             .then({
                 let request_channel = self.channel_endpoint.clone();
-                move |addr: String| {
+                move |addr: Ipv4Addr| {
                     let request_channel = request_channel.clone();
                     async move {
                         let (return_sender, mut return_receiver) = channel(1);
                         request_channel
                             .send(MetadataRequest {
-                                ip: addr.clone(),
+                                ip: addr,
                                 return_channel: return_sender,
                             })
                             .await

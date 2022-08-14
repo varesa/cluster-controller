@@ -2,12 +2,12 @@ use tokio::sync::mpsc::Sender;
 
 #[derive(Debug)]
 pub struct MetadataRequest {
-    pub ip: String,
+    pub ip: std::net::Ipv4Addr,
     pub return_channel: Sender<MetadataResponse>,
 }
 
 #[derive(Debug)]
 pub struct MetadataResponse {
-    pub ip: String,
+    pub ip: std::net::Ipv4Addr,
     pub metadata: String,
 }

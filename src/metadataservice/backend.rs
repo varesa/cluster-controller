@@ -6,6 +6,8 @@ use crate::Error;
 
 pub struct MetadataBackend {
     channel_endpoint: Receiver<MetadataRequest>,
+    // Reserved as part of the interface
+    #[allow(dead_code)]
     client: Client,
 }
 
@@ -27,7 +29,7 @@ impl MetadataBackend {
             if let Some(msg) = self.channel_endpoint.recv().await {
                 msg.return_channel
                     .send(MetadataResponse {
-                        ip: msg.ip.clone(),
+                        ip: msg.ip,
                         metadata: format!("Metadata for {}\n", &msg.ip),
                     })
                     .await?;
