@@ -1,5 +1,6 @@
 use core::result::Result;
 use core::result::Result::{Err, Ok};
+use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::path::Path;
 use std::process::Command;
@@ -44,9 +45,18 @@ pub fn create_ns(ns_name: &str) -> Result<File, Error> {
     File::open(ns_path).map_err(Error::NetnsOpenFailed)
 }
 
+fn generate_interface_prefix(namespace: &str, router: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(namespace);
+    hasher.update(router);
+    let hex = format!("{:x}", hasher.finalize());
+    hex[0..9].to_string()
+}
+
 pub fn create_interface(ns_name: &str, router_name: &str) -> Result<(), Error> {
-    let if_host = format!("todo-host");
-    let if_ns = format!("todo-ns");
+    let prefix = generate_interface_prefix(ns_name, router_name);
+    let if_host = format!("{prefix}-host");
+    let if_ns = format!("{prefix}-ns");
 
     ip_command_netns(ns_name, vec!["link", "set", "lo", "up"])?;
 
