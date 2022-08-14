@@ -41,30 +41,6 @@ struct State {
 create_set_status!(Network, NetworkStatus, set_network_status);
 create_set_status!(Router, RouterStatus, set_router_status);
 
-fn ensure_network_exists(name: &str) -> Result<LogicalSwitch, Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
-    match LogicalSwitch::get_by_name(ovn.clone(), name) {
-        Ok(ls) => Ok(ls),
-        Err(Error::OvnNotFound(_, _)) => {
-            println!("ovn: Sw {name} doesn't exist, creating");
-            LogicalSwitch::create(ovn, name)
-        }
-        Err(e) => Err(e),
-    }
-}
-
-fn ensure_router_exists(name: &str) -> Result<LogicalRouter, Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
-    match LogicalRouter::get_by_name(ovn.clone(), name) {
-        Ok(lr) => Ok(lr),
-        Err(Error::OvnNotFound(_, _)) => {
-            println!("ovn: Router {name} doesn't exist, creating");
-            LogicalRouter::create(ovn, name)
-        }
-        Err(e) => Err(e),
-    }
-}
-
 fn ensure_router_routes(router: &str, routes: &[Route]) -> Result<(), Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     LogicalRouter::get_by_name(ovn, router)?.set_routes(routes)
@@ -129,11 +105,7 @@ fn ensure_router_attachment(
         "addresses": "router",
         "options": ["map", [ ["router-port", lrp_name] ]]
     });
-    match LogicalSwitchPort::get_by_name(ovn, &lsp_name) {
-        Ok(lsp) => Ok(lsp),
-        Err(Error::OvnNotFound(_, _)) => ls.add_lsp(&lsp_name, Some(params.as_object().unwrap())),
-        Err(e) => Err(e),
-    }?;
+    ls.lsp().create_if_missing(&lsp_name, Some(params.as_object().unwrap()))?;
     Ok(())
 }
 
@@ -149,6 +121,7 @@ fn delete_router(name: &str) -> Result<(), Error> {
 
 /// Handle updates to networks in the cluster
 async fn reconcile_network(network: Arc<Network>, ctx: Arc<State>) -> Result<Action, Error> {
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let client = ctx.client.clone();
     let name = name_namespaced(network.as_ref());
 
@@ -160,7 +133,7 @@ async fn reconcile_network(network: Arc<Network>, ctx: Arc<State>) -> Result<Act
     } else {
         println!("ovn: update for network {name}");
         client_ensure_finalizer!(client, Network, network.as_ref(), "ovn");
-        ensure_network_exists(&name)?;
+        LogicalSwitch::create_if_missing(ovn, &name)?;
         if let Some(dhcp_options) = network.spec.dhcp.as_ref() {
             ensure_dhcp(&name, dhcp_options)?;
         }
@@ -191,24 +164,17 @@ async fn connect_vm_nic(
     let ls_name = format!("{}-{}", &namespace, &network_name);
     let mut ls = LogicalSwitch::get_by_name(ovn.clone(), &ls_name)?;
 
-    match LogicalSwitchPort::get_by_name(ovn, nic.ovn_id.as_ref().unwrap()) {
-        Ok(_lsp) => Ok(()),
-        Err(Error::OvnNotFound(_, _)) => {
-            println!("ovn: lsp missing for NIC, creating");
-            let lsp_id = nic.ovn_id.as_ref().unwrap();
-            let mut lsp = ls.add_lsp(lsp_id, None)?;
+    let lsp_id = nic.ovn_id.as_ref().unwrap();
+    let mut lsp = ls.lsp().create_if_missing(lsp_id, None)?;
 
-            lsp.set_address(nic.mac_address.as_ref().expect("MAC address missing"))?;
+    lsp.set_address(nic.mac_address.as_ref().expect("MAC address missing"))?;
 
-            let api: Api<Network> = Api::namespaced(client.clone(), &namespace);
-            let network = api.get(network_name).await?;
-            if let Some(dhcp) = network.spec.dhcp {
-                lsp.set_dhcp_options(&dhcp.cidr)?;
-            }
-            Ok(())
-        }
-        Err(e) => Err(e),
+    let api: Api<Network> = Api::namespaced(client.clone(), &namespace);
+    let network = api.get(network_name).await?;
+    if let Some(dhcp) = network.spec.dhcp {
+        lsp.set_dhcp_options(&dhcp.cidr)?;
     }
+    Ok(())
 }
 
 fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), Error> {
@@ -262,6 +228,7 @@ async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action
 
 /// Handle updates to routers in the cluster
 async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action, Error> {
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let client = ctx.client.clone();
     let namespace = router
         .metadata
@@ -280,7 +247,7 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
         println!("ovn: update for router {name}");
         client_ensure_finalizer!(client, Router, router.as_ref(), "ovn");
 
-        ensure_router_exists(&name)?;
+        LogicalRouter::create_if_missing(ovn, &name)?;
         if let Some(routes) = &router.spec.routes {
             ensure_router_routes(&name, routes)?;
         } else {
@@ -309,6 +276,30 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
     }
 
     ok_and_requeue!(600)
+}
+
+async fn connect_metadataservice() -> Result<(), Error> {
+    /*let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    let namespace = ResourceExt::namespace(vm).expect("Failed to get VM namespace");
+    let network_name = nic.name.as_ref().expect("No network name set");
+    let ls_name = format!("{}-{}", &namespace, &network_name);
+    let mut ls = LogicalSwitch::get_by_name(ovn.clone(), &ls_name)?;
+
+    match LogicalSwitchPort::get_by_name(ovn, nic.ovn_id.as_ref().unwrap()) {
+        Ok(_lsp) => Ok(()),
+        Err(Error::OvnNotFound(_, _)) => {
+            println!("ovn: lsp missing for NIC, creating");
+            let lsp_id = nic.ovn_id.as_ref().unwrap();
+            let mut lsp = ls.lsp().
+            let mut lsp = ls.add_lsp(lsp_id, None)?;
+
+            lsp.set_address(nic.mac_address.as_ref().expect("MAC address missing"))?;
+
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }*/
+    todo!()
 }
 
 fn error_policy(_error: &Error, _ctx: Arc<State>) -> Action {

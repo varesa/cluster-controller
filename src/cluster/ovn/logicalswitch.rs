@@ -6,8 +6,8 @@ use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnNamed, OvnNamedGet
 use crate::cluster::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
 };
-use crate::cluster::ovn::logicalswitchport::LogicalSwitchPort;
-use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH, TYPE_LOGICAL_SWITCH_PORT};
+use crate::cluster::ovn::logicalswitchport::{LogicalSwitchPort, LogicalSwitchPortBuilder};
+use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH};
 use crate::Error;
 
 pub struct LogicalSwitch {
@@ -26,39 +26,6 @@ impl LogicalSwitch {
         });
         self.ovn.transact(&[set_cidr]);
         Ok(())
-    }
-
-    pub fn add_lsp(
-        &mut self,
-        lsp_name: &str,
-        extra_params: Option<&Map<String, Value>>,
-    ) -> Result<LogicalSwitchPort, Error> {
-        let mut params = if let Some(extra_params) = extra_params {
-            extra_params.clone()
-        } else {
-            Map::new()
-        };
-        params.insert("name".to_string(), Value::String(lsp_name.to_string()));
-
-        let add_lsp = json!({
-            "op": "insert",
-            "table": TYPE_LOGICAL_SWITCH_PORT,
-            "row": params,
-            "uuid-name": "new_lsp"
-        });
-
-        let add_lsp_to_ls = json!({
-            "op": "mutate",
-            "table": TYPE_LOGICAL_SWITCH,
-            "where": [
-                ["_uuid", "==", ["uuid", self.uuid()]]
-            ],
-            "mutations": [
-                ["ports", "insert", ["set", [["named-uuid", "new_lsp"]]]]
-            ]
-        });
-        self.ovn.transact(&[add_lsp, add_lsp_to_ls]);
-        LogicalSwitchPort::get_by_name(self.ovn.clone(), lsp_name)
     }
 
     pub fn del_lsp(&mut self, lsp_id: &str) -> Result<(), Error> {
@@ -80,6 +47,13 @@ impl LogicalSwitch {
         });
         self.ovn.transact(&[del_lsp]);
         Ok(())
+    }
+
+    pub fn lsp(&mut self) -> LogicalSwitchPortBuilder {
+        LogicalSwitchPortBuilder {
+            ovn: self.ovn.clone(),
+            ls: self,
+        }
     }
 }
 

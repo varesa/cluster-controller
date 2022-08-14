@@ -1,14 +1,70 @@
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
-use crate::cluster::ovn::common::{OvnCommon, OvnNamed};
+use crate::cluster::ovn::common::{OvnCommon, OvnNamed, OvnNamedGetters};
 use crate::cluster::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
 };
 use crate::cluster::ovn::dhcpoptions::DhcpOptions;
-use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH_PORT};
+use crate::cluster::ovn::logicalswitch::LogicalSwitch;
+use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH_PORT, TYPE_LOGICAL_SWITCH};
 use crate::Error;
+
+pub struct LogicalSwitchPortBuilder<'a> {
+    pub ovn: Arc<Ovn>,
+    pub ls: &'a LogicalSwitch,
+}
+
+impl LogicalSwitchPortBuilder<'_> {
+    pub fn create(
+        self,
+        lsp_name: &str,
+        extra_params: Option<&Map<String, Value>>,
+    ) -> Result<LogicalSwitchPort, Error> {
+        let mut params = if let Some(extra_params) = extra_params {
+            extra_params.clone()
+        } else {
+            Map::new()
+        };
+        params.insert("name".to_string(), Value::String(lsp_name.to_string()));
+
+        let add_lsp = json!({
+            "op": "insert",
+            "table": TYPE_LOGICAL_SWITCH_PORT,
+            "row": params,
+            "uuid-name": "new_lsp"
+        });
+
+        let add_lsp_to_ls = json!({
+            "op": "mutate",
+            "table": TYPE_LOGICAL_SWITCH,
+            "where": [
+                ["_uuid", "==", ["uuid", self.ls.uuid()]]
+            ],
+            "mutations": [
+                ["ports", "insert", ["set", [["named-uuid", "new_lsp"]]]]
+            ]
+        });
+        self.ovn.transact(&[add_lsp, add_lsp_to_ls]);
+        LogicalSwitchPort::get_by_name(self.ovn, lsp_name)
+    }
+
+    pub fn create_if_missing(
+        self,
+        lsp_name: &str,
+        extra_params: Option<&Map<String, Value>>,
+    ) -> Result<LogicalSwitchPort, Error> {
+        match LogicalSwitchPort::get_by_name(self.ovn.clone(), lsp_name) {
+            Ok(ls) => Ok(ls),
+            Err(Error::OvnNotFound(_, _)) => {
+                println!("ovn: {} {} doesn't exist, creating", LogicalSwitchPort::ovn_type(), lsp_name);
+                self.create(lsp_name, extra_params)
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
 
 pub struct LogicalSwitchPort {
     ovn: Arc<Ovn>,

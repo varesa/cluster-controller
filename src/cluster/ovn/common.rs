@@ -35,6 +35,7 @@ pub trait OvnBasicType: OvnNamed {}
 /// Trait containing method implementations for OvnBasicType
 pub trait OvnBasicActions: OvnBasicType {
     fn create(ovn: Arc<Ovn>, name: &str) -> Result<Self, Error>;
+    fn create_if_missing(ovn: Arc<Ovn>, name: &str) -> Result<Self, Error>;
     fn delete(self) -> Result<(), Error>;
 }
 
@@ -76,6 +77,17 @@ where
         ovn.insert(&Self::ovn_type(), params);
 
         Self::get_by_name(ovn, name)
+    }
+
+    fn create_if_missing(ovn: Arc<Ovn>, name: &str) -> Result<Self, Error> {
+        match Self::get_by_name(ovn.clone(), name) {
+            Ok(ls) => Ok(ls),
+            Err(Error::OvnNotFound(_, _)) => {
+                println!("ovn: {} {} doesn't exist, creating", Self::ovn_type(), name);
+                Self::create(ovn, name)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     #[allow(unused_mut)]
