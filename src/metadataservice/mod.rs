@@ -7,6 +7,7 @@ use crate::Error;
 
 mod backend;
 pub mod deployment;
+mod networking;
 pub mod protocol;
 mod proxy;
 
