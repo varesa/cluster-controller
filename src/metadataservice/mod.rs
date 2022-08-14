@@ -24,12 +24,12 @@ pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
     let split: Vec<&str> = target.split('/').collect();
     let namespace = split.get(0).unwrap();
     let router = split.get(1).unwrap();
-    let ns_name = format!("{}-{}-metadatasvc", namespace, router);
+    let router_name = format!("{}-{}", namespace, router);
 
     let (ch_backend, ch_proxy) = bidirectional_channel::<ChannelProtocol>();
 
-    let proxy_task = tokio::task::spawn(async {
-        let proxy_thread = std::thread::spawn(move || MetadataProxy::run(ch_proxy, &ns_name));
+    let proxy_task = tokio::task::spawn(async move {
+        let proxy_thread = std::thread::spawn(move || MetadataProxy::run(ch_proxy, &router_name));
         panic!(
             "proxy thread exited: {:?}",
             tokio::task::spawn_blocking(|| { proxy_thread.join() }).await

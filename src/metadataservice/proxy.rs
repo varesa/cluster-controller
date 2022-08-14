@@ -50,7 +50,7 @@ fn create_ns(ns_name: &str) -> Result<File, Error> {
     File::open(ns_path).map_err(Error::NetnsOpenFailed)
 }
 
-fn create_interface(ns_name: &str) -> Result<(), Error> {
+fn create_interface(ns_name: &str, router_name: &str) -> Result<(), Error> {
     let if_host = format!("todo-host");
     let if_ns = format!("todo-ns");
 
@@ -75,7 +75,15 @@ fn create_interface(ns_name: &str) -> Result<(), Error> {
         }
         Err(err)
     })?;
-    command("/usr/bin/ovs-vsctl", vec!["set", "Interface", &if_host, &format!("external_ids:iface-id=metadataservice-{}", &if_host)])?;
+    command(
+        "/usr/bin/ovs-vsctl",
+        vec![
+            "set",
+            "Interface",
+            &if_host,
+            &format!("external_ids:iface-id=mds-{}", router_name),
+        ],
+    )?;
     Ok(())
 }
 
@@ -86,7 +94,7 @@ pub struct MetadataProxy {
 impl MetadataProxy {
     pub fn run(
         channel_endpoint: ChannelEndpoint<ChannelProtocol>,
-        namespace: &str,
+        router_name: &str,
     ) -> Result<(), Error> {
         if env::var_os("RUST_LOG").is_none() {
             // Set `RUST_LOG=todos=debug` to see debug logs,
@@ -95,17 +103,12 @@ impl MetadataProxy {
         }
         pretty_env_logger::init();
 
-        println!("proxy: Starting metadata proxy");
-        let ns = create_ns(namespace)?;
-        create_interface(namespace)?;
-        setns(ns.as_raw_fd(), CloneFlags::CLONE_NEWNET).map_err(Error::NetnsChangeFailed)?;
+        let netns_name = format!("{router_name}-metadatasvc");
 
-        let debug = Command::new("/usr/sbin/ip")
-            .arg("addr")
-            .output()
-            .expect("Failed to list IP")
-            .stdout;
-        println!("{}", String::from_utf8(debug).unwrap());
+        println!("proxy: Starting metadata proxy");
+        let ns = create_ns(&netns_name)?;
+        create_interface(&netns_name, router_name)?;
+        setns(ns.as_raw_fd(), CloneFlags::CLONE_NEWNET).map_err(Error::NetnsChangeFailed)?;
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         let mut mp = MetadataProxy { channel_endpoint };
