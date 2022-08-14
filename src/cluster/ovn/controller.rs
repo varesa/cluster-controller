@@ -14,8 +14,7 @@ use tokio::time::Duration;
 use crate::cluster::get_running_image;
 use crate::cluster::ovn::{
     common::OvnBasicActions, common::OvnNamedGetters, dhcpoptions::DhcpOptions,
-    logicalrouter::LogicalRouter, logicalrouterport::LogicalRouterPort,
-    logicalswitchport::LogicalSwitchPort, lowlevel::Ovn,
+    logicalrouter::LogicalRouter, logicalswitchport::LogicalSwitchPort, lowlevel::Ovn,
 };
 use crate::crd::libvirt::{v1beta2::VirtualMachine, NetworkAttachment};
 use crate::crd::ovn::{
@@ -70,7 +69,11 @@ fn connect_router_to_ls(
 ) -> Result<(), Error> {
     let lrp_name = format!("lr_{}_ls_{}", router.name(), switch.name());
 
-    router.lrp().create_if_missing(&lrp_name, address)?;
+    router
+        .lrp()
+        .create_if_missing(&lrp_name, address)?
+        // TODO: do something about redundant update if LRP already exists
+        .update(address)?;
 
     let lsp_name = format!("ls_{}_lr_{}", switch.name(), router.name());
     let params = json!({
