@@ -44,8 +44,22 @@ pub fn make_deployment(image: &str, namespace: &str, router: &str) -> Result<Dep
                 ],
                 "securityContext": {
                   "privileged": true
-                }
+                },
+                "volumeMounts": [
+                    {
+                        "name": "ovsdb",
+                        "mountPath": "/var/run/openvswitch/db.sock"
+                    }
+                ]
               }
+            ],
+            "volumes": [
+                {
+                    "name": "ovsdb",
+                    "hostPath": {
+                        "path": "/var/run/openvswitch/db.sock"
+                    }
+                }
             ]
           }
         }
