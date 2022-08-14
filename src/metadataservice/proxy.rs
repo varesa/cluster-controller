@@ -1,8 +1,10 @@
 use std::env;
 use std::fs::File;
+use std::net::SocketAddr;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::process::Command;
+use std::sync::Arc;
 
 use nix::sched::{setns, CloneFlags};
 use warp::Filter;
@@ -96,7 +98,7 @@ fn create_interface(ns_name: &str, router_name: &str) -> Result<(), Error> {
 }
 
 pub struct MetadataProxy {
-    channel_endpoint: ChannelEndpoint<ChannelProtocol>,
+    channel_endpoint: Arc<ChannelEndpoint<ChannelProtocol>>,
 }
 
 impl MetadataProxy {
@@ -119,7 +121,9 @@ impl MetadataProxy {
         setns(ns.as_raw_fd(), CloneFlags::CLONE_NEWNET).map_err(Error::NetnsChangeFailed)?;
 
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let mut mp = MetadataProxy { channel_endpoint };
+        let mut mp = MetadataProxy {
+            channel_endpoint: Arc::new(channel_endpoint),
+        };
         rt.block_on(mp.main())?;
         Err(Error::UnexpectedExit(String::from(
             "metadata proxy HTTP API (async main) died",
@@ -127,8 +131,34 @@ impl MetadataProxy {
     }
 
     pub async fn main(&mut self) -> Result<(), Error> {
-        let root =
-            warp::path::end().map(|| format!("Metadata proxy from {}", get_version_string()));
+        let root = warp::addr::remote()
+            .and(warp::path::end())
+            .and_then(|addr: Option<SocketAddr>| async move {
+                match addr {
+                    Some(SocketAddr::V4(addr4)) => Ok(addr4.to_string()),
+                    _ => return Err(warp::reject::not_found()),
+                }
+            })
+            .then({
+                let channel = self.channel_endpoint.clone();
+                move |addr: String| {
+                    let channel = channel.clone();
+                    async move {
+                        channel
+                            .tx
+                            .send(ChannelProtocol::MetadataRequest(MetadataRequest {
+                                ip: addr.clone(),
+                            }))
+                            .await;
+                        let resp = format!(
+                            "Metadata proxy from {}\nClient IP: {}\n",
+                            get_version_string(),
+                            addr
+                        );
+                        Ok(resp)
+                    }
+                }
+            });
 
         warp::serve(root.with(warp::log("api")))
             .run(([0, 0, 0, 0], 80))
