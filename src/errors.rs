@@ -98,6 +98,8 @@ pub enum Error {
     NetnsChangeFailed(#[from] nix::errno::Errno),
     #[error("Command {0:?} failed: {1}")]
     CommandError(Vec<String>, String),
+    #[error("Failed to determine instance for metadata: {0}")]
+    InstanceMatchFailed(String),
 
     // Custom/generic
     #[error("Timed out waiting for operation: {0}")]

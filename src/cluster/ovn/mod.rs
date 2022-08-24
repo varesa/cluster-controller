@@ -3,7 +3,7 @@ use kube::Client;
 use crate::crd;
 use crate::errors::Error;
 
-mod common;
+pub mod common;
 mod controller;
 mod deserialization;
 mod dhcpoptions;

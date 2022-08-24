@@ -9,5 +9,5 @@ pub struct MetadataRequest {
 #[derive(Debug)]
 pub struct MetadataResponse {
     pub ip: std::net::Ipv4Addr,
-    pub metadata: String,
+    pub metadata: Option<String>,
 }

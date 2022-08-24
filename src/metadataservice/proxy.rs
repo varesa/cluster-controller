@@ -48,7 +48,7 @@ impl MetadataProxy {
                     _ => Err(warp::reject::not_found()),
                 }
             })
-            .then({
+            .and_then({
                 let request_channel = self.channel_endpoint.clone();
                 move |addr: Ipv4Addr| {
                     let request_channel = request_channel.clone();
@@ -65,15 +65,23 @@ impl MetadataProxy {
                             .recv()
                             .await
                             .expect("Failed to get metadata response");
-                        let resp = format!(
-                            "Metadata proxy from {}\nClient IP: {}\nMetadata: {}\n",
-                            get_version_string(),
-                            addr,
-                            response.metadata
-                        );
-                        Ok(resp)
+                        if let Some(metadata) = response.metadata {
+                            Ok((addr, metadata))
+                        } else {
+                            Err(warp::reject::not_found())
+                        }
                     }
                 }
+            })
+            .then(|params: (Ipv4Addr, String)| async move {
+                let (addr, metadata) = params;
+                let resp = format!(
+                    "Metadata proxy from {}\nClient IP: {}\nMetadata: {}\n",
+                    get_version_string(),
+                    addr,
+                    metadata
+                );
+                Ok(resp)
             });
 
         warp::serve(root.with(warp::log("api")))
