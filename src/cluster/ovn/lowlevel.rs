@@ -55,6 +55,7 @@ impl Ovn {
             TYPE_DHCP_OPTIONS => json!(["_uuid", "cidr"]),
             TYPE_LOGICAL_ROUTER => json!(["_uuid", "name", "static_routes"]),
             TYPE_LOGICAL_ROUTER_STATIC_ROUTE => json!(["_uuid", "ip_prefix", "nexthop"]),
+            TYPE_LOGICAL_SWITCH_PORT => json!(["_uuid", "name", "dynamic_addresses"]),
             _ => json!(["_uuid", "name"]),
         };
         let select = json!({
