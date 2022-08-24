@@ -1,15 +1,16 @@
-mod ceph;
-mod daemonset;
-mod libvirt;
-mod ovn;
-
-use crate::errors::Error;
-use crate::{crd, NAMESPACE};
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment};
 use kube::{
     api::{Patch, PatchParams},
     Api, Client,
 };
+
+use crate::errors::Error;
+use crate::{crd, NAMESPACE};
+
+mod ceph;
+mod daemonset;
+mod libvirt;
+pub mod ovn;
 
 const DEPLOYMENT_NAME: &str = "cluster-controller";
 
@@ -63,6 +64,8 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     });
 
     let _ = tokio::try_join!(ceph_task, libvirt_task, ovn_task);
-    eprintln!("supervisor: ERROR: One of the controllers died, killing the rest of the application");
+    eprintln!(
+        "supervisor: ERROR: One of the controllers died, killing the rest of the application"
+    );
     std::process::exit(1);
 }

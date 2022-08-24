@@ -3,6 +3,7 @@ use serde_json::de::Deserializer;
 use serde_json::Value;
 use std::{io::Write, net::TcpStream};
 
+#[derive(Debug)]
 pub struct JsonRpcConnection {
     stream: TcpStream,
     id: u64,

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use serde_json::{json, Map, Value};
 
-use crate::cluster::ovn::common::{OvnCommon, OvnNamed, OvnNamedGetters};
+use crate::cluster::ovn::common::{OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters};
 use crate::cluster::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
 };
@@ -70,10 +70,12 @@ impl LogicalSwitchPortBuilder<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct LogicalSwitchPort {
     ovn: Arc<Ovn>,
     uuid: String,
     name: String,
+    dynamic_addresses: String,
 }
 
 impl LogicalSwitchPort {
@@ -102,6 +104,20 @@ impl LogicalSwitchPort {
         self.ovn.transact(&[set_dhcp_options]);
         Ok(())
     }
+
+    pub fn dynamic_ip(&self) -> Option<String> {
+        let split: Vec<&str> = self.dynamic_addresses.split(' ').collect();
+        split.get(1).map(|s| String::from(*s))
+    }
+
+    pub fn get_by_ip(ovn: Arc<Ovn>, ip: String) -> Result<Vec<LogicalSwitchPort>, Error> {
+        let ports = Self::list(ovn)?;
+        let ports_with_ip: Vec<LogicalSwitchPort> = ports
+            .into_iter()
+            .filter(|port| port.dynamic_ip().unwrap_or_else(|| String::from("")) == ip)
+            .collect();
+        Ok(ports_with_ip)
+    }
 }
 
 impl OvnCommon for LogicalSwitchPort {
@@ -124,6 +140,8 @@ impl OvnCommon for LogicalSwitchPort {
             ovn,
             uuid: deserialize_uuid(object)?,
             name: deserialize_string(object, "name")?,
+            dynamic_addresses: deserialize_string(object, "dynamic_addresses")
+                .or_else(|_| Ok::<String, Error>(String::new()))?,
         })
     }
 }

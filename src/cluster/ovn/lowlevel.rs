@@ -13,6 +13,7 @@ pub const TYPE_LOGICAL_ROUTER_PORT: &str = "Logical_Router_Port";
 pub const TYPE_LOGICAL_ROUTER_STATIC_ROUTE: &str = "Logical_Router_Static_Route";
 pub const TYPE_DHCP_OPTIONS: &str = "DHCP_Options";
 
+#[derive(Debug)]
 pub struct Ovn {
     connection: Mutex<JsonRpcConnection>,
 }

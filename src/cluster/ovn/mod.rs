@@ -11,8 +11,8 @@ mod jsonrpc;
 mod logicalrouter;
 mod logicalrouterport;
 mod logicalswitch;
-mod logicalswitchport;
-mod lowlevel;
+pub mod logicalswitchport;
+pub mod lowlevel;
 mod staticroute;
 
 pub async fn run(client: Client) -> Result<(), Error> {
