@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
-use k8s_openapi::api::apps::v1::Deployment;
-use kube::api::{Patch, PatchParams};
 use kube::runtime::controller::{Action, Controller};
 use kube::{
     api::{Api, ListParams, PostParams},
@@ -11,7 +9,6 @@ use kube::{
 use serde_json::json;
 use tokio::time::Duration;
 
-use crate::cluster::get_running_image;
 use crate::cluster::ovn::{
     common::OvnBasicActions, common::OvnNamedGetters, dhcpoptions::DhcpOptions,
     logicalrouter::LogicalRouter, logicalswitchport::LogicalSwitchPort, lowlevel::Ovn,
@@ -22,7 +19,7 @@ use crate::crd::ovn::{
     RouterStatus,
 };
 use crate::errors::Error;
-use crate::metadataservice::deployment::make_deployment;
+use crate::metadataservice::deployment::deploy as deploy_mds;
 use crate::utils::name_namespaced;
 use crate::{
     api_replace_resource, client_ensure_finalizer, client_remove_finalizer, create_controller,
@@ -242,7 +239,6 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
         .namespace
         .as_ref()
         .expect("get router namespace");
-    let deployments: Api<Deployment> = Api::namespaced(client.clone(), namespace);
     let name = name_namespaced(router.as_ref());
 
     if router.metadata.deletion_timestamp.is_some() {
@@ -262,18 +258,14 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
         }
 
         if let Some(true) = &router.spec.metadata_service {
-            let metadataservice_deploy = make_deployment(
-                &get_running_image(client.clone()).await?,
+            deploy_mds(
+                client.clone(),
+                "ovn-cluster-controller",
                 namespace,
                 router.metadata.name.as_ref().expect("get router name"),
-            )?;
-            deployments
-                .patch(
-                    metadataservice_deploy.metadata.name.as_ref().unwrap(),
-                    &PatchParams::apply("ovn-cluster-controller"),
-                    &Patch::Apply(&metadataservice_deploy),
-                )
-                .await?;
+            )
+            .await?;
+
             connect_metadataservice(&mut lr).await?;
         }
 

@@ -14,7 +14,7 @@ pub mod ovn;
 
 const DEPLOYMENT_NAME: &str = "cluster-controller";
 
-async fn get_running_image(kube: Client) -> Result<String, Error> {
+pub async fn get_running_image(kube: Client) -> Result<String, Error> {
     let deployments: Api<Deployment> = Api::namespaced(kube, NAMESPACE);
     let deployment = deployments.get(DEPLOYMENT_NAME).await?;
     let image = deployment.spec.unwrap().template.spec.unwrap().containers[0]
