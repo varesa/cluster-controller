@@ -26,12 +26,20 @@ fn make_cluster_role() -> ClusterRole {
             name: Some(String::from("metadata-service")),
             ..ObjectMeta::default()
         },
-        rules: Some(vec![PolicyRule {
-            api_groups: Some(vec![String::from("cluster-virt.acl.fi")]),
-            resources: Some(vec![String::from("virtualmachines")]),
-            verbs: vec![String::from("list")],
-            ..PolicyRule::default()
-        }]),
+        rules: Some(vec![
+            PolicyRule {
+                api_groups: Some(vec![String::from("cluster-virt.acl.fi")]),
+                resources: Some(vec![String::from("virtualmachines")]),
+                verbs: vec![String::from("list")],
+                ..PolicyRule::default()
+            },
+            PolicyRule {
+                api_groups: Some(vec![String::from("")]),
+                resources: Some(vec![String::from("configmaps")]),
+                verbs: vec![String::from("get")],
+                ..PolicyRule::default()
+            },
+        ]),
         ..ClusterRole::default()
     }
 }
