@@ -93,6 +93,7 @@ pub mod v1beta2 {
         pub volumes: Vec<VolumeAttachment>,
         pub networks: Vec<NetworkAttachment>,
         pub uuid: Option<String>,
+        pub userdata: Option<String>,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]

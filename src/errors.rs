@@ -100,6 +100,10 @@ pub enum Error {
     CommandError(Vec<String>, String),
     #[error("Failed to determine instance for metadata: {0}")]
     InstanceMatchFailed(String),
+    #[error("ConfigMap {0} not found")]
+    ConfigMapNotFound(String),
+    #[error("ConfigMap {0} invalid: {1}")]
+    ConfigMapInvalid(String, String),
 
     // Custom/generic
     #[error("Timed out waiting for operation: {0}")]

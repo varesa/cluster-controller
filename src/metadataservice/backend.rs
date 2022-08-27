@@ -1,5 +1,6 @@
+use k8s_openapi::api::core::v1::ConfigMap;
 use kube::api::ListParams;
-use kube::{Api, Client};
+use kube::{Api, Client, Resource};
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 
@@ -69,15 +70,55 @@ impl MetadataBackend {
                     .collect();
                 assert_eq!(matching_vms.len(), 1);
                 let vm = matching_vms.first().unwrap();
-
                 println!("backend: Matched VM {:?}", vm);
 
-                msg.return_channel
-                    .send(MetadataResponse {
-                        ip: msg.ip,
-                        metadata: Some(format!("Metadata for {}\n", &msg.ip)),
-                    })
-                    .await?;
+                if let Some(userdata_name) = &vm.spec.userdata {
+                    let cm_api: Api<ConfigMap> =
+                        Api::namespaced(self.client.clone(), vm.meta().namespace.as_ref().unwrap());
+
+                    let maybe_userdata = cm_api
+                        .get(userdata_name)
+                        .await
+                        .as_ref()
+                        .map_err(|_| Error::ConfigMapNotFound(userdata_name.to_string()))
+                        .and_then(|config_map| {
+                            config_map.data.as_ref().ok_or_else(|| {
+                                Error::ConfigMapInvalid(
+                                    userdata_name.to_string(),
+                                    String::from("no .data"),
+                                )
+                            })
+                        })
+                        .and_then(|cm_data| {
+                            cm_data.get("userdata").ok_or_else(|| {
+                                Error::ConfigMapInvalid(
+                                    userdata_name.to_string(),
+                                    String::from("no .data.userdata"),
+                                )
+                            })
+                        })
+                        .map(|userdata_ref| userdata_ref.clone());
+
+                    match maybe_userdata {
+                        Ok(userdata) => {
+                            msg.return_channel
+                                .send(MetadataResponse {
+                                    ip: msg.ip,
+                                    metadata: Some(userdata),
+                                })
+                                .await?;
+                        }
+                        Err(e) => {
+                            println!("backend: error fetching metadata for {}: {}", &msg.ip, e);
+                            msg.return_channel
+                                .send(MetadataResponse {
+                                    ip: msg.ip,
+                                    metadata: None,
+                                })
+                                .await?;
+                        }
+                    }
+                }
             }
         }
     }
