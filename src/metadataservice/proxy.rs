@@ -4,7 +4,7 @@ use std::os::unix::io::AsRawFd;
 
 use nix::sched::{setns, CloneFlags};
 use tokio::sync::mpsc::{channel, Sender};
-use warp::Filter;
+use warp::{Filter, Rejection};
 
 use crate::metadataservice::networking;
 use crate::metadataservice::protocol::MetadataRequest;
@@ -39,9 +39,10 @@ impl MetadataProxy {
         )))
     }
 
-    pub async fn main(&mut self) -> Result<(), Error> {
-        let root = warp::addr::remote()
-            .and(warp::path::end())
+    fn fetch_metadata(
+        &mut self,
+    ) -> impl Filter<Extract = ((Ipv4Addr, String),), Error = Rejection> + Clone {
+        warp::addr::remote()
             .and_then(|addr: Option<SocketAddr>| async move {
                 match addr {
                     Some(SocketAddr::V4(addr4)) => Ok(*addr4.ip()),
@@ -75,20 +76,28 @@ impl MetadataProxy {
                     }
                 }
             })
-            .then(|params: (Ipv4Addr, String)| async move {
-                let (addr, metadata) = params;
-                let resp = format!(
-                    "Metadata proxy from {}\nClient IP: {}\nMetadata: {}\n",
-                    get_version_string(),
-                    addr,
-                    metadata
-                );
-                Ok(resp)
-            });
+    }
 
-        warp::serve(root.with(warp::log("api")))
-            .run(([0, 0, 0, 0], 80))
-            .await;
+    pub async fn main(&mut self) -> Result<(), Error> {
+        let root =
+            warp::path::end()
+                .and(self.fetch_metadata())
+                .map(|params: (Ipv4Addr, String)| {
+                    let (addr, metadata) = params;
+                    format!(
+                        "Metadata proxy from {}\nClient IP: {}\nMetadata: {}\n",
+                        get_version_string(),
+                        addr,
+                        metadata
+                    )
+                });
+
+        let userdata = warp::path!("openstack" / "latest" / "user_data")
+            .and(self.fetch_metadata())
+            .map(|params: (Ipv4Addr, String)| params.1);
+
+        let app = root.or(userdata).with(warp::log("api"));
+        warp::serve(app).run(([0, 0, 0, 0], 80)).await;
         Err(Error::UnexpectedExit(String::from(
             "metadata proxy HTTP API (warp) died",
         )))
