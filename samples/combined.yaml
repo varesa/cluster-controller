@@ -66,6 +66,7 @@ spec:
     - name: vm-1-root
   networks:
     - name: testneta
+  userdata: test-userdata
 ---
 apiVersion: cluster-virt.acl.fi/v1beta2
 kind: VirtualMachine
@@ -81,3 +82,15 @@ spec:
     - name: vm-2-root
   networks:
     - name: testnetb
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: test2
+  name: test-userdata
+data:
+  userdata: |
+    Hello
+    world
+
