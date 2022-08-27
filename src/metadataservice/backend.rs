@@ -80,7 +80,10 @@ impl MetadataBackend {
                         .get(userdata_name)
                         .await
                         .as_ref()
-                        .map_err(|_| Error::ConfigMapNotFound(userdata_name.to_string()))
+                        .map_err(|e| {
+                            println!("backend: {:?}", e);
+                            Error::ConfigMapNotFound(userdata_name.to_string())
+                        })
                         .and_then(|config_map| {
                             config_map.data.as_ref().ok_or_else(|| {
                                 Error::ConfigMapInvalid(

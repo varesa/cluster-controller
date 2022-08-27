@@ -65,10 +65,12 @@ impl MetadataProxy {
                             .recv()
                             .await
                             .expect("Failed to get metadata response");
-                        if let Ok(metadata) = *response.metadata {
-                            Ok((addr, metadata))
-                        } else {
-                            Err(warp::reject::not_found())
+                        match *response.metadata {
+                            Ok(metadata) => Ok((addr, metadata)),
+                            Err(e) => {
+                                println!("proxy: received error {:?}", e);
+                                Err(warp::reject::not_found())
+                            }
                         }
                     }
                 }
