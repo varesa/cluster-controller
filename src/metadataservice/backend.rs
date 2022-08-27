@@ -46,13 +46,13 @@ impl MetadataBackend {
                     msg.return_channel
                         .send(MetadataResponse {
                             ip: msg.ip,
-                            metadata: None,
+                            metadata: Box::new(Err(Error::InstanceMatchFailed(format!(
+                                "Matched {} instances",
+                                ports.len()
+                            )))),
                         })
                         .await?;
-                    return Err(Error::InstanceMatchFailed(format!(
-                        "Matched {} instances",
-                        ports.len()
-                    )));
+                    continue;
                 };
 
                 println!("backend: Selected {}", port.name());
@@ -104,20 +104,28 @@ impl MetadataBackend {
                             msg.return_channel
                                 .send(MetadataResponse {
                                     ip: msg.ip,
-                                    metadata: Some(userdata),
+                                    metadata: Box::new(Ok(userdata)),
                                 })
                                 .await?;
                         }
                         Err(e) => {
-                            println!("backend: error fetching metadata for {}: {}", &msg.ip, e);
+                            println!("backend: error fetching metadata for {}: {:?}", &msg.ip, e);
                             msg.return_channel
                                 .send(MetadataResponse {
                                     ip: msg.ip,
-                                    metadata: None,
+                                    metadata: Box::new(Err(e)),
                                 })
                                 .await?;
                         }
                     }
+                } else {
+                    println!("backend: No userdata specified in vm spec");
+                    msg.return_channel
+                        .send(MetadataResponse {
+                            ip: msg.ip,
+                            metadata: Box::new(Err(Error::UserdataNotSpecified)),
+                        })
+                        .await?;
                 }
             }
         }
