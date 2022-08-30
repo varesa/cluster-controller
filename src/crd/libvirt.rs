@@ -131,7 +131,9 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
     let status = vm_crd.status.expect("CRD has no status").clone();
 
     for version in status.stored_versions.clone().unwrap_or_default() {
+        println!("CRD virtualmachines: checking version {}", &version);
         if &version == "v1beta" {
+            println!("CRD virtualmachines: upgrading {}", &version);
             for namespace in get_namespace_names(client.clone()).await? {
                 let api_v1beta: Api<v1beta::VirtualMachine> =
                     Api::namespaced(client.clone(), &namespace);
@@ -140,6 +142,7 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
 
                 let vms_v1beta = api_v1beta.list(&ListParams::default()).await?;
                 for vm in vms_v1beta {
+                    println!("CRD virtualmachines: Upgrading {} {}/{}", &version, &namespace, &vm.metadata.name.as_ref().unwrap());
                     let patch = json!({
                         "status": {
                             "migration_pending": false,
@@ -154,7 +157,8 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
                         .await?;
                 }
             }
-            utils::remove_crd_version(CRD_NAME, "v1beta", client.clone()).await?;
+            println!("CRD virtualmachines: removing version {}", &version);
+            utils::remove_crd_version(CRD_NAME, &version, client.clone()).await?;
         }
     }
 

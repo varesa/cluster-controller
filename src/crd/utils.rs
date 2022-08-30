@@ -41,5 +41,6 @@ pub async fn remove_crd_version(
     let mut crd = crds.get(crd_name).await?;
     crd.spec.versions.retain(|v| v.name != crd_version);
     crds.replace(crd_name, &PostParams::default(), &crd).await?;
+    println!("CRD: Patching {:?}", &crd);
     Ok(())
 }
