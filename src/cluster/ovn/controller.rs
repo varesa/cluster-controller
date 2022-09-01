@@ -165,13 +165,15 @@ async fn connect_vm_nic(
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let namespace = ResourceExt::namespace(vm).expect("Failed to get VM namespace");
     let network_name = nic.name.as_ref().expect("No network name set");
+    let mac_address = nic.mac_address.as_ref().expect("MAC address missing");
+
     let ls_name = format!("{}-{}", &namespace, &network_name);
     let mut ls = LogicalSwitch::get_by_name(ovn.clone(), &ls_name)?;
 
     let lsp_id = nic.ovn_id.as_ref().unwrap();
     let mut lsp = ls.lsp().create_if_missing(lsp_id, None)?;
 
-    lsp.set_address(nic.mac_address.as_ref().expect("MAC address missing"))?;
+    lsp.set_address(mac_address)?;
 
     let api: Api<Network> = Api::namespaced(client.clone(), &namespace);
     let network = api.get(network_name).await?;

@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use serde_json::{json, Value};
 
-use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnNamed, OvnNamedGetters};
+use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters};
 use crate::cluster::ovn::deserialization::{
-    deserialize_object, deserialize_string, deserialize_uuid,
+    deserialize_object, deserialize_string, deserialize_uuid, deserialize_uuid_set,
 };
 use crate::cluster::ovn::logicalswitchport::{LogicalSwitchPort, LogicalSwitchPortBuilder};
 use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH};
@@ -14,6 +14,7 @@ pub struct LogicalSwitch {
     ovn: Arc<Ovn>,
     uuid: String,
     name: String,
+    port_ids: Vec<String>,
 }
 
 impl LogicalSwitch {
@@ -55,6 +56,23 @@ impl LogicalSwitch {
             ls: self,
         }
     }
+
+    pub fn port_ids(&self) -> Vec<String> {
+        self.port_ids.clone()
+    }
+
+    pub fn find_lsp_owner(ovn: Arc<Ovn>, lsp: &LogicalSwitchPort) -> Result<LogicalSwitch, Error> {
+        let switches = LogicalSwitch::list(ovn)?;
+        switches
+            .into_iter()
+            .find(|switch| switch.port_ids.contains(&lsp.uuid()))
+            .ok_or_else(|| {
+                Error::OvnNotFound(
+                    LogicalSwitch::ovn_type(),
+                    format!("owner of {}", lsp.uuid()),
+                )
+            })
+    }
 }
 
 impl OvnCommon for LogicalSwitch {
@@ -77,6 +95,7 @@ impl OvnCommon for LogicalSwitch {
             ovn,
             uuid: deserialize_uuid(object)?,
             name: deserialize_string(object, "name")?,
+            port_ids: deserialize_uuid_set(object, "ports")?,
         })
     }
 }

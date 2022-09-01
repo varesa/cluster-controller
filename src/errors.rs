@@ -74,6 +74,8 @@ pub enum Error {
     OvnNotFound(String, String),
     #[error("Deserialization failed")]
     OvnDeserializationFailed,
+    #[error("Conflicting resource: {0}")]
+    OvnConflict(String),
 
     // Misc libs
     #[error("JSON error {0}")]

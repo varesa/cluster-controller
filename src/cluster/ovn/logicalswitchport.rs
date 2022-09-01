@@ -10,6 +10,7 @@ use crate::cluster::ovn::dhcpoptions::DhcpOptions;
 use crate::cluster::ovn::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH, TYPE_LOGICAL_SWITCH_PORT};
 use crate::Error;
+use crate::Error::OvnConflict;
 
 pub struct LogicalSwitchPortBuilder<'a> {
     pub ovn: Arc<Ovn>,
@@ -63,10 +64,24 @@ impl LogicalSwitchPortBuilder<'_> {
                     LogicalSwitchPort::ovn_type(),
                     lsp_name
                 );
+
                 self.create(lsp_name, extra_params)
             }
             Err(e) => Err(e),
         }
+    }
+
+    pub fn get_by_mac(self, mac_address: &str) -> Result<LogicalSwitchPort, Error> {
+        let mut all_lsps = LogicalSwitchPort::list(self.ovn.clone())?;
+        let ls_port_ids = self.ls.port_ids();
+        all_lsps.retain(|lsp| ls_port_ids.contains(&lsp.uuid()));
+
+        all_lsps
+            .into_iter()
+            .find(|lsp| lsp.addresses.contains(mac_address))
+            .ok_or_else(|| {
+                Error::OvnNotFound(LogicalSwitchPort::ovn_type(), mac_address.to_string())
+            })
     }
 }
 
@@ -75,11 +90,16 @@ pub struct LogicalSwitchPort {
     ovn: Arc<Ovn>,
     uuid: String,
     name: String,
+    addresses: String,
     dynamic_addresses: String,
 }
 
 impl LogicalSwitchPort {
     pub fn set_address(&mut self, mac_address: &str) -> Result<(), Error> {
+        let mut ls = self.get_ls()?;
+        if ls.lsp().get_by_mac(mac_address).is_ok() {
+            return Err(OvnConflict(mac_address.to_string()));
+        }
         let set_address = json!({
             "op": "update",
             "table": TYPE_LOGICAL_SWITCH_PORT,
@@ -118,6 +138,10 @@ impl LogicalSwitchPort {
             .collect();
         Ok(ports_with_ip)
     }
+
+    pub fn get_ls(&self) -> Result<LogicalSwitch, Error> {
+        LogicalSwitch::find_lsp_owner(self.ovn.clone(), self)
+    }
 }
 
 impl OvnCommon for LogicalSwitchPort {
@@ -140,6 +164,7 @@ impl OvnCommon for LogicalSwitchPort {
             ovn,
             uuid: deserialize_uuid(object)?,
             name: deserialize_string(object, "name")?,
+            addresses: deserialize_string(object, "addresses")?,
             dynamic_addresses: deserialize_string(object, "dynamic_addresses")
                 .or_else(|_| Ok::<String, Error>(String::new()))?,
         })
