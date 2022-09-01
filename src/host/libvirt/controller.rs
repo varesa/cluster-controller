@@ -85,7 +85,7 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Arc<State>) -> Result<Event, Error>
         (false, false) => Ok(Event::Added),
         (true, false) => Ok(Event::Updated),
         (true, true) => Ok(Event::Deleted),
-        (false, true) => panic!("We shouldn't see deletion of other node's VMs"),
+        (false, true) => Ok(Event::Deleted), // might not exist due to e.g. invalid spec
     }
 }
 
