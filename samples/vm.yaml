@@ -1,4 +1,4 @@
-apiVersion: cluster-virt.acl.fi/v1beta
+apiVersion: cluster-virt.acl.fi/v1beta2
 kind: VirtualMachine
 metadata:
   name: vm-1.mydomain.com
