@@ -96,10 +96,18 @@ pub struct LogicalSwitchPort {
 
 impl LogicalSwitchPort {
     pub fn set_address(&mut self, mac_address: &str) -> Result<(), Error> {
+        // Ignore if already set
+        if self.addresses.contains(mac_address) {
+            return Ok(());
+        }
+
+        // Fail if already in use elsewhere
         let mut ls = self.get_ls()?;
         if ls.lsp().get_by_mac(mac_address).is_ok() {
             return Err(OvnConflict(mac_address.to_string()));
         }
+
+        // Otherwise set
         let set_address = json!({
             "op": "update",
             "table": TYPE_LOGICAL_SWITCH_PORT,
