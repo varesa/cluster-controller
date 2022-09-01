@@ -56,7 +56,7 @@ impl Ovn {
             TYPE_LOGICAL_ROUTER => json!(["_uuid", "name", "static_routes"]),
             TYPE_LOGICAL_ROUTER_STATIC_ROUTE => json!(["_uuid", "ip_prefix", "nexthop"]),
             TYPE_LOGICAL_SWITCH => json!(["_uuid", "name", "ports"]),
-            TYPE_LOGICAL_SWITCH_PORT => json!(["_uuid", "name", "dynamic_addresses"]),
+            TYPE_LOGICAL_SWITCH_PORT => json!(["_uuid", "name", "addresses", "dynamic_addresses"]),
             _ => json!(["_uuid", "name"]),
         };
         let select = json!({
