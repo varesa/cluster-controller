@@ -172,7 +172,8 @@ impl OvnCommon for LogicalSwitchPort {
             ovn,
             uuid: deserialize_uuid(object)?,
             name: deserialize_string(object, "name")?,
-            addresses: deserialize_string(object, "addresses")?,
+            addresses: deserialize_string(object, "addresses")
+                .or_else(|_| Ok::<String, Error>(String::new()))?,
             dynamic_addresses: deserialize_string(object, "dynamic_addresses")
                 .or_else(|_| Ok::<String, Error>(String::new()))?,
         })
