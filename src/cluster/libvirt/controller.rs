@@ -36,12 +36,12 @@ async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
 
         // Generate a new OVN port ID if not set and using OVN network
         if nic.name.is_some() && nic.ovn_id.is_none() {
-            nic.ovn_id = Some(format!(
-                "{}-{}-{}",
-                vm_name,
-                nic.name.as_ref().unwrap(),
-                nic.mac_address.as_ref().unwrap().replace(':', "")
-            ));
+            nic.ovn_id = Some(
+                Uuid::new_v4()
+                    .to_hyphenated()
+                    .encode_lower(&mut Uuid::encode_buffer())
+                    .into(),
+            );
         }
     }
     client_replace_resource!(client, VirtualMachine, vm);
