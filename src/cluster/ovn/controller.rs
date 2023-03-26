@@ -13,6 +13,8 @@ use crate::cluster::ovn::{
     common::OvnBasicActions, common::OvnNamedGetters, dhcpoptions::DhcpOptions,
     logicalrouter::LogicalRouter, logicalswitchport::LogicalSwitchPort, lowlevel::Ovn,
 };
+use crate::crd::libvirt::set_vm_status;
+use crate::crd::libvirt::v1beta2::VirtualMachineStatus;
 use crate::crd::libvirt::{v1beta2::VirtualMachine, NetworkAttachment};
 use crate::crd::ovn::{
     DhcpOptions as DhcpOptionsCrd, Network, NetworkStatus, Route, Router, RouterAttachment,
@@ -223,10 +225,24 @@ async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action
     } else {
         println!("ovn: VM {name} updated");
         client_ensure_finalizer!(client, VirtualMachine, vm.as_ref(), "ovn");
+        let mut ip_addresses: Vec<String> = Vec::new();
         for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
             println!("ovn: connecting NIC {index} for VM {name}");
             connect_vm_nic(client.clone(), &vm, nic).await?;
+            if let Some(ovn_id) = nic.ovn_id.as_ref() {
+                let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+                let lsp = LogicalSwitchPort::get_by_name(ovn, ovn_id)?;
+                if let Some(ip) = lsp.dynamic_ip() {
+                    ip_addresses.push(ip);
+                }
+            }
         }
+
+        let new_status = VirtualMachineStatus {
+            ip_addresses: Some(ip_addresses),
+            ..vm.status.clone().expect("VM has no status")
+        };
+        set_vm_status(&*vm, new_status, client).await?;
 
         ok_and_requeue!(600)
     }

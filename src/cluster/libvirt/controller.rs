@@ -90,6 +90,7 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
                 migration_pending: false,
                 node: None,
                 domain_name: String::new(),
+                ip_addresses: None,
             })
         })
         .unwrap();
