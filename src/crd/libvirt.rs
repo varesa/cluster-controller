@@ -108,8 +108,18 @@ pub mod v1beta2 {
 
 pub async fn create(client: Client) -> Result<(), Error> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+
+    if let Ok(crd) = crds.get(CRD_NAME).await {
+        let current_versions: Vec<String> = crd.spec.versions.into_iter().map(|version| version.name).collect();
+        if &current_versions == &[String::from("v1beta2")] {
+            println!("CRD virtualmachines: nothing to do");
+            return Ok(());
+        }
+    }
+
     let patch_params = PatchParams::apply("cluster-manager.libvirt").force();
 
+    // Create all possible versions to exist in parallel
     let crd_versions = vec![
         v1beta::VirtualMachine::crd(),
         v1beta2::VirtualMachine::crd(),
@@ -118,7 +128,15 @@ pub async fn create(client: Client) -> Result<(), Error> {
     crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&crd))
         .await?;
     wait_crd_ready(&crds, CRD_NAME).await?;
+
+    // Migrate all objects to the latest version
     run_migrations(client.clone()).await?;
+
+    // Remove all but the latest CRD version
+    let latest_crd = v1beta2::VirtualMachine::crd();
+    crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&latest_crd))
+        .await?;
+
     Ok(())
 }
 
