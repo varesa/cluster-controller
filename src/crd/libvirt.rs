@@ -85,7 +85,7 @@ pub mod v1beta2 {
         shortname = "vm",
         namespaced,
         printcolumn = r#"{"name":"Node", "type":"string", "description":"Node the VM is scheduled to", "jsonPath":".status.node"}"#,
-        printcolumn = r#"{"name":"IPs", "type":"string", "description":"Dynamic IPs assigned", "jsonPath":".status.ip_addresses"}"#,
+        printcolumn = r#"{"name":"IPs", "type":"string", "description":"Dynamic IPs assigned", "jsonPath":".status.ip_addresses_string"}"#,
     )]
     pub struct VirtualMachineSpec {
         pub cpus: usize,
@@ -105,6 +105,7 @@ pub mod v1beta2 {
         pub node: Option<String>,
         pub domain_name: String,
         pub ip_addresses: Option<Vec<String>>,
+        pub ip_addresses_string: Option<String>,
     }
 }
 

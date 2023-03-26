@@ -91,6 +91,7 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
                 node: None,
                 domain_name: String::new(),
                 ip_addresses: None,
+                ip_addresses_string: None,
             })
         })
         .unwrap();

@@ -238,8 +238,10 @@ async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action
             }
         }
 
+        let ip_addresses_string = ip_addresses.join(",");
         let new_status = VirtualMachineStatus {
             ip_addresses: Some(ip_addresses),
+            ip_addresses_string: Some(ip_addresses_string),
             ..vm.status.clone().expect("VM has no status")
         };
         set_vm_status(&*vm, new_status, client).await?;
