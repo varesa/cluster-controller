@@ -5,16 +5,17 @@ use kube::{
     Client,
 };
 use lazy_static::lazy_static;
+use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
+use uuid::Uuid;
 
 use crate::cluster::libvirt::{scheduling, utils::generate_mac_address};
-use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
+use crate::crd::libvirt::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
-use crate::utils::name_namespaced;
+use crate::utils::{name_namespaced, TryStatus};
 use crate::{api_replace_resource, client_replace_resource, create_controller, ok_and_requeue};
-use uuid::Uuid;
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -22,24 +23,63 @@ struct State {
     client: Client,
 }
 
+fn find_matching_network<'a>(
+    list: &'a [NetworkAttachment],
+    network: &'a NetworkAttachment,
+) -> Option<&'a NetworkAttachment> {
+    if network.name.is_some() {
+        list.iter().find(|candidate| candidate.name == network.name)
+    } else if network.bridge.is_some() {
+        list.iter()
+            .find(|candidate| candidate.bridge == network.bridge)
+    } else {
+        panic!("A network with neither name nor bridge should not exist")
+    }
+}
+
 async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
     let vm_name = name_namespaced(vm);
-    for (index, nic) in vm.spec.networks.iter_mut().enumerate() {
+
+    let status_networks = vm.try_status()?.networks.clone();
+    let mut new_status_networks = Vec::new();
+
+    for (index, nic_spec) in vm.spec.networks.iter_mut().enumerate() {
+        let mut nic_status = find_matching_network(&status_networks, nic_spec)
+            .cloned()
+            .unwrap_or(NetworkAttachment {
+                name: nic_spec.name.clone(),
+                bridge: nic_spec.bridge.clone(),
+                ..NetworkAttachment::default()
+            });
+
         // Generate a new MAC address if not set
-        if nic.mac_address.is_none() {
-            let new_mac = generate_mac_address(&vm_name, nic, index);
-            nic.mac_address = Some(new_mac.clone());
+        if nic_spec.mac_address.is_some() {
+            nic_status.mac_address = nic_spec.mac_address.clone();
+        } else if nic_status.mac_address.is_none() {
+            nic_status.mac_address = Some(generate_mac_address(&vm_name, nic_spec, index));
         }
 
         // Generate a new OVN port ID if not set and using OVN network
-        if nic.name.is_some() && nic.ovn_id.is_none() {
-            nic.ovn_id = Some(
-                Uuid::new_v4()
-                    .to_hyphenated()
-                    .encode_lower(&mut Uuid::encode_buffer())
-                    .into(),
-            );
+        if nic_spec.name.is_some() {
+            if nic_spec.ovn_id.is_some() {
+                nic_status.ovn_id = nic_spec.ovn_id.clone();
+            } else if nic_status.ovn_id.is_none() {
+                nic_status.ovn_id = Some(
+                    Uuid::new_v4()
+                        .to_hyphenated()
+                        .encode_lower(&mut Uuid::encode_buffer())
+                        .into(),
+                );
+            }
         }
+        new_status_networks.push(nic_status);
+    }
+    if json!(status_networks) != json!(new_status_networks) {
+        let new_status = VirtualMachineStatus {
+            networks: new_status_networks,
+            ..vm.try_status()?.clone()
+        };
+        set_vm_status(vm, new_status, client.clone()).await?;
     }
     client_replace_resource!(client, VirtualMachine, vm);
     Ok(())
