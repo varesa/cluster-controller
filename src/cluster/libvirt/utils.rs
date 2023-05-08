@@ -7,7 +7,7 @@ const PREFIX: &str = "52:54:00";
 /// a MAC address based on a hash of the information
 pub fn generate_mac_address(vm_name: &str, nic: &NetworkAttachment, index: usize) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(&vm_name);
+    hasher.update(vm_name);
     let network = nic.name.clone();
     let bridge = nic.bridge.clone();
     hasher.update(

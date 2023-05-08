@@ -4,13 +4,13 @@ use std::process::Command;
 
 fn main() {
     let output = Command::new("git")
-        .args(&["rev-parse", "HEAD"])
+        .args(["rev-parse", "HEAD"])
         .output()
         .unwrap();
     let git_hash = String::from_utf8(output.stdout).map_or("undetermined".into(), |o| o);
 
     let output = Command::new("git")
-        .args(&["rev-list", "--count", "HEAD"])
+        .args(["rev-list", "--count", "HEAD"])
         .output()
         .unwrap();
     let git_count = String::from_utf8(output.stdout).map_or("undetermined".into(), |o| o);

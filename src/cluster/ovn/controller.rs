@@ -243,7 +243,7 @@ async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action
                 ip_addresses_string: Some(ip_addresses_string),
                 ..status
             };
-            set_vm_status(&*vm, new_status, client).await?;
+            set_vm_status(&vm, new_status, client).await?;
         }
 
         ok_and_requeue!(600)
