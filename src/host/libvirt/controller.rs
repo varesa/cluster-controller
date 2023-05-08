@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::time::Duration;
 
 use super::lowlevel::Libvirt;
-use crate::crd::libvirt::v1beta2::VirtualMachine;
+use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
 use crate::host::libvirt::handlers::LIBVIRT_URI;
 use crate::host::libvirt::utils::get_domain_name;

@@ -206,7 +206,7 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
     Ok(())
 }
 
-type Vm = v1beta3::VirtualMachine;
-type VmStatus = v1beta3::VirtualMachineStatus;
+pub(crate) type VirtualMachine = v1beta3::VirtualMachine;
+pub(crate) type VirtualMachineStatus = v1beta3::VirtualMachineStatus;
 
-create_set_status!(Vm, VmStatus, set_vm_status);
+create_set_status!(VirtualMachine, VirtualMachineStatus, set_vm_status);

@@ -13,9 +13,7 @@ use crate::cluster::ovn::{
     common::OvnBasicActions, common::OvnNamedGetters, dhcpoptions::DhcpOptions,
     logicalrouter::LogicalRouter, logicalswitchport::LogicalSwitchPort, lowlevel::Ovn,
 };
-use crate::crd::libvirt::set_vm_status;
-use crate::crd::libvirt::v1beta2::VirtualMachineStatus;
-use crate::crd::libvirt::{v1beta2::VirtualMachine, NetworkAttachment};
+use crate::crd::libvirt::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
 use crate::crd::ovn::{
     DhcpOptions as DhcpOptionsCrd, Network, NetworkStatus, Route, Router, RouterAttachment,
     RouterStatus,

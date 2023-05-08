@@ -1,5 +1,5 @@
 use crate::crd::cluster::Cluster;
-use crate::crd::libvirt::v1beta2::VirtualMachine;
+use crate::crd::libvirt::VirtualMachine;
 use crate::Error::Volumelocked;
 use askama::Template;
 use kube::ResourceExt;

@@ -1,7 +1,4 @@
-use crate::crd::libvirt::{
-    set_vm_status,
-    v1beta2::{VirtualMachine, VirtualMachineStatus},
-};
+use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::host::libvirt::controller::State;
 use crate::host::libvirt::utils::{get_cluster, get_domain_name};
 use crate::Error;

@@ -10,10 +10,7 @@ use tokio::sync::Mutex;
 use tokio::time::Duration;
 
 use crate::cluster::libvirt::{scheduling, utils::generate_mac_address};
-use crate::crd::libvirt::{
-    set_vm_status,
-    v1beta2::{VirtualMachine, VirtualMachineStatus},
-};
+use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
 use crate::utils::name_namespaced;
 use crate::{api_replace_resource, client_replace_resource, create_controller, ok_and_requeue};
@@ -92,6 +89,7 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
                 domain_name: String::new(),
                 ip_addresses: None,
                 ip_addresses_string: None,
+                networks: vec![],
             })
         })
         .unwrap();
