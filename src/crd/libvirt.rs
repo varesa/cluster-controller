@@ -34,41 +34,6 @@ pub struct NetworkAttachment {
     pub ovn_id: Option<String>,
 }
 
-mod v1beta {
-    use super::*;
-
-    #[derive(
-        CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
-    )]
-    #[kube(
-        group = "cluster-virt.acl.fi",
-        version = "v1beta",
-        kind = "VirtualMachine",
-        status = "VirtualMachineStatus",
-        derive = "PartialEq",
-        derive = "Default",
-        shortname = "vm",
-        namespaced,
-        printcolumn = r#"{"name":"Node", "type":"string", "description":"Node the VM is scheduled to", "jsonPath":".status.node"}"#
-    )]
-    pub struct VirtualMachineSpec {
-        pub cpus: usize,
-        // String to allow suffixes like '1 Gi'
-        pub memory: String,
-        pub volumes: Vec<VolumeAttachment>,
-        pub networks: Vec<NetworkAttachment>,
-        pub uuid: Option<String>,
-    }
-
-    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
-    pub struct VirtualMachineStatus {
-        pub scheduled: bool,
-        pub running: bool,
-        pub node: Option<String>,
-        pub domain_name: String,
-    }
-}
-
 pub mod v1beta2 {
     use super::*;
 
@@ -85,7 +50,7 @@ pub mod v1beta2 {
         shortname = "vm",
         namespaced,
         printcolumn = r#"{"name":"Node", "type":"string", "description":"Node the VM is scheduled to", "jsonPath":".status.node"}"#,
-        printcolumn = r#"{"name":"IPs", "type":"string", "description":"Dynamic IPs assigned", "jsonPath":".status.ip_addresses_string"}"#,
+        printcolumn = r#"{"name":"IPs", "type":"string", "description":"Dynamic IPs assigned", "jsonPath":".status.ip_addresses_string"}"#
     )]
     pub struct VirtualMachineSpec {
         pub cpus: usize,
@@ -109,13 +74,59 @@ pub mod v1beta2 {
     }
 }
 
+pub mod v1beta3 {
+    use super::*;
+
+    #[derive(
+        CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
+    )]
+    #[kube(
+        group = "cluster-virt.acl.fi",
+        version = "v1beta3",
+        kind = "VirtualMachine",
+        status = "VirtualMachineStatus",
+        derive = "PartialEq",
+        derive = "Default",
+        shortname = "vm",
+        namespaced,
+        printcolumn = r#"{"name":"Node", "type":"string", "description":"Node the VM is scheduled to", "jsonPath":".status.node"}"#,
+        printcolumn = r#"{"name":"IPs", "type":"string", "description":"Dynamic IPs assigned", "jsonPath":".status.ip_addresses_string"}"#
+    )]
+    pub struct VirtualMachineSpec {
+        pub cpus: usize,
+        // String to allow suffixes like '1 Gi'
+        pub memory: String,
+        pub volumes: Vec<VolumeAttachment>,
+        pub networks: Vec<NetworkAttachment>,
+        pub uuid: Option<String>,
+        pub userdata: Option<String>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+    pub struct VirtualMachineStatus {
+        pub scheduled: bool,
+        pub running: bool,
+        pub migration_pending: bool,
+        pub node: Option<String>,
+        pub domain_name: String,
+        pub ip_addresses: Option<Vec<String>>,
+        pub ip_addresses_string: Option<String>,
+        pub networks: Vec<NetworkAttachment>,
+    }
+}
+
 pub async fn create(client: Client) -> Result<(), Error> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     let patch_params = PatchParams::apply("cluster-manager.libvirt").force();
 
     if let Ok(crd) = crds.get(CRD_NAME).await {
-        let current_versions: Vec<String> = crd.spec.versions.into_iter().map(|version| version.name).collect();
-        if &current_versions == &[String::from("v1beta2")] {
+        let current_versions: Vec<String> = crd
+            .spec
+            .versions
+            .into_iter()
+            .map(|version| version.name)
+            .collect();
+        if current_versions == [String::from("v1beta3")] {
             println!("CRD virtualmachines: no migrations required");
 
             let latest_crd = v1beta2::VirtualMachine::crd();
@@ -128,10 +139,10 @@ pub async fn create(client: Client) -> Result<(), Error> {
 
     // Create all possible versions to exist in parallel
     let crd_versions = vec![
-        v1beta::VirtualMachine::crd(),
         v1beta2::VirtualMachine::crd(),
+        v1beta3::VirtualMachine::crd(),
     ];
-    let crd = merge_crds(crd_versions, "v1beta2")?;
+    let crd = merge_crds(crd_versions, "v1beta3")?;
     crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&crd))
         .await?;
     wait_crd_ready(&crds, CRD_NAME).await?;
@@ -157,23 +168,28 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
 
     for version in status.stored_versions.clone().unwrap_or_default() {
         println!("CRD virtualmachines: checking version {}", &version);
-        if &version == "v1beta" {
+        if &version == "v1beta2" {
             println!("CRD virtualmachines: upgrading {}", &version);
             for namespace in get_namespace_names(client.clone()).await? {
-                let api_v1beta: Api<v1beta::VirtualMachine> =
-                    Api::namespaced(client.clone(), &namespace);
                 let api_v1beta2: Api<v1beta2::VirtualMachine> =
                     Api::namespaced(client.clone(), &namespace);
+                let api_v1beta3: Api<v1beta3::VirtualMachine> =
+                    Api::namespaced(client.clone(), &namespace);
 
-                let vms_v1beta = api_v1beta.list(&ListParams::default()).await?;
-                for vm in vms_v1beta {
-                    println!("CRD virtualmachines: Upgrading {} {}/{}", &version, &namespace, &vm.metadata.name.as_ref().unwrap());
+                let vms_v1beta2 = api_v1beta2.list(&ListParams::default()).await?;
+                for vm in vms_v1beta2 {
+                    println!(
+                        "CRD virtualmachines: Upgrading {} {}/{}",
+                        &version,
+                        &namespace,
+                        &vm.metadata.name.as_ref().unwrap()
+                    );
                     let patch = json!({
                         "status": {
-                            "migration_pending": false,
+                            "networks": &vm.spec.networks,
                         }
                     });
-                    api_v1beta2
+                    api_v1beta3
                         .patch_status(
                             vm.metadata.name.as_ref().expect("vm has no name"),
                             &patch_params,
@@ -190,7 +206,7 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
     Ok(())
 }
 
-type Vm = v1beta2::VirtualMachine;
-type VmStatus = v1beta2::VirtualMachineStatus;
+type Vm = v1beta3::VirtualMachine;
+type VmStatus = v1beta3::VirtualMachineStatus;
 
 create_set_status!(Vm, VmStatus, set_vm_status);
