@@ -34,6 +34,12 @@ pub struct NetworkAttachment {
     pub ovn_id: Option<String>,
 }
 
+mod latest {
+    pub const VERSION: &str = "v1beta3";
+    pub type VirtualMachine = super::v1beta3::VirtualMachine;
+    pub type VirtualMachineStatus = super::v1beta3::VirtualMachineStatus;
+}
+
 pub mod v1beta2 {
     use super::*;
 
@@ -126,10 +132,10 @@ pub async fn create(client: Client) -> Result<(), Error> {
             .into_iter()
             .map(|version| version.name)
             .collect();
-        if current_versions == [String::from("v1beta3")] {
+        if current_versions == [String::from(latest::VERSION)] {
             println!("CRD virtualmachines: no migrations required");
 
-            let latest_crd = v1beta3::VirtualMachine::crd();
+            let latest_crd = latest::VirtualMachine::crd();
             crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&latest_crd))
                 .await?;
 
@@ -142,7 +148,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
         v1beta2::VirtualMachine::crd(),
         v1beta3::VirtualMachine::crd(),
     ];
-    let crd = merge_crds(crd_versions, "v1beta3")?;
+    let crd = merge_crds(crd_versions, latest::VERSION)?;
     crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&crd))
         .await?;
     wait_crd_ready(&crds, CRD_NAME).await?;
@@ -151,7 +157,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
     run_migrations(client.clone()).await?;
 
     // Remove all but the latest CRD version
-    let latest_crd = v1beta2::VirtualMachine::crd();
+    let latest_crd = latest::VirtualMachine::crd();
     crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&latest_crd))
         .await?;
 
@@ -206,7 +212,7 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) type VirtualMachine = v1beta3::VirtualMachine;
-pub(crate) type VirtualMachineStatus = v1beta3::VirtualMachineStatus;
+pub(crate) type VirtualMachine = latest::VirtualMachine;
+pub(crate) type VirtualMachineStatus = latest::VirtualMachineStatus;
 
 create_set_status!(VirtualMachine, VirtualMachineStatus, set_vm_status);
