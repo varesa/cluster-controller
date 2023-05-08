@@ -129,7 +129,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
         if current_versions == [String::from("v1beta3")] {
             println!("CRD virtualmachines: no migrations required");
 
-            let latest_crd = v1beta2::VirtualMachine::crd();
+            let latest_crd = v1beta3::VirtualMachine::crd();
             crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&latest_crd))
                 .await?;
 
