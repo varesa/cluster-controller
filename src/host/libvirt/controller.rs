@@ -14,6 +14,7 @@ use crate::errors::Error;
 use crate::host::libvirt::handlers::LIBVIRT_URI;
 use crate::host::libvirt::utils::get_domain_name;
 use crate::host::libvirt::{handlers, secrets};
+use crate::utils::TryStatus;
 use crate::{create_controller, ok_no_requeue};
 
 /// State available for the reconcile and error_policy functions
@@ -48,7 +49,7 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Arc<State>) -> Result<Event, Error>
         return Ok(Event::MissingDomainName);
     };
 
-    let vm_status = vm.status.clone().expect("VM has no status");
+    let vm_status = vm.try_status()?;
 
     if !vm_status.scheduled {
         return Ok(Event::Unscheduled);
@@ -63,11 +64,7 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Arc<State>) -> Result<Event, Error>
 
     let vm_runs_on_us = ctx.libvirt.has_domain(&libvirt_domain_name)?;
     let target_node_is_us = target_node == &my_node_name;
-    let migration_pending = vm
-        .status
-        .as_ref()
-        .expect("VM has no status")
-        .migration_pending;
+    let migration_pending = vm.try_status()?.migration_pending;
 
     if target_node_is_us && migration_pending {
         return Ok(Event::InboundMigration);

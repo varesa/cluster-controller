@@ -1,6 +1,7 @@
 use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::host::libvirt::controller::State;
 use crate::host::libvirt::utils::{get_cluster, get_domain_name};
+use crate::utils::TryStatus;
 use crate::Error;
 use crate::{
     api_replace_resource, client_ensure_finalizer, client_remove_finalizer, ok_and_requeue,
@@ -61,13 +62,7 @@ pub async fn handle_outbound_migration(
     let vm_name = get_domain_name(vm).expect("VM has a libvirt domain name");
     let domain =
         Domain::lookup_by_name(&ctx.libvirt.connection, &vm_name).expect("Domain not found");
-    let destination_node = vm
-        .status
-        .as_ref()
-        .expect("VM has no status")
-        .node
-        .as_ref()
-        .expect("No destination node");
+    let destination_node = vm.try_status()?.node.as_ref().expect("No destination node");
 
     domain.migrate_to_uri(
         &format!("qemu+ssh://{destination_node}/system"),
@@ -99,7 +94,7 @@ pub async fn handle_inbound_migration(
         return ok_and_requeue!(5);
     }
 
-    let mut new_status = vm.status.clone().expect("VM has no status");
+    let mut new_status = vm.try_status()?.clone();
     new_status.migration_pending = false;
     set_vm_status(vm, new_status, ctx.kube.clone()).await?;
 

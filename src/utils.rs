@@ -1,9 +1,10 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Namespace;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+use kube::core::object::HasStatus;
 use kube::{
     api::{ListParams, Resource, WatchEvent},
-    Api, Client,
+    Api, Client, CustomResourceExt, ResourceExt,
 };
 
 use crate::errors::Error;
@@ -221,4 +222,22 @@ macro_rules! ok_no_requeue {
 
 pub fn get_version_string() -> String {
     format!("{}-{}", env!("GIT_COUNT"), env!("GIT_HASH"))
+}
+
+pub trait TryStatus {
+    type Status;
+    fn try_status(&self) -> Result<&Self::Status, Error>;
+}
+
+impl<T: HasStatus + ResourceExt + CustomResourceExt> TryStatus for T {
+    type Status = T::Status;
+
+    fn try_status(&self) -> Result<&Self::Status, Error> {
+        self.status().ok_or(Error::NoStatusSubresource(format!(
+            "{}/{} in ns {} has no status",
+            T::api_resource().kind,
+            self.name_any(),
+            self.namespace().unwrap_or(String::from("<no namespace>")),
+        )))
+    }
 }

@@ -56,6 +56,8 @@ pub enum Error {
     KubeWatcher(#[from] kube::runtime::watcher::Error),
     #[error("CRD version merge error {0}")]
     CrdMergeError(#[from] kube::core::crd::MergeError),
+    #[error("Resource {0} has no status")]
+    NoStatusSubresource(String),
 
     // Ceph
     #[error("librados error {0}")]
