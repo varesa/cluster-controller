@@ -10,6 +10,7 @@ use crate::errors::Error;
 use crate::host::libvirt::templates::{DomainTemplate, NetworkInterfaceTemplate, StorageTemplate};
 use crate::host::libvirt::utils::{get_domain_name, parse_memory};
 use crate::shared::ceph;
+use crate::utils::TryStatus;
 
 pub struct Libvirt {
     pub connection: Connect,
@@ -57,7 +58,7 @@ impl Libvirt {
         }
 
         let mut nics = Vec::new();
-        for nic in &vm.spec.networks {
+        for nic in &vm.try_status()?.networks {
             let bridge = match nic.ovn_id.clone() {
                 Some(_) => String::from("br-int"),
                 None => nic.bridge.clone().expect("bridge to be set"),
