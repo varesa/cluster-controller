@@ -26,11 +26,17 @@ pub struct VolumeAttachment {
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
 pub struct NetworkAttachment {
     // Allow specification of a managed Network instance
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+
     // Or an externally created host bridge device
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bridge: Option<String>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mac_address: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ovn_id: Option<String>,
 }
 
