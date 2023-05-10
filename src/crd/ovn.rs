@@ -9,9 +9,6 @@ use serde::{Deserialize, Serialize};
 use crate::errors::Error;
 use crate::utils::wait_crd_ready;
 
-#[derive(Debug, PartialEq, Eq, Clone, JsonSchema, Serialize, Deserialize, Default)]
-pub struct Quantity(String);
-
 const NETWORK_CRD_NAME: &str = "networks.cluster-virt.acl.fi";
 const ROUTER_CRD_NAME: &str = "routers.cluster-virt.acl.fi";
 

@@ -13,9 +13,6 @@ use crate::crd::utils;
 use crate::errors::Error;
 use crate::utils::{get_namespace_names, wait_crd_ready};
 
-#[derive(Debug, PartialEq, Eq, Clone, JsonSchema, Serialize, Deserialize, Default)]
-pub struct Quantity(String);
-
 const CRD_NAME: &str = "virtualmachines.cluster-virt.acl.fi";
 
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
@@ -42,6 +39,7 @@ pub struct NetworkAttachment {
 
 mod latest {
     pub const VERSION: &str = "v1beta3";
+
     pub type VirtualMachine = super::v1beta3::VirtualMachine;
     pub type VirtualMachineStatus = super::v1beta3::VirtualMachineStatus;
 }

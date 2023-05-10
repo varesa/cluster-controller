@@ -9,9 +9,6 @@ use serde::{Deserialize, Serialize};
 use crate::errors::Error;
 use crate::utils::wait_crd_ready;
 
-#[derive(Debug, PartialEq, Eq, Clone, JsonSchema, Serialize, Deserialize, Default)]
-pub struct Quantity(String);
-
 const VOLUME_CRD_NAME: &str = "volumes.cluster-virt.acl.fi";
 const IMAGE_CRD_NAME: &str = "images.cluster-virt.acl.fi";
 
