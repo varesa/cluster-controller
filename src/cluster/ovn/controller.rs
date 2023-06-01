@@ -20,7 +20,7 @@ use crate::crd::ovn::{
 };
 use crate::errors::Error;
 use crate::metadataservice::deployment::deploy as deploy_mds;
-use crate::utils::{name_namespaced, TryStatus};
+use crate::utils::name_namespaced;
 use crate::{
     api_replace_resource, client_ensure_finalizer, client_remove_finalizer, create_controller,
     create_set_status, ok_and_requeue, ok_no_requeue, resource_has_finalizer, GROUP_NAME,
@@ -198,15 +198,16 @@ fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(),
     Ok(())
 }
 
-fn get_vm_ovn_nics(vm: &VirtualMachine) -> Result<Vec<NetworkAttachment>, Error> {
-    let nics = vm
-        .try_status()?
-        .networks
-        .clone()
-        .into_iter()
-        .filter(|net| net.ovn_id.is_some())
-        .collect();
-    Ok(nics)
+fn get_vm_ovn_nics(vm: &VirtualMachine) -> Vec<NetworkAttachment> {
+    match &vm.status {
+        Some(status) => status
+            .networks
+            .clone()
+            .into_iter()
+            .filter(|net| net.ovn_id.is_some())
+            .collect(),
+        None => Vec::new(),
+    }
 }
 
 /// Handle updates to VMs in the cluster
@@ -216,17 +217,18 @@ async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action
 
     if vm.metadata.deletion_timestamp.is_some() {
         println!("ovn: VM {name} waiting for deletion");
-        for (index, nic) in get_vm_ovn_nics(&vm)?.iter().enumerate() {
+        for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
             println!("ovn: disconnecting NIC {index} for VM {name}");
             disconnect_vm_nic(&vm, nic)?;
         }
+
         client_remove_finalizer!(client, VirtualMachine, vm.as_ref(), "ovn");
         ok_no_requeue!()
     } else {
         println!("ovn: VM {name} updated");
         client_ensure_finalizer!(client, VirtualMachine, vm.as_ref(), "ovn");
         let mut ip_addresses: Vec<String> = Vec::new();
-        for (index, nic) in get_vm_ovn_nics(&vm)?.iter().enumerate() {
+        for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
             println!("ovn: connecting NIC {index} for VM {name}");
             connect_vm_nic(client.clone(), &vm, nic).await?;
             if let Some(ovn_id) = nic.ovn_id.as_ref() {
