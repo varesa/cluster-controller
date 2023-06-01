@@ -114,45 +114,39 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
         return ok_and_requeue!(600);
     }
 
-    fill_nics(&mut vm, client.clone()).await?;
-    fill_uuid(&mut vm, client.clone()).await?;
-
-    let old_status = vm
-        .status
-        .clone()
-        .or_else(|| {
-            Some(VirtualMachineStatus {
+    if vm.status.is_none() {
+        set_vm_status(
+            &vm,
+            VirtualMachineStatus {
                 scheduled: false,
                 running: false,
                 migration_pending: false,
                 node: None,
-                domain_name: String::new(),
+                domain_name: name.clone(),
                 ip_addresses: None,
                 ip_addresses_string: None,
                 networks: vec![],
-            })
-        })
-        .unwrap();
-
-    let mut new_status = VirtualMachineStatus { ..old_status };
-
-    if new_status.domain_name.is_empty() {
-        new_status.domain_name = name.clone();
+            },
+            client.clone(),
+        )
+        .await?;
     }
 
-    if !old_status.scheduled {
+    fill_nics(&mut vm, client.clone()).await?;
+    fill_uuid(&mut vm, client.clone()).await?;
+
+    let mut status = vm.try_status()?.clone();
+
+    if !status.scheduled {
         let _mutex = SCHEDULE_MUTEX.lock().await;
         println!("libvirt: Acquired mutex to schedule: {}", name);
 
         let node = scheduling::schedule(&vm, client.clone()).await?;
-        new_status.node = Some(node.metadata.name.expect("Unknown node name"));
-        new_status.scheduled = true;
+        status.node = Some(node.metadata.name.expect("Unknown node name"));
+        status.scheduled = true;
 
         // Status must be updated before we release the scheduling mutex
-        set_vm_status(&vm, new_status, client.clone()).await?;
-    } else {
-        // Just update the status without acquiring the mutex
-        set_vm_status(&vm, new_status, client.clone()).await?;
+        set_vm_status(&vm, status, client.clone()).await?;
     }
 
     println!("libvirt: updated: {}", name);
