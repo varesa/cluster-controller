@@ -53,7 +53,12 @@ impl DhcpOptions {
             ($source:ident, $destination:ident, [$($name:ident),+]) => {
                 $(
                 if let Some(value) = $source.$name.clone() {
-                    $destination.push([String::from(stringify!($name)), value.to_string()]);
+                    let value = if stringify!($name) == "domain_name" {
+                        format!("\"{}\"", value)
+                    } else {
+                        value.to_string()
+                    };
+                    $destination.push([String::from(stringify!($name)), value]);
                 }
                 )+
             }
