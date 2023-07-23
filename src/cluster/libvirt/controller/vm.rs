@@ -162,7 +162,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
         client: client.clone(),
     });
     let vms: Api<VirtualMachine> = Api::all(client.clone());
-    println!("libvirt: Starting controller");
+    println!("libvirt: Starting vm controller");
     create_controller!(vms, reconcile, error_policy, context);
     Ok(())
 }

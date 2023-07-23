@@ -207,6 +207,24 @@ macro_rules! client_remove_finalizer {
 }
 
 #[macro_export]
+macro_rules! client_add_annotation {
+    ($client:expr, $resource_type:ident, $resource:expr, $annotation_name:expr, $annotation_value:expr) => {
+        let namespace = $resource
+            .metadata
+            .namespace
+            .as_ref()
+            .expect("Unable to get namespace");
+        let api: Api<$resource_type> = Api::namespaced($client.clone(), &namespace);
+
+        let mut new_resource = $resource.to_owned();
+        new_resource
+            .annotations_mut()
+            .insert($annotation_name, $annotation_value);
+        api_replace_resource!(api, &new_resource);
+    };
+}
+
+#[macro_export]
 macro_rules! ok_and_requeue {
     ($duration:expr) => {
         Ok(Action::requeue(Duration::from_secs($duration)))
