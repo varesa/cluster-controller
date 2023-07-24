@@ -14,8 +14,8 @@ use uuid::Uuid;
 use crate::cluster::libvirt::{scheduling, utils::generate_mac_address};
 use crate::crd::libvirt::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
-use crate::utils::{name_namespaced, TryStatus};
-use crate::{api_replace_resource, client_replace_resource, create_controller, ok_and_requeue};
+use crate::utils::{name_namespaced, ExtendResource, TryStatus};
+use crate::{create_controller, ok_and_requeue};
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -81,7 +81,7 @@ async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
         };
         set_vm_status(vm, new_status, client.clone()).await?;
     }
-    client_replace_resource!(client, VirtualMachine, vm);
+    vm.commit(client, "cluster-manager.libvirt").await?;
     Ok(())
 }
 
@@ -93,7 +93,7 @@ async fn fill_uuid(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
                 .encode_lower(&mut Uuid::encode_buffer())
                 .into(),
         );
-        client_replace_resource!(client, VirtualMachine, vm);
+        vm.commit(client, "cluster-manager.libvirt").await?;
     }
     Ok(())
 }

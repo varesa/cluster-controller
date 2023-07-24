@@ -123,33 +123,6 @@ macro_rules! create_set_status {
 }
 
 #[macro_export]
-macro_rules! api_replace_resource {
-    ($api:expr, $resource:expr) => {
-        $api.replace(
-            &$resource.metadata.name.as_ref().expect("get resource name"),
-            &kube::api::PostParams::default(),
-            $resource,
-        )
-        .await?;
-    };
-}
-
-#[macro_export]
-macro_rules! client_replace_resource {
-    ($client:ident, $resource_type:ident, $resource:ident) => {
-        let api: Api<$resource_type> = Api::namespaced(
-            $client.clone(),
-            &$resource
-                .metadata
-                .namespace
-                .as_ref()
-                .expect("get resource namespace"),
-        );
-        api_replace_resource!(api, $resource);
-    };
-}
-
-#[macro_export]
 macro_rules! ok_and_requeue {
     ($duration:expr) => {
         Ok(Action::requeue(Duration::from_secs($duration)))
