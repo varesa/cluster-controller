@@ -49,6 +49,10 @@ impl std::fmt::Display for ClusterNotFound {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    // Tokio
+    #[error("Task join error {0}")]
+    JoinFailure(#[from] tokio::task::JoinError),
+
     // Kubernetes
     #[error("Kubernetes error {0}")]
     Kube(#[from] kube::Error),
