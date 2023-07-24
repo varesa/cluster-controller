@@ -8,7 +8,7 @@ use warp::{Filter, Rejection};
 
 use crate::metadataservice::networking;
 use crate::metadataservice::protocol::MetadataRequest;
-use crate::utils::get_version_string;
+use crate::utils::strings::get_version_string;
 use crate::Error;
 
 pub struct MetadataProxy {

@@ -11,7 +11,7 @@ use crate::errors::Error;
 use crate::host::libvirt::handlers::LIBVIRT_URI;
 use crate::host::libvirt::utils::get_domain_name;
 use crate::host::libvirt::{handlers, secrets};
-use crate::utils::TryStatus;
+use crate::utils::extend_traits::TryStatus;
 use crate::{create_controller, ok_no_requeue};
 
 /// State available for the reconcile and error_policy functions

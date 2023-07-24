@@ -3,7 +3,7 @@ use std::env;
 use kube::Client;
 
 use crate::errors::Error;
-use crate::utils::get_version_string;
+use crate::utils::strings::get_version_string;
 
 mod cluster;
 mod errors;

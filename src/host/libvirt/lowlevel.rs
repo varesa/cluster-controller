@@ -10,7 +10,7 @@ use crate::errors::Error;
 use crate::host::libvirt::templates::{DomainTemplate, NetworkInterfaceTemplate, StorageTemplate};
 use crate::host::libvirt::utils::{get_domain_name, parse_memory};
 use crate::shared::ceph;
-use crate::utils::TryStatus;
+use crate::utils::extend_traits::TryStatus;
 
 pub struct Libvirt {
     pub connection: Connect,

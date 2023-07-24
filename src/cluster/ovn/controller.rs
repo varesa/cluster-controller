@@ -22,7 +22,8 @@ use crate::crd::ovn::{
 };
 use crate::errors::Error;
 use crate::metadataservice::deployment::deploy as deploy_mds;
-use crate::utils::{name_namespaced, ExtendResource};
+use crate::utils::extend_traits::ExtendResource;
+use crate::utils::strings::name_namespaced;
 use crate::{create_controller, create_set_status, ok_and_requeue, ok_no_requeue};
 
 /// State available for the reconcile and error_policy functions

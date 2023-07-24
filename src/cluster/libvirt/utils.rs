@@ -1,6 +1,7 @@
 use crate::crd::libvirt::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
-use crate::utils::{name_namespaced, ExtendResource, TryStatus};
+use crate::utils::extend_traits::{ExtendResource, TryStatus};
+use crate::utils::strings::name_namespaced;
 use kube::Client;
 use serde_json::json;
 use sha2::{Digest, Sha256};

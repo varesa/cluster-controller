@@ -11,7 +11,7 @@ use tokio::time::Duration;
 use crate::cluster::libvirt::controller::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
-use crate::utils::{ExtendResource, TryStatus};
+use crate::utils::extend_traits::{ExtendResource, TryStatus};
 use crate::{create_controller, ok_and_requeue};
 
 /// State available for the reconcile and error_policy functions

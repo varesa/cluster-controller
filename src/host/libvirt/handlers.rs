@@ -1,7 +1,7 @@
 use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::host::libvirt::controller::State;
 use crate::host::libvirt::utils::{get_cluster, get_domain_name};
-use crate::utils::{ExtendResource, TryStatus};
+use crate::utils::extend_traits::{ExtendResource, TryStatus};
 use crate::Error;
 use crate::{ok_and_requeue, ok_no_requeue};
 use kube::runtime::controller::Action;

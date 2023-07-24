@@ -15,8 +15,8 @@ use crate::crd::ceph::Volume;
 use crate::create_controller;
 use crate::errors::Error;
 use crate::shared::ceph::lowlevel;
-use crate::utils::name_namespaced;
-use crate::utils::ExtendResource;
+use crate::utils::extend_traits::ExtendResource;
+use crate::utils::strings::name_namespaced;
 use crate::{KEYRING_SECRET, NAMESPACE};
 
 const POOL_VOLUMES: &str = "volumes";
