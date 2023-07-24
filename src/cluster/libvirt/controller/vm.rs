@@ -76,7 +76,12 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
         let _mutex = SCHEDULE_MUTEX.lock().await;
         println!("libvirt: Acquired mutex to schedule: {}", name);
 
-        let node = scheduling::schedule(&vm, client.clone()).await?;
+        let schedule_result = scheduling::schedule(&vm, false, client.clone()).await;
+        let node = if migration_required && schedule_result.is_err() {
+            scheduling::schedule(&vm, true, client.clone()).await?
+        } else {
+            schedule_result?
+        };
         status.node = Some(node.metadata.name.expect("Unknown node name"));
         status.scheduled = true;
 

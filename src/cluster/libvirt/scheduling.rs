@@ -1,4 +1,4 @@
-use crate::cluster::libvirt::controller::MAINTENANCE_ANNOTATION;
+use crate::cluster::libvirt::controller::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
 use k8s_openapi::api::core::v1::Node;
 use kube::{
     api::{Api, ListParams, ResourceExt},
@@ -44,7 +44,7 @@ async fn get_nodes_with_label_scheduled(
 /// Remove nodes by the given names from the candidate list
 fn remove_candidate_nodes(candidates: &mut Vec<Node>, nodes_to_remove: &Vec<String>) {
     for node_to_remove in nodes_to_remove {
-        candidates.retain(|candidate| candidate.metadata.name.as_ref().unwrap() != node_to_remove);
+        candidates.retain(|candidate| &candidate.name_unchecked() != node_to_remove);
     }
 }
 
@@ -57,21 +57,37 @@ fn remove_nodes_in_maintenance(candidates: &mut Vec<Node>) {
 
 const ANTI_AFFINITY_LABEL: &str = "antiAffinity";
 
-pub(crate) async fn schedule(vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
+pub(crate) async fn schedule(
+    vm: &VirtualMachine,
+    ignore_affinity: bool,
+    client: Client,
+) -> Result<Node, Error> {
     let node_api: Api<Node> = Api::all(client.clone());
+
+    // Get all nodes
     let mut candidates = node_api.list(&ListParams::default()).await?;
 
-    let labels = ResourceExt::labels(vm);
-    let anti_affinity_group = labels.get(ANTI_AFFINITY_LABEL);
-    if let Some(anti_affinity_group) = anti_affinity_group {
-        let blocked_nodes = get_nodes_with_label_scheduled(
-            client.clone(),
-            ANTI_AFFINITY_LABEL,
-            anti_affinity_group,
-        )
-        .await?;
-        remove_nodes_in_maintenance(&mut candidates.items);
-        remove_candidate_nodes(&mut candidates.items, &blocked_nodes);
+    // Remove nodes in maintenance
+    remove_nodes_in_maintenance(&mut candidates.items);
+
+    // Remove a node we are migrating away from (most of then same as a node in maintenance)
+    if let Some(source_node) = vm.annotations().get(MIGRATION_REQUEST_ANNOTATION) {
+        remove_candidate_nodes(&mut candidates.items, &vec![source_node.clone()])
+    }
+
+    if !ignore_affinity {
+        // Remove nodes that already have VMs in the same anti-affinity group
+        let labels = vm.labels();
+        let anti_affinity_group = labels.get(ANTI_AFFINITY_LABEL);
+        if let Some(anti_affinity_group) = anti_affinity_group {
+            let blocked_nodes = get_nodes_with_label_scheduled(
+                client.clone(),
+                ANTI_AFFINITY_LABEL,
+                anti_affinity_group,
+            )
+            .await?;
+            remove_candidate_nodes(&mut candidates.items, &blocked_nodes);
+        }
     }
 
     if let Some(node) = candidates.items.choose(&mut rand::thread_rng()) {
