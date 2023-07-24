@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::time::Duration;
 use virt::domain::Domain;
 
+pub const FINALIZER: &str = "libvirt-host";
 pub const LIBVIRT_URI: &str = "qemu:///system";
 const NO_BW_LIMIT: u64 = 0;
 
@@ -18,6 +19,8 @@ lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("libvirt-host");
 }
 
+/// Called when a VM assigned to us has been deleted from the API.
+/// Destroys libvirt VM locally if present and unregisters the finalizer
 pub async fn handle_delete(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, Error> {
     let mut vm = (*vm).clone();
     let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
@@ -33,16 +36,18 @@ pub async fn handle_delete(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Actio
             println!("Domain {vm_name} doesn't exist, ignoring");
         }
     };
-    vm.remove_finalizer("libvirt-host", ctx.kube.clone(), &FIELD_MANAGER)
+    vm.remove_finalizer(FINALIZER, ctx.kube.clone(), &FIELD_MANAGER)
         .await?;
 
     ok_no_requeue!()
 }
 
+/// Called when a VM has been assigned to us. Registers a finalizer and adds a libvirt VM
+/// locally
 pub async fn handle_add(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, Error> {
     let mut vm = (*vm).clone();
     let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
-    vm.ensure_finalizer("libvirt-host", ctx.kube.clone(), &FIELD_MANAGER)
+    vm.ensure_finalizer(FINALIZER, ctx.kube.clone(), &FIELD_MANAGER)
         .await?;
 
     // Get cluster capabilities / definition
@@ -60,6 +65,8 @@ pub async fn handle_add(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, 
     ok_and_requeue!(600)
 }
 
+/// A VM that is running on us has been scheduled for migration to another node. Start a live
+/// libvirt migration to new host and wait
 pub async fn handle_outbound_migration(
     vm: &VirtualMachine,
     ctx: Arc<State>,
@@ -79,6 +86,8 @@ pub async fn handle_outbound_migration(
     ok_and_requeue!(10)
 }
 
+/// A VM that is running somewhere else has been scheduled for a migration to us. Wait for the
+/// migration to complete and
 pub async fn handle_inbound_migration(
     vm: &VirtualMachine,
     ctx: Arc<State>,
