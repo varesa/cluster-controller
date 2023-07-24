@@ -4,6 +4,7 @@ use crate::cluster::libvirt::utils::{fill_nics, fill_uuid};
 use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
 use crate::utils::extend_traits::{ExtendResource, TryStatus};
+use crate::utils::strings::field_manager;
 use crate::{create_controller, ok_and_requeue};
 use futures::StreamExt;
 use kube::runtime::controller::{Action, Controller};
@@ -20,6 +21,7 @@ struct State {
 }
 
 lazy_static! {
+    static ref FIELD_MANAGER: String = field_manager("libvirt.vm");
     static ref SCHEDULE_MUTEX: Mutex<()> = Mutex::new(());
 }
 
@@ -59,7 +61,13 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
     let mut status = vm.try_status()?.clone();
     let migration_required =
         if let Some(node_to_leave) = vm.annotations().get(MIGRATION_REQUEST_ANNOTATION) {
-            status.node.as_ref() == Some(node_to_leave)
+            if status.node.as_ref() == Some(node_to_leave) {
+                true
+            } else {
+                vm.annotations_mut().remove(MIGRATION_REQUEST_ANNOTATION);
+                vm.commit(client.clone(), &FIELD_MANAGER).await?;
+                false
+            }
         } else {
             false
         };
