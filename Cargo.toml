@@ -29,7 +29,7 @@ tempfile = "3.1.0"
 futures = "0.3.5"
 thiserror = "1.0.22"
 humanize-rs = "0.1.5"
-askama = "0.8"
+askama = "0.12"
 sha2 = "0.9.3"
 uuid = { version = "0.8", features = ["v4"] }
 regex = "1.5.4"
@@ -38,6 +38,7 @@ ipnet = "2.4.0"
 rand = "0.8.5"
 log = "0.4.17"
 pretty_env_logger = "0.4.0"
+async-trait = "0.1.72"
 
 # ceph
 libc = "0.2.82"
@@ -50,4 +51,3 @@ virt = { git = "https://github.com/varesa/libvirt-rust.git", branch = "hack" }
 # metadata proxy
 nix = "0.24.2"
 warp = "0.3.2"
-async-trait = "0.1.72"
