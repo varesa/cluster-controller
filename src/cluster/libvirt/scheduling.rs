@@ -8,6 +8,7 @@ use rand::seq::SliceRandom;
 
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
+use crate::utils::extend_traits::{ExtendResource, TryStatus};
 
 /// Find all VMs registered to the k8s apiserver with the given label set to the given value
 async fn get_vms_with_label(
@@ -22,6 +23,73 @@ async fn get_vms_with_label(
     };
     let conflicting_vms = vm_api.list(&list_params).await?;
     Ok(conflicting_vms.items)
+}
+
+/// Return all VMs except self in the same anti-affinity group as the given VM
+async fn get_others_in_affinity_group(
+    client: Client,
+    ref_vm: &VirtualMachine,
+) -> Result<Vec<VirtualMachine>, Error> {
+    let maybe_group = ref_vm.labels().get(ANTI_AFFINITY_LABEL);
+    if let Some(group) = maybe_group {
+        let mut vms = get_vms_with_label(client, ANTI_AFFINITY_LABEL, group).await?;
+        vms.retain(|vm| vm.name_prefixed_with_namespace() != ref_vm.name_prefixed_with_namespace());
+        Ok(vms)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+/// Check for compliance with anti-affinity groups
+pub async fn is_uncompliant(vm: &VirtualMachine, client: Client) -> Result<bool, Error> {
+    let status = vm.try_status()?.clone();
+
+    if status.scheduled {
+        let anti_affinity_members = get_others_in_affinity_group(client.clone(), vm).await?;
+        let uncompliant = anti_affinity_members.iter().any(|other_vm| {
+            let mynode = vm.status.as_ref().and_then(|status| status.node.as_ref());
+            let othernode = other_vm
+                .status
+                .as_ref()
+                .and_then(|status| status.node.as_ref());
+
+            mynode.is_some() && mynode == othernode
+        });
+
+        return Ok(uncompliant);
+    }
+
+    Ok(false)
+}
+
+/// Check if the VM has the annotation signaling a migration request set, and if it's value
+/// corresponds to the current node. If the annotation is present, but points to another node
+/// (e.g. post-migration state), ignore it.
+pub fn migration_requested(vm: &VirtualMachine) -> bool {
+    let current_node = get_vm_node(vm);
+
+    if let Some(node_to_leave) = vm.annotations().get(MIGRATION_REQUEST_ANNOTATION) {
+        current_node == Some(node_to_leave.clone())
+    } else {
+        false
+    }
+}
+
+/// Checks if the VM has the annotation signaling a migration request set, and if it points to some
+/// other node as a result of a completed migration. Clear the label in that case.
+pub async fn clear_successful_migration(
+    vm: &mut VirtualMachine,
+    client: Client,
+    field_manager: &str,
+) -> Result<(), Error> {
+    let current_node = get_vm_node(vm);
+    if let Some(node_to_leave) = vm.annotations().get(MIGRATION_REQUEST_ANNOTATION) {
+        if current_node != Some(node_to_leave.clone()) {
+            vm.annotations_mut().remove(MIGRATION_REQUEST_ANNOTATION);
+            vm.commit(client.clone(), field_manager).await?;
+        }
+    }
+    Ok(())
 }
 
 /// Try to return the node the VM is scheduled to run on.
@@ -57,6 +125,11 @@ fn remove_nodes_in_maintenance(candidates: &mut Vec<Node>) {
 
 const ANTI_AFFINITY_LABEL: &str = "antiAffinity";
 
+/// Try to schedule the VM to some node according to rules. Returns either a node-object, or an
+/// Error if no node meets the requirements.
+///
+/// ignore_affinity allows temporarily bypassing anti-affinity rules which can be useful in case
+/// of e.g. host maintenance
 pub(crate) async fn schedule(
     vm: &VirtualMachine,
     ignore_affinity: bool,

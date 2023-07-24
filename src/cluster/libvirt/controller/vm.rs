@@ -1,5 +1,7 @@
-use crate::cluster::libvirt::controller::MIGRATION_REQUEST_ANNOTATION;
 use crate::cluster::libvirt::scheduling;
+use crate::cluster::libvirt::scheduling::{
+    clear_successful_migration, is_uncompliant, migration_requested,
+};
 use crate::cluster::libvirt::utils::{fill_nics, fill_uuid};
 use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
@@ -8,7 +10,7 @@ use crate::utils::strings::field_manager;
 use crate::{create_controller, ok_and_requeue};
 use futures::StreamExt;
 use kube::runtime::controller::{Action, Controller};
-use kube::{api::Api, Client, ResourceExt};
+use kube::{api::Api, Client};
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -59,24 +61,21 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
     fill_uuid(&mut vm, client.clone()).await?;
 
     let mut status = vm.try_status()?.clone();
-    let migration_required =
-        if let Some(node_to_leave) = vm.annotations().get(MIGRATION_REQUEST_ANNOTATION) {
-            if status.node.as_ref() == Some(node_to_leave) {
-                true
-            } else {
-                vm.annotations_mut().remove(MIGRATION_REQUEST_ANNOTATION);
-                vm.commit(client.clone(), &FIELD_MANAGER).await?;
-                false
-            }
-        } else {
-            false
-        };
 
-    if !status.scheduled || migration_required {
+    // Check if we have a pending migration request
+    let migration_required = migration_requested(&vm);
+
+    // Check if we are non-compliant with anti-affinity groups
+    let reschedule_required = is_uncompliant(&vm, client.clone()).await?;
+
+    if !status.scheduled || migration_required || reschedule_required {
         let _mutex = SCHEDULE_MUTEX.lock().await;
         println!("libvirt: Acquired mutex to schedule: {}", name);
 
+        // Schedule normally
         let schedule_result = scheduling::schedule(&vm, false, client.clone()).await;
+        // If scheduling failed and we have requested a migration, allow bypassing of affinity
+        // so that we can temporarily remove a hypervisor when N(affinity group) == N(hypervisors)
         let node = if migration_required && schedule_result.is_err() {
             scheduling::schedule(&vm, true, client.clone()).await?
         } else {
@@ -92,6 +91,8 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
         // Status must be updated before we release the scheduling mutex
         set_vm_status(&vm, status, client.clone()).await?;
     }
+
+    clear_successful_migration(&mut vm, client.clone(), &FIELD_MANAGER).await?;
 
     println!("libvirt: updated: {}", name);
     ok_and_requeue!(600)
