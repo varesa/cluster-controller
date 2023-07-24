@@ -6,6 +6,7 @@ use kube::{
     api::{Api, PostParams},
     Client, Resource, ResourceExt,
 };
+use lazy_static::lazy_static;
 use serde_json::json;
 use tokio::time::Duration;
 
@@ -23,7 +24,12 @@ use crate::crd::ovn::{
 use crate::errors::Error;
 use crate::metadataservice::deployment::deploy as deploy_mds;
 use crate::utils::extend_traits::ExtendResource;
+use crate::utils::strings::field_manager;
 use crate::{create_controller, create_set_status, ok_and_requeue, ok_no_requeue};
+
+lazy_static! {
+    static ref FIELD_MANAGER: String = field_manager("ovn");
+}
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -130,13 +136,13 @@ async fn reconcile_network(network: Arc<Network>, ctx: Arc<State>) -> Result<Act
         println!("ovn: Network {} waiting for deletion", name);
         delete_network(&name)?;
         network
-            .remove_finalizer("ovn", client, "cluster-controller.ovn")
+            .remove_finalizer("ovn", client, &FIELD_MANAGER)
             .await?;
         println!("ovn: Network {} deleted", name);
     } else {
         println!("ovn: update for network {name}");
         network
-            .ensure_finalizer("ovn", client.clone(), "cluster-controller.ovn")
+            .ensure_finalizer("ovn", client.clone(), &FIELD_MANAGER)
             .await?;
         LogicalSwitch::create_if_missing(ovn, &name)?;
         if let Some(dhcp_options) = network.spec.dhcp.as_ref() {
@@ -223,12 +229,11 @@ async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action
             println!("ovn: disconnecting NIC {index} for VM {name}");
             disconnect_vm_nic(&vm, nic)?;
         }
-        vm.remove_finalizer("ovn", client, "cluster-controller.ovn")
-            .await?;
+        vm.remove_finalizer("ovn", client, &FIELD_MANAGER).await?;
         ok_no_requeue!()
     } else {
         println!("ovn: VM {name} updated");
-        vm.ensure_finalizer("ovn", client.clone(), "cluster-controller.ovn")
+        vm.ensure_finalizer("ovn", client.clone(), &FIELD_MANAGER)
             .await?;
         let mut ip_addresses: Vec<String> = Vec::new();
         for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
@@ -274,13 +279,13 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
         println!("ovn: Router {} waiting for deletion", name);
         delete_router(&name)?;
         router
-            .remove_finalizer("ovn", client, "cluster-controller.ovn")
+            .remove_finalizer("ovn", client, &FIELD_MANAGER)
             .await?;
         println!("ovn: Router {} deleted", name);
     } else {
         println!("ovn: update for router {name}");
         router
-            .ensure_finalizer("ovn", client.clone(), "cluster-controller.ovn")
+            .ensure_finalizer("ovn", client.clone(), &FIELD_MANAGER)
             .await?;
 
         let mut lr = LogicalRouter::create_if_missing(ovn, &name)?;

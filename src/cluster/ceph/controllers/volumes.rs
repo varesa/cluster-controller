@@ -7,6 +7,7 @@ use kube::{
     error::ErrorResponse,
     Client,
 };
+use lazy_static::lazy_static;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::time::Duration;
@@ -16,11 +17,16 @@ use crate::create_controller;
 use crate::errors::Error;
 use crate::shared::ceph::lowlevel;
 use crate::utils::extend_traits::ExtendResource;
+use crate::utils::strings::field_manager;
 use crate::{KEYRING_SECRET, NAMESPACE};
 
 const POOL_VOLUMES: &str = "volumes";
 const POOL_TEMPLATES: &str = "templates";
 const KEYRING: &str = "client.libvirt";
+
+lazy_static! {
+    static ref FIELD_MANAGER: String = field_manager("ceph");
+}
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -138,13 +144,13 @@ async fn reconcile(volume: Arc<Volume>, ctx: Arc<State>) -> Result<Action, Error
         println!("ceph: Volume {name} waiting for deletion");
         ensure_removed(&name)?;
         volume
-            .remove_finalizer("ceph", ctx.client.clone(), "cluster-controller.ceph")
+            .remove_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
             .await?;
         println!("ceph: Volume {name} deleted");
     } else {
         println!("ceph: Volume {name} updated");
         volume
-            .ensure_finalizer("ceph", ctx.client.clone(), "cluster-controller.ceph")
+            .ensure_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
             .await?;
         ensure_exists(&name, bytes, template)?;
         println!("ceph: Volume {name} update success");

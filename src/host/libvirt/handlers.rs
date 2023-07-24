@@ -2,15 +2,21 @@ use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::host::libvirt::controller::State;
 use crate::host::libvirt::utils::{get_cluster, get_domain_name};
 use crate::utils::extend_traits::{ExtendResource, TryStatus};
+use crate::utils::strings::field_manager;
 use crate::Error;
 use crate::{ok_and_requeue, ok_no_requeue};
 use kube::runtime::controller::Action;
+use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::time::Duration;
 use virt::domain::Domain;
 
 pub const LIBVIRT_URI: &str = "qemu:///system";
 const NO_BW_LIMIT: u64 = 0;
+
+lazy_static! {
+    static ref FIELD_MANAGER: String = field_manager("libvirt-host");
+}
 
 pub async fn handle_delete(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, Error> {
     let mut vm = (*vm).clone();
@@ -27,12 +33,8 @@ pub async fn handle_delete(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Actio
             println!("Domain {vm_name} doesn't exist, ignoring");
         }
     };
-    vm.remove_finalizer(
-        "libvirt-host",
-        ctx.kube.clone(),
-        "cluster-manager.libvirt-host",
-    )
-    .await?;
+    vm.remove_finalizer("libvirt-host", ctx.kube.clone(), &FIELD_MANAGER)
+        .await?;
 
     ok_no_requeue!()
 }
@@ -40,12 +42,8 @@ pub async fn handle_delete(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Actio
 pub async fn handle_add(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, Error> {
     let mut vm = (*vm).clone();
     let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
-    vm.ensure_finalizer(
-        "libvirt-host",
-        ctx.kube.clone(),
-        "cluster-controller.libvirt-host",
-    )
-    .await?;
+    vm.ensure_finalizer("libvirt-host", ctx.kube.clone(), &FIELD_MANAGER)
+        .await?;
 
     // Get cluster capabilities / definition
     let cluster = get_cluster(&ctx).await?;
