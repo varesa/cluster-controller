@@ -60,7 +60,7 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<State>) -> Result<Action, Error> {
     ok_and_requeue!(600)
 }
 
-fn error_policy(_error: &Error, _ctx: Arc<State>) -> Action {
+fn error_policy(_object: Arc<Node>, _error: &Error, _ctx: Arc<State>) -> Action {
     Action::requeue(Duration::from_secs(15))
 }
 

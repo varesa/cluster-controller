@@ -1,9 +1,6 @@
 use futures::StreamExt;
 use kube::runtime::controller::{Action, Controller};
-use kube::{
-    api::{Api, ListParams},
-    Client,
-};
+use kube::{api::Api, Client};
 use std::env;
 use std::sync::Arc;
 use tokio::time::Duration;
@@ -99,7 +96,7 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
     }
 }
 
-fn error_policy(_error: &Error, _ctx: Arc<State>) -> Action {
+fn error_policy(_object: Arc<VirtualMachine>, _error: &Error, _ctx: Arc<State>) -> Action {
     Action::requeue(Duration::from_secs(15))
 }
 

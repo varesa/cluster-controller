@@ -3,7 +3,7 @@ use humanize_rs::bytes::Bytes;
 use k8s_openapi::api::core::v1::Secret;
 use kube::runtime::controller::{Action, Controller};
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams},
+    api::{Api, Patch, PatchParams},
     error::ErrorResponse,
     Client,
 };
@@ -154,7 +154,7 @@ async fn reconcile(volume: Arc<Volume>, ctx: Arc<State>) -> Result<Action, Error
     Ok(Action::requeue(Duration::from_secs(600)))
 }
 
-fn error_policy(_error: &Error, _ctx: Arc<State>) -> Action {
+fn error_policy(_object: Arc<Volume>, _error: &Error, _ctx: Arc<State>) -> Action {
     Action::requeue(Duration::from_secs(15))
 }
 

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures::StreamExt;
 use kube::runtime::controller::{Action, Controller};
 use kube::{
-    api::{Api, ListParams, PostParams},
+    api::{Api, PostParams},
     Client, Resource, ResourceExt,
 };
 use serde_json::json;
@@ -323,7 +323,7 @@ async fn connect_metadataservice(lr: &mut LogicalRouter) -> Result<(), Error> {
     Ok(())
 }
 
-fn error_policy(_error: &Error, _ctx: Arc<State>) -> Action {
+fn error_policy<T>(_object: Arc<T>, _error: &Error, _ctx: Arc<State>) -> Action {
     Action::requeue(Duration::from_secs(15))
 }
 
