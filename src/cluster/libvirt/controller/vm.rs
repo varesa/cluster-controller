@@ -1,3 +1,4 @@
+use crate::cluster::libvirt::controller::MIGRATION_REQUEST_ANNOTATION;
 use crate::cluster::libvirt::scheduling;
 use crate::cluster::libvirt::utils::{fill_nics, fill_uuid};
 use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
@@ -6,7 +7,7 @@ use crate::utils::{name_namespaced, TryStatus};
 use crate::{create_controller, ok_and_requeue};
 use futures::StreamExt;
 use kube::runtime::controller::{Action, Controller};
-use kube::{api::Api, Client};
+use kube::{api::Api, Client, ResourceExt};
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -56,14 +57,24 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
     fill_uuid(&mut vm, client.clone()).await?;
 
     let mut status = vm.try_status()?.clone();
+    let migration_required =
+        if let Some(node_to_leave) = vm.annotations().get(MIGRATION_REQUEST_ANNOTATION) {
+            status.node.as_ref() == Some(node_to_leave)
+        } else {
+            false
+        };
 
-    if !status.scheduled {
+    if !status.scheduled || migration_required {
         let _mutex = SCHEDULE_MUTEX.lock().await;
         println!("libvirt: Acquired mutex to schedule: {}", name);
 
         let node = scheduling::schedule(&vm, client.clone()).await?;
         status.node = Some(node.metadata.name.expect("Unknown node name"));
         status.scheduled = true;
+
+        if migration_required {
+            status.migration_pending = true;
+        }
 
         // Status must be updated before we release the scheduling mutex
         set_vm_status(&vm, status, client.clone()).await?;

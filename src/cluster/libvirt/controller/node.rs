@@ -8,6 +8,7 @@ use kube::{
 use std::sync::Arc;
 use tokio::time::Duration;
 
+use crate::cluster::libvirt::controller::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
 use crate::utils::{ExtendResource, TryStatus};
@@ -19,9 +20,6 @@ struct State {
     client: Client,
 }
 
-const MAINTENANCE_ANNOTATION: &str = "cluster-virt.acl.fi/maintenance";
-const MIGRATION_REQUEST_ANNOTATION: &str = "cluster-virt.acl.fi/migration-required";
-
 async fn request_reschedule_node_vms(node: &Node, client: Client) -> Result<(), Error> {
     let vms: Api<VirtualMachine> = Api::all(client.clone());
     if let Ok(mut list) = vms.list(&ListParams::default()).await {
@@ -30,7 +28,7 @@ async fn request_reschedule_node_vms(node: &Node, client: Client) -> Result<(), 
                 if scheduled_node == &node.name_unchecked() {
                     vm.annotations_mut().insert(
                         String::from(MIGRATION_REQUEST_ANNOTATION),
-                        String::from("true"),
+                        node.name_unchecked(),
                     );
                     vm.commit(client.clone(), "cluster-manager.libvirt.node")
                         .await?;

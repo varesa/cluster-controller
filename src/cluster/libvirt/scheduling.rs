@@ -1,3 +1,4 @@
+use crate::cluster::libvirt::controller::MAINTENANCE_ANNOTATION;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
     api::{Api, ListParams, ResourceExt},
@@ -47,6 +48,13 @@ fn remove_candidate_nodes(candidates: &mut Vec<Node>, nodes_to_remove: &Vec<Stri
     }
 }
 
+/// Remove all nodes which have the maintenance annotation set
+fn remove_nodes_in_maintenance(candidates: &mut Vec<Node>) {
+    candidates.retain(|candidate| {
+        candidate.annotations().get(MAINTENANCE_ANNOTATION) != Some(&String::from("true"))
+    });
+}
+
 const ANTI_AFFINITY_LABEL: &str = "antiAffinity";
 
 pub(crate) async fn schedule(vm: &VirtualMachine, client: Client) -> Result<Node, Error> {
@@ -62,6 +70,7 @@ pub(crate) async fn schedule(vm: &VirtualMachine, client: Client) -> Result<Node
             anti_affinity_group,
         )
         .await?;
+        remove_nodes_in_maintenance(&mut candidates.items);
         remove_candidate_nodes(&mut candidates.items, &blocked_nodes);
     }
 
