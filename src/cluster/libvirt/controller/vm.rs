@@ -3,8 +3,7 @@ use crate::cluster::libvirt::scheduling;
 use crate::cluster::libvirt::utils::{fill_nics, fill_uuid};
 use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
-use crate::utils::extend_traits::TryStatus;
-use crate::utils::strings::name_namespaced;
+use crate::utils::extend_traits::{ExtendResource, TryStatus};
 use crate::{create_controller, ok_and_requeue};
 use futures::StreamExt;
 use kube::runtime::controller::{Action, Controller};
@@ -28,7 +27,7 @@ lazy_static! {
 async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, Error> {
     let client = ctx.client.clone();
     let mut vm = vm.as_ref().to_owned();
-    let name = name_namespaced(&vm);
+    let name = vm.name_prefixed_with_namespace();
     println!("libvirt: beginning to reconcile: {}", name);
 
     if vm.metadata.deletion_timestamp.is_some() {

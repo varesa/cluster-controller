@@ -1,7 +1,6 @@
 use crate::crd::libvirt::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
 use crate::utils::extend_traits::{ExtendResource, TryStatus};
-use crate::utils::strings::name_namespaced;
 use kube::Client;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -44,7 +43,7 @@ fn find_matching_network<'a>(
 /// For every network in the VM spec, add MAC addresses and OVN port IDs where necessary and not
 /// specified. Save the extra information in the status subresource
 pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
-    let vm_name = name_namespaced(vm);
+    let vm_name = vm.name_prefixed_with_namespace();
 
     let status_networks = vm.try_status()?.networks.clone();
     let mut new_status_networks = Vec::new();

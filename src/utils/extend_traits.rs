@@ -41,6 +41,8 @@ pub trait ExtendResource {
         client: Client,
         field_manager: &str,
     ) -> Result<(), Error>;
+    fn namespace_unchecked(&self) -> String;
+    fn name_prefixed_with_namespace(&self) -> String;
 }
 
 #[async_trait]
@@ -123,5 +125,16 @@ where
             self.commit(client, field_manager).await?;
         }
         Ok(())
+    }
+
+    fn namespace_unchecked(&self) -> String {
+        self.meta()
+            .namespace
+            .clone()
+            .expect(".metadata.namespace missing")
+    }
+
+    fn name_prefixed_with_namespace(&self) -> String {
+        format!("{}-{}", self.namespace_unchecked(), self.name_unchecked())
     }
 }

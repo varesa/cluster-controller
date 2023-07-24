@@ -23,7 +23,6 @@ use crate::crd::ovn::{
 use crate::errors::Error;
 use crate::metadataservice::deployment::deploy as deploy_mds;
 use crate::utils::extend_traits::ExtendResource;
-use crate::utils::strings::name_namespaced;
 use crate::{create_controller, create_set_status, ok_and_requeue, ok_no_requeue};
 
 /// State available for the reconcile and error_policy functions
@@ -102,7 +101,7 @@ fn ensure_router_attachment(
     let lr_name = format!("{}-{}", &namespace, &name);
     let mut lr = LogicalRouter::get_by_name(ovn.clone(), &lr_name)?;
 
-    let ls_name = name_namespaced(network);
+    let ls_name = network.name_prefixed_with_namespace();
     let mut ls = LogicalSwitch::get_by_name(ovn, &ls_name)?;
 
     connect_router_to_ls(&mut lr, &mut ls, &router_attachment.address)?;
@@ -125,7 +124,7 @@ async fn reconcile_network(network: Arc<Network>, ctx: Arc<State>) -> Result<Act
     let mut network = (*network).clone();
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let client = ctx.client.clone();
-    let name = name_namespaced(&network);
+    let name = network.name_prefixed_with_namespace();
 
     if network.metadata.deletion_timestamp.is_some() {
         println!("ovn: Network {} waiting for deletion", name);
@@ -215,7 +214,7 @@ fn get_vm_ovn_nics(vm: &VirtualMachine) -> Vec<NetworkAttachment> {
 /// Handle updates to VMs in the cluster
 async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, Error> {
     let mut vm = (*vm).clone();
-    let name = name_namespaced(&vm);
+    let name = vm.name_prefixed_with_namespace();
     let client = ctx.client.clone();
 
     if vm.metadata.deletion_timestamp.is_some() {
@@ -269,7 +268,7 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
         .as_ref()
         .expect("get router namespace")
         .clone();
-    let name = name_namespaced(&router);
+    let name = router.name_prefixed_with_namespace();
 
     if router.metadata.deletion_timestamp.is_some() {
         println!("ovn: Router {} waiting for deletion", name);

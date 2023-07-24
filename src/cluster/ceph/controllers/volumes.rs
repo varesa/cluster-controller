@@ -16,7 +16,6 @@ use crate::create_controller;
 use crate::errors::Error;
 use crate::shared::ceph::lowlevel;
 use crate::utils::extend_traits::ExtendResource;
-use crate::utils::strings::name_namespaced;
 use crate::{KEYRING_SECRET, NAMESPACE};
 
 const POOL_VOLUMES: &str = "volumes";
@@ -131,7 +130,7 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
 /// Handle updates to volumes in the cluster
 async fn reconcile(volume: Arc<Volume>, ctx: Arc<State>) -> Result<Action, Error> {
     let mut volume = (*volume).clone();
-    let name = name_namespaced(&volume);
+    let name = volume.name_prefixed_with_namespace();
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
     let template = volume.spec.template.clone();
 
