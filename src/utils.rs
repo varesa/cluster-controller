@@ -1,11 +1,15 @@
+use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Namespace;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+use kube::api::PostParams;
 use kube::core::object::HasStatus;
 use kube::{
     api::{ListParams, Resource, WatchEvent},
     Api, Client, CustomResourceExt, ResourceExt,
 };
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 use crate::errors::Error;
 
@@ -207,24 +211,6 @@ macro_rules! client_remove_finalizer {
 }
 
 #[macro_export]
-macro_rules! client_add_annotation {
-    ($client:expr, $resource_type:ident, $resource:expr, $annotation_name:expr, $annotation_value:expr) => {
-        let namespace = $resource
-            .metadata
-            .namespace
-            .as_ref()
-            .expect("Unable to get namespace");
-        let api: Api<$resource_type> = Api::namespaced($client.clone(), &namespace);
-
-        let mut new_resource = $resource.to_owned();
-        new_resource
-            .annotations_mut()
-            .insert($annotation_name, $annotation_value);
-        api_replace_resource!(api, &new_resource);
-    };
-}
-
-#[macro_export]
 macro_rules! ok_and_requeue {
     ($duration:expr) => {
         Ok(Action::requeue(Duration::from_secs($duration)))
@@ -257,5 +243,36 @@ impl<T: HasStatus + ResourceExt + CustomResourceExt> TryStatus for T {
             self.name_any(),
             self.namespace().unwrap_or(String::from("<no namespace>")),
         )))
+    }
+}
+
+#[async_trait]
+pub trait ExtendResource {
+    async fn commit(&mut self, client: Client, field_manager: &str) -> Result<(), Error>;
+}
+
+#[async_trait]
+impl<T> ExtendResource for T
+where
+    for<'a> T: Clone + Debug + Deserialize<'a> + Resource + ResourceExt + Serialize + Sync + Send,
+    <T as Resource>::DynamicType: Default,
+{
+    async fn commit(&mut self, client: Client, field_manager: &str) -> Result<(), Error> {
+        let api: Api<Self> = if let Some(namespace) = self.namespace() {
+            Api::namespaced(client, &namespace)
+        } else {
+            Api::all(client)
+        };
+
+        api.replace(
+            &self.name_unchecked(),
+            &PostParams {
+                dry_run: false,
+                field_manager: Some(String::from(field_manager)),
+            },
+            self,
+        )
+        .await?;
+        Ok(())
     }
 }

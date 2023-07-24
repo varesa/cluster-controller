@@ -2,7 +2,7 @@ use futures::StreamExt;
 use k8s_openapi::api::core::v1::Node;
 use kube::runtime::controller::{Action, Controller};
 use kube::{
-    api::{Api, ListParams, PostParams},
+    api::{Api, ListParams},
     Client, ResourceExt,
 };
 use std::sync::Arc;
@@ -10,8 +10,8 @@ use tokio::time::Duration;
 
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
-use crate::utils::TryStatus;
-use crate::{api_replace_resource, client_add_annotation, create_controller, ok_and_requeue};
+use crate::utils::{ExtendResource, TryStatus};
+use crate::{create_controller, ok_and_requeue};
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -24,17 +24,16 @@ const MIGRATION_REQUEST_ANNOTATION: &str = "cluster-virt.acl.fi/migration-requir
 
 async fn request_reschedule_node_vms(node: &Node, client: Client) -> Result<(), Error> {
     let vms: Api<VirtualMachine> = Api::all(client.clone());
-    if let Ok(list) = vms.list(&ListParams::default()).await {
-        for vm in list {
+    if let Ok(mut list) = vms.list(&ListParams::default()).await {
+        for vm in list.iter_mut() {
             if let Some(scheduled_node) = &vm.try_status()?.node {
                 if scheduled_node == &node.name_unchecked() {
-                    client_add_annotation!(
-                        client,
-                        VirtualMachine,
-                        vm,
+                    vm.annotations_mut().insert(
                         String::from(MIGRATION_REQUEST_ANNOTATION),
-                        String::from("true")
+                        String::from("true"),
                     );
+                    vm.commit(client.clone(), "cluster-manager.libvirt.node")
+                        .await?;
                 }
             }
         }
