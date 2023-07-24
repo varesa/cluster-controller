@@ -63,7 +63,7 @@ async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
             } else if nic_status.ovn_id.is_none() {
                 nic_status.ovn_id = Some(
                     Uuid::new_v4()
-                        .to_hyphenated()
+                        .hyphenated()
                         .encode_lower(&mut Uuid::encode_buffer())
                         .into(),
                 );
@@ -86,7 +86,7 @@ async fn fill_uuid(vm: &mut VirtualMachine, client: Client) -> Result<(), Error>
     if vm.spec.uuid.is_none() {
         vm.spec.uuid = Some(
             Uuid::new_v4()
-                .to_hyphenated()
+                .hyphenated()
                 .encode_lower(&mut Uuid::encode_buffer())
                 .into(),
         );

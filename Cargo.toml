@@ -19,7 +19,7 @@ k8s-openapi = { version = "0.18.0", default-features = false, features = ["v1_24
 # serialization
 serde = "1.0.174"
 serde_json = "1.0.103"
-serde_yaml = "0.8.26"
+serde_yaml = "0.9.25"
 serde_derive = "1.0.174"
 schemars = "0.8.12"
 
@@ -30,14 +30,14 @@ futures = "0.3.28"
 thiserror = "1.0.44"
 humanize-rs = "0.1.5"
 askama = "0.12"
-sha2 = "0.9.9"
-uuid = { version = "0.8", features = ["v4"] }
+sha2 = "0.10.7"
+uuid = { version = "1.4", features = ["v4"] }
 regex = "1.9.1"
 lazy_static = "1.4.0"
 ipnet = "2.8.0"
 rand = "0.8.5"
 log = "0.4.19"
-pretty_env_logger = "0.4.0"
+pretty_env_logger = "0.5.0"
 async-trait = "0.1.72"
 
 # ceph
@@ -49,5 +49,5 @@ librbd-sys = "0.1.0"
 virt = { git = "https://github.com/varesa/libvirt-rust.git", branch = "hack" }
 
 # metadata proxy
-nix = "0.24.3"
+nix = "0.26.2"
 warp = "0.3.5"
