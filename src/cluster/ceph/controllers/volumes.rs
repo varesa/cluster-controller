@@ -3,7 +3,7 @@ use humanize_rs::bytes::Bytes;
 use k8s_openapi::api::core::v1::Secret;
 use kube::runtime::controller::{Action, Controller};
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, PostParams},
+    api::{Api, ListParams, Patch, PatchParams},
     error::ErrorResponse,
     Client,
 };
@@ -12,14 +12,12 @@ use std::sync::Arc;
 use tokio::time::Duration;
 
 use crate::crd::ceph::Volume;
+use crate::create_controller;
 use crate::errors::Error;
 use crate::shared::ceph::lowlevel;
 use crate::utils::name_namespaced;
-use crate::{
-    api_replace_resource, client_ensure_finalizer, resource_has_finalizer, GROUP_NAME,
-    KEYRING_SECRET, NAMESPACE,
-};
-use crate::{client_remove_finalizer, create_controller};
+use crate::utils::ExtendResource;
+use crate::{KEYRING_SECRET, NAMESPACE};
 
 const POOL_VOLUMES: &str = "volumes";
 const POOL_TEMPLATES: &str = "templates";
@@ -132,18 +130,23 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
 
 /// Handle updates to volumes in the cluster
 async fn reconcile(volume: Arc<Volume>, ctx: Arc<State>) -> Result<Action, Error> {
-    let name = name_namespaced(volume.as_ref());
+    let mut volume = (*volume).clone();
+    let name = name_namespaced(&volume);
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
     let template = volume.spec.template.clone();
 
     if volume.metadata.deletion_timestamp.is_some() {
         println!("ceph: Volume {name} waiting for deletion");
         ensure_removed(&name)?;
-        client_remove_finalizer!(ctx.client.clone(), Volume, volume.as_ref(), "ceph");
+        volume
+            .remove_finalizer("ceph", ctx.client.clone(), "cluster-controller.ceph")
+            .await?;
         println!("ceph: Volume {name} deleted");
     } else {
         println!("ceph: Volume {name} updated");
-        client_ensure_finalizer!(ctx.client.clone(), Volume, volume.as_ref(), "ceph");
+        volume
+            .ensure_finalizer("ceph", ctx.client.clone(), "cluster-controller.ceph")
+            .await?;
         ensure_exists(&name, bytes, template)?;
         println!("ceph: Volume {name} update success");
     }

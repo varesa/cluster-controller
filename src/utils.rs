@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 use crate::errors::Error;
+use crate::GROUP_NAME;
 
 pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) -> Result<(), Error> {
     if crds.get(name).await.is_ok() {
@@ -126,7 +127,7 @@ macro_rules! api_replace_resource {
     ($api:expr, $resource:expr) => {
         $api.replace(
             &$resource.metadata.name.as_ref().expect("get resource name"),
-            &PostParams::default(),
+            &kube::api::PostParams::default(),
             $resource,
         )
         .await?;
@@ -145,68 +146,6 @@ macro_rules! client_replace_resource {
                 .expect("get resource namespace"),
         );
         api_replace_resource!(api, $resource);
-    };
-}
-
-#[macro_export]
-macro_rules! resource_has_finalizer {
-    ($resource:expr, $finalizer_name:expr) => {
-        $resource
-            .metadata
-            .finalizers
-            .as_ref()
-            .and_then(|finalizers| {
-                finalizers
-                    .iter()
-                    .find(|&finalizer| finalizer == $finalizer_name)
-            })
-            .is_some()
-    };
-}
-
-#[macro_export]
-macro_rules! client_ensure_finalizer {
-    ($client:expr, $resource_type:ident, $resource:expr, $controller_name:expr) => {
-        let finalizer_name = format!("{}/{}", GROUP_NAME, $controller_name);
-        let namespace = $resource
-            .metadata
-            .namespace
-            .as_ref()
-            .expect("Unable to get namespace");
-        let api: Api<$resource_type> = Api::namespaced($client.clone(), &namespace);
-
-        #[allow(clippy::needless_borrow)]
-        if !resource_has_finalizer!($resource, &finalizer_name) {
-            let mut new_resource = $resource.to_owned();
-            if let Some(finalizers) = new_resource.metadata.finalizers.as_mut() {
-                finalizers.push(finalizer_name);
-            } else {
-                new_resource.metadata.finalizers = Some(vec![finalizer_name]);
-            }
-            api_replace_resource!(api, &new_resource);
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! client_remove_finalizer {
-    ($client:expr, $resource_type:ident, $resource:expr, $controller_name:expr) => {
-        let finalizer_name = format!("{}/{}", GROUP_NAME, $controller_name);
-        let namespace = $resource
-            .metadata
-            .namespace
-            .as_ref()
-            .expect("Unable to get namespace");
-        let api: Api<$resource_type> = Api::namespaced($client.clone(), &namespace);
-
-        #[allow(clippy::needless_borrow)]
-        if resource_has_finalizer!($resource, &finalizer_name) {
-            let mut finalizers = $resource.metadata.finalizers.clone().unwrap();
-            finalizers.retain(|f| f != &finalizer_name);
-            let mut new_resource = $resource.to_owned();
-            new_resource.metadata.finalizers = Some(finalizers);
-            api_replace_resource!(api, &new_resource);
-        }
     };
 }
 
@@ -249,6 +188,19 @@ impl<T: HasStatus + ResourceExt + CustomResourceExt> TryStatus for T {
 #[async_trait]
 pub trait ExtendResource {
     async fn commit(&mut self, client: Client, field_manager: &str) -> Result<(), Error>;
+    fn has_finalizer(&self, finalizer_name: &str) -> bool;
+    async fn ensure_finalizer(
+        &mut self,
+        finalizer_name: &str,
+        client: Client,
+        field_manager: &str,
+    ) -> Result<(), Error>;
+    async fn remove_finalizer(
+        &mut self,
+        finalizer_name: &str,
+        client: Client,
+        field_manager: &str,
+    ) -> Result<(), Error>;
 }
 
 #[async_trait]
@@ -273,6 +225,56 @@ where
             self,
         )
         .await?;
+        Ok(())
+    }
+
+    fn has_finalizer(&self, finalizer_name: &str) -> bool {
+        self.meta()
+            .finalizers
+            .as_ref()
+            .and_then(|finalizers| {
+                finalizers
+                    .iter()
+                    .find(|&finalizer| finalizer == finalizer_name)
+            })
+            .is_some()
+    }
+
+    async fn ensure_finalizer(
+        &mut self,
+        finalizer_name: &str,
+        client: Client,
+        field_manager: &str,
+    ) -> Result<(), Error> {
+        let finalizer_name = format!("{}/{}", GROUP_NAME, finalizer_name);
+
+        if !self.has_finalizer(&finalizer_name) {
+            if let Some(finalizers) = self.meta_mut().finalizers.as_mut() {
+                finalizers.push(finalizer_name);
+            } else {
+                self.meta_mut().finalizers = Some(vec![finalizer_name]);
+            }
+            self.commit(client, field_manager).await?;
+        }
+        Ok(())
+    }
+
+    async fn remove_finalizer(
+        &mut self,
+        finalizer_name: &str,
+        client: Client,
+        field_manager: &str,
+    ) -> Result<(), Error> {
+        let finalizer_name = format!("{}/{}", GROUP_NAME, finalizer_name);
+
+        if self.has_finalizer(&finalizer_name) {
+            self.meta_mut()
+                .finalizers
+                .as_mut()
+                .unwrap()
+                .retain(|f| f != &finalizer_name);
+            self.commit(client, field_manager).await?;
+        }
         Ok(())
     }
 }

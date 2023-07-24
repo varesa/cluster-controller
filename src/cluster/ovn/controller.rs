@@ -9,6 +9,8 @@ use kube::{
 use serde_json::json;
 use tokio::time::Duration;
 
+use super::common::OvnNamed;
+use super::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
     common::OvnBasicActions, common::OvnNamedGetters, dhcpoptions::DhcpOptions,
     logicalrouter::LogicalRouter, logicalswitchport::LogicalSwitchPort, lowlevel::Ovn,
@@ -20,14 +22,8 @@ use crate::crd::ovn::{
 };
 use crate::errors::Error;
 use crate::metadataservice::deployment::deploy as deploy_mds;
-use crate::utils::name_namespaced;
-use crate::{
-    api_replace_resource, client_ensure_finalizer, client_remove_finalizer, create_controller,
-    create_set_status, ok_and_requeue, ok_no_requeue, resource_has_finalizer, GROUP_NAME,
-};
-
-use super::common::OvnNamed;
-use super::logicalswitch::LogicalSwitch;
+use crate::utils::{name_namespaced, ExtendResource};
+use crate::{create_controller, create_set_status, ok_and_requeue, ok_no_requeue};
 
 /// State available for the reconcile and error_policy functions
 /// called by the Controller
@@ -125,18 +121,23 @@ fn delete_router(name: &str) -> Result<(), Error> {
 
 /// Handle updates to networks in the cluster
 async fn reconcile_network(network: Arc<Network>, ctx: Arc<State>) -> Result<Action, Error> {
+    let mut network = (*network).clone();
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let client = ctx.client.clone();
-    let name = name_namespaced(network.as_ref());
+    let name = name_namespaced(&network);
 
     if network.metadata.deletion_timestamp.is_some() {
         println!("ovn: Network {} waiting for deletion", name);
         delete_network(&name)?;
-        client_remove_finalizer!(client, Network, network.as_ref(), "ovn");
+        network
+            .remove_finalizer("ovn", client, "cluster-controller.ovn")
+            .await?;
         println!("ovn: Network {} deleted", name);
     } else {
         println!("ovn: update for network {name}");
-        client_ensure_finalizer!(client, Network, network.as_ref(), "ovn");
+        network
+            .ensure_finalizer("ovn", client.clone(), "cluster-controller.ovn")
+            .await?;
         LogicalSwitch::create_if_missing(ovn, &name)?;
         if let Some(dhcp_options) = network.spec.dhcp.as_ref() {
             ensure_dhcp(&name, dhcp_options)?;
@@ -212,7 +213,8 @@ fn get_vm_ovn_nics(vm: &VirtualMachine) -> Vec<NetworkAttachment> {
 
 /// Handle updates to VMs in the cluster
 async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, Error> {
-    let name = name_namespaced(vm.as_ref());
+    let mut vm = (*vm).clone();
+    let name = name_namespaced(&vm);
     let client = ctx.client.clone();
 
     if vm.metadata.deletion_timestamp.is_some() {
@@ -221,12 +223,13 @@ async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action
             println!("ovn: disconnecting NIC {index} for VM {name}");
             disconnect_vm_nic(&vm, nic)?;
         }
-
-        client_remove_finalizer!(client, VirtualMachine, vm.as_ref(), "ovn");
+        vm.remove_finalizer("ovn", client, "cluster-controller.ovn")
+            .await?;
         ok_no_requeue!()
     } else {
         println!("ovn: VM {name} updated");
-        client_ensure_finalizer!(client, VirtualMachine, vm.as_ref(), "ovn");
+        vm.ensure_finalizer("ovn", client.clone(), "cluster-controller.ovn")
+            .await?;
         let mut ip_addresses: Vec<String> = Vec::new();
         for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
             println!("ovn: connecting NIC {index} for VM {name}");
@@ -256,23 +259,29 @@ async fn reconcile_vm(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action
 
 /// Handle updates to routers in the cluster
 async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action, Error> {
+    let mut router = (*router).clone();
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let client = ctx.client.clone();
     let namespace = router
         .metadata
         .namespace
         .as_ref()
-        .expect("get router namespace");
-    let name = name_namespaced(router.as_ref());
+        .expect("get router namespace")
+        .clone();
+    let name = name_namespaced(&router);
 
     if router.metadata.deletion_timestamp.is_some() {
         println!("ovn: Router {} waiting for deletion", name);
         delete_router(&name)?;
-        client_remove_finalizer!(client, Router, router.as_ref(), "ovn");
+        router
+            .remove_finalizer("ovn", client, "cluster-controller.ovn")
+            .await?;
         println!("ovn: Router {} deleted", name);
     } else {
         println!("ovn: update for router {name}");
-        client_ensure_finalizer!(client, Router, router.as_ref(), "ovn");
+        router
+            .ensure_finalizer("ovn", client.clone(), "cluster-controller.ovn")
+            .await?;
 
         let mut lr = LogicalRouter::create_if_missing(ovn, &name)?;
         if let Some(routes) = &router.spec.routes {
@@ -285,7 +294,7 @@ async fn reconcile_router(router: Arc<Router>, ctx: Arc<State>) -> Result<Action
             deploy_mds(
                 client.clone(),
                 "ovn-cluster-controller",
-                namespace,
+                &namespace,
                 router.metadata.name.as_ref().expect("get router name"),
             )
             .await?;

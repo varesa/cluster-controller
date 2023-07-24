@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use kube::runtime::controller::{Action, Controller};
 use kube::{
-    api::{Api, ListParams, PostParams},
+    api::{Api, ListParams},
     Client,
 };
 use lazy_static::lazy_static;
