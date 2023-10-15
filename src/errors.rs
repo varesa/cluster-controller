@@ -122,4 +122,6 @@ pub enum Error {
     ClusterNotFound(#[from] ClusterNotFound),
     #[error("Task ended unexpectedly: {0}")]
     UnexpectedExit(String),
+    #[error("Feature not implemented: {0}")]
+    NotImplemented(String),
 }
