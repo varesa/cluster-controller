@@ -7,7 +7,7 @@ use kube::{
 use crate::errors::Error;
 use crate::{crd, NAMESPACE};
 
-mod ceph;
+pub(crate) mod ceph;
 mod daemonset;
 mod libvirt;
 pub mod ovn;
@@ -26,7 +26,7 @@ pub async fn get_running_image(kube: Client) -> Result<String, Error> {
 }
 
 pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
-    let daemonsets: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
+    /*let daemonsets: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
 
     // Create cluster CRD
     crd::cluster::create(client.clone()).await?;
@@ -66,6 +66,6 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     let _ = tokio::try_join!(ceph_task, libvirt_task, ovn_task);
     eprintln!(
         "supervisor: ERROR: One of the controllers died, killing the rest of the application"
-    );
+    );*/
     std::process::exit(1);
 }

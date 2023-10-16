@@ -1,7 +1,6 @@
 use std::ffi::CStr;
 use std::fmt::Formatter;
 
-use crate::metadataservice::protocol::{MetadataRequest, MetadataResponse};
 use libc::{c_int, strerror};
 
 fn c_error_name(n: c_int) -> String {
@@ -93,11 +92,6 @@ pub enum Error {
     #[error("Error parsing CIDR: {0}")]
     ParseNetwork(#[from] ipnet::AddrParseError),
 
-    // Metadata proxy
-    #[error("Failed to send metadata request between threads")]
-    RequestSendError(#[from] tokio::sync::mpsc::error::SendError<MetadataRequest>),
-    #[error("Failed to send metadata response between threads")]
-    ResponseSendError(#[from] tokio::sync::mpsc::error::SendError<MetadataResponse>),
     #[error("Failed to create network namespace: {0}")]
     NetnsCreateFailed(String),
     #[error("Failed to open network namespace: {0}")]
