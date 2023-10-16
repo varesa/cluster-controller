@@ -7,6 +7,7 @@ use kube::core::WatchEvent;
 use kube::{Api, Client};
 
 pub mod extend_traits;
+pub mod resource_controller;
 pub mod strings;
 #[macro_use]
 pub mod shortcuts;
