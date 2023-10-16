@@ -1,7 +1,6 @@
-use futures::StreamExt;
 use humanize_rs::bytes::Bytes;
 use k8s_openapi::api::core::v1::Secret;
-use kube::runtime::controller::{Action, Controller};
+use kube::runtime::controller::Action;
 use kube::{
     api::{Api, Patch, PatchParams},
     error::ErrorResponse,
@@ -13,10 +12,10 @@ use std::sync::Arc;
 use tokio::time::Duration;
 
 use crate::crd::ceph::Volume;
-use crate::create_controller;
 use crate::errors::Error;
 use crate::shared::ceph::lowlevel;
 use crate::utils::extend_traits::ExtendResource;
+use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;
 use crate::{KEYRING_SECRET, NAMESPACE};
 
@@ -26,12 +25,6 @@ const KEYRING: &str = "client.libvirt";
 
 lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("ceph");
-}
-
-/// State available for the reconcile and error_policy functions
-/// called by the Controller
-struct State {
-    client: Client,
 }
 
 /// Check if an volume already exists in the cluster and
@@ -134,42 +127,45 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
 }
 
 /// Handle updates to volumes in the cluster
-async fn reconcile(volume: Arc<Volume>, ctx: Arc<State>) -> Result<Action, Error> {
+async fn update_fn(volume: Arc<Volume>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let mut volume = (*volume).clone();
     let name = volume.name_prefixed_with_namespace();
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
     let template = volume.spec.template.clone();
 
-    if volume.metadata.deletion_timestamp.is_some() {
-        println!("ceph: Volume {name} waiting for deletion");
-        ensure_removed(&name)?;
-        volume
-            .remove_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
-            .await?;
-        println!("ceph: Volume {name} deleted");
-    } else {
-        println!("ceph: Volume {name} updated");
-        volume
-            .ensure_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
-            .await?;
-        ensure_exists(&name, bytes, template)?;
-        println!("ceph: Volume {name} update success");
-    }
+    println!("ceph: Volume {name} updated");
+    volume
+        .ensure_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
+        .await?;
+    ensure_exists(&name, bytes, template)?;
+    println!("ceph: Volume {name} update success");
 
     Ok(Action::requeue(Duration::from_secs(600)))
 }
 
-fn error_policy(_object: Arc<Volume>, _error: &Error, _ctx: Arc<State>) -> Action {
-    Action::requeue(Duration::from_secs(15))
+/// Handle updates to volumes in the cluster
+async fn remove_fn(volume: Arc<Volume>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
+    let mut volume = (*volume).clone();
+    let name = volume.name_prefixed_with_namespace();
+
+    println!("ceph: Volume {name} waiting for deletion");
+    ensure_removed(&name)?;
+    volume
+        .remove_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
+        .await?;
+    println!("ceph: Volume {name} deleted");
+
+    Ok(Action::requeue(Duration::from_secs(600)))
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
     ensure_keyring(client.clone()).await?;
-    let context = Arc::new(State {
-        client: client.clone(),
-    });
-    let volumes: Api<Volume> = Api::all(client.clone());
     println!("ceph: Starting controller");
-    create_controller!(volumes, reconcile, error_policy, context);
+    ResourceControllerBuilder::new(client)
+        .with_default_state()
+        .with_default_error_policy()
+        .with_functions(update_fn, remove_fn)
+        .run()
+        .await;
     Ok(())
 }
