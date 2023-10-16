@@ -18,9 +18,9 @@ use crate::utils::strings::field_manager;
 ////////
 
 type StoredErrorPolicyFn<ResourceType, State> =
-    Box<dyn Fn(Arc<ResourceType>, &Error, Arc<State>) -> Action + Send + Sync>;
+    Box<dyn Fn(Arc<ResourceType>, &Error, Arc<State>) -> Action + Send>;
 type StoredReconcileFn<ResourceType, State, Fut> =
-    Box<dyn Fn(Arc<ResourceType>, Arc<State>) -> Fut + Sync + Send>;
+    Box<dyn Fn(Arc<ResourceType>, Arc<State>) -> Fut + Send>;
 
 struct DefaultState {
     client: Client,
@@ -80,12 +80,12 @@ impl<State> ResourceControllerBuilderWithState<State> {
 impl<ResourceType, State> ResourceControllerBuilderWithStateAndErrorPolicy<ResourceType, State> {
     pub fn with_functions<UpdateFut, RemoveFut>(
         self,
-        update_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> UpdateFut + Sync + Send + 'static,
-        remove_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> RemoveFut + Sync + Send + 'static,
+        update_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> UpdateFut + Send + 'static,
+        remove_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> RemoveFut + Send + 'static,
     ) -> ResourceController<ResourceType, State, UpdateFut, RemoveFut>
     where
-        UpdateFut: TryFuture<Ok = Action, Error = crate::Error> + Send + Sync + 'static,
-        RemoveFut: TryFuture<Ok = Action, Error = crate::Error> + Send + Sync + 'static,
+        UpdateFut: TryFuture<Ok = Action, Error = crate::Error> + Send + 'static,
+        RemoveFut: TryFuture<Ok = Action, Error = crate::Error> + Send + 'static,
     {
         ResourceController {
             client: self.client,
@@ -109,8 +109,8 @@ where
         + Sync
         + 'static,
     <ResourceType as kube::Resource>::DynamicType: Clone + Debug + Default + Eq + Hash + Unpin,
-    UpdateFut: Future<Output = Result<Action, Error>> + Send + Sync + 'static,
-    RemoveFut: Future<Output = Result<Action, Error>> + Send + Sync + 'static,
+    UpdateFut: Future<Output = Result<Action, Error>> + Send + 'static,
+    RemoveFut: Future<Output = Result<Action, Error>> + Send + 'static,
     State: Send + Sync + 'static,
 {
     pub fn run(self) -> impl Future {
