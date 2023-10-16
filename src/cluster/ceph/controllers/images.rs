@@ -18,9 +18,9 @@ use crate::utils::strings::field_manager;
 ////////
 
 type StoredErrorPolicyFn<ResourceType, State> =
-    Box<dyn Fn(Arc<ResourceType>, &Error, Arc<State>) -> Action + Send>;
+    Box<dyn Fn(Arc<ResourceType>, &Error, Arc<State>) -> Action + Send + Sync>;
 type StoredReconcileFn<ResourceType, State, Fut> =
-    Box<dyn Fn(Arc<ResourceType>, Arc<State>) -> Fut + Send>;
+    Box<dyn Fn(Arc<ResourceType>, Arc<State>) -> Fut + Send + Sync>;
 
 struct DefaultState {
     client: Client,
@@ -80,8 +80,8 @@ impl<State> ResourceControllerBuilderWithState<State> {
 impl<ResourceType, State> ResourceControllerBuilderWithStateAndErrorPolicy<ResourceType, State> {
     pub fn with_functions<UpdateFut, RemoveFut>(
         self,
-        update_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> UpdateFut + Send + 'static,
-        remove_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> RemoveFut + Send + 'static,
+        update_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> UpdateFut + Send + Sync + 'static,
+        remove_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> RemoveFut + Send + Sync + 'static,
     ) -> ResourceController<ResourceType, State, UpdateFut, RemoveFut>
     where
         UpdateFut: TryFuture<Ok = Action, Error = crate::Error> + Send + 'static,
@@ -140,14 +140,6 @@ where
                     Err(e) => println!("reconcile failed: {:?}", e),
                 }
             })
-    }
-
-    async fn reconcile(_image: Arc<ResourceType>, _ctx: Arc<State>) -> Result<Action, Error> {
-        Ok(Action::requeue(Duration::from_secs(600)))
-    }
-
-    fn error_policy(_object: Arc<ResourceType>, _error: &Error, _ctx: Arc<State>) -> Action {
-        Action::requeue(Duration::from_secs(15))
     }
 }
 
