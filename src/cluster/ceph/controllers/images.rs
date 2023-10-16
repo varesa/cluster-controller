@@ -12,9 +12,15 @@ use tokio::time::Duration;
 use crate::crd::ceph::Image;
 use crate::errors::Error;
 use crate::shared::ceph::lowlevel;
+use crate::utils::extend_traits::ExtendResource;
 use crate::utils::strings::field_manager;
 
 ////////
+
+type StoredErrorPolicyFn<ResourceType, State> =
+    Box<dyn Fn(Arc<ResourceType>, &Error, Arc<State>) -> Action + Send + Sync>;
+type StoredReconcileFn<ResourceType, State, Fut> =
+    Box<dyn Fn(Arc<ResourceType>, Arc<State>) -> Fut + Sync + Send>;
 
 struct DefaultState {
     client: Client,
@@ -30,14 +36,14 @@ pub struct ResourceControllerBuilderWithState<State> {
 pub struct ResourceControllerBuilderWithStateAndErrorPolicy<ResourceType, State> {
     client: Client,
     state: Arc<State>,
-    error_policy: Box<dyn Fn(Arc<ResourceType>, &Error, Arc<State>) -> Action + Send + Sync>,
+    error_policy: StoredErrorPolicyFn<ResourceType, State>,
 }
 pub struct ResourceController<ResourceType, State, UpdateFut, RemoveFut> {
     client: Client,
     state: Arc<State>,
-    error_policy: Box<dyn Fn(Arc<ResourceType>, &Error, Arc<State>) -> Action + Send + Sync>,
-    update_fn: Box<dyn Fn(Arc<ResourceType>, Arc<State>) -> UpdateFut>,
-    remove_fn: Box<dyn Fn(Arc<ResourceType>, Arc<State>) -> RemoveFut>,
+    error_policy: StoredErrorPolicyFn<ResourceType, State>,
+    update_fn: StoredReconcileFn<ResourceType, State, UpdateFut>,
+    remove_fn: StoredReconcileFn<ResourceType, State, RemoveFut>,
 }
 
 impl ResourceControllerBuilder {
@@ -58,10 +64,7 @@ impl ResourceControllerBuilder {
 impl<State> ResourceControllerBuilderWithState<State> {
     fn with_default_error_policy<ResourceType>(
         self,
-    ) -> ResourceControllerBuilderWithStateAndErrorPolicy<ResourceType, State>
-/*where
-        ResourceType: kube::Resource,
-        <ResourceType as kube::Resource>::DynamicType: std::default::Default,*/ {
+    ) -> ResourceControllerBuilderWithStateAndErrorPolicy<ResourceType, State> {
         let error_policy_fn = |_object: Arc<ResourceType>, _error: &Error, _ctx: Arc<State>| {
             Action::requeue(Duration::from_secs(15))
         };
@@ -77,14 +80,12 @@ impl<State> ResourceControllerBuilderWithState<State> {
 impl<ResourceType, State> ResourceControllerBuilderWithStateAndErrorPolicy<ResourceType, State> {
     pub fn with_functions<UpdateFut, RemoveFut>(
         self,
-        update_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> UpdateFut + 'static,
-        remove_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> RemoveFut + 'static,
+        update_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> UpdateFut + Sync + Send + 'static,
+        remove_fn: impl Fn(Arc<ResourceType>, Arc<State>) -> RemoveFut + Sync + Send + 'static,
     ) -> ResourceController<ResourceType, State, UpdateFut, RemoveFut>
     where
-        UpdateFut: TryFuture<Ok = Action, Error = crate::Error> + Send + 'static,
-        //UpdateFut::Error: std::error::Error + Send + 'static,
-        RemoveFut: TryFuture<Ok = Action, Error = crate::Error> + Send + 'static,
-        //RemoveFut::Error: std::error::Error + Send + 'static,
+        UpdateFut: TryFuture<Ok = Action, Error = crate::Error> + Send + Sync + 'static,
+        RemoveFut: TryFuture<Ok = Action, Error = crate::Error> + Send + Sync + 'static,
     {
         ResourceController {
             client: self.client,
@@ -99,39 +100,46 @@ impl<ResourceType, State> ResourceControllerBuilderWithStateAndErrorPolicy<Resou
 impl<ResourceType, State, UpdateFut, RemoveFut>
     ResourceController<ResourceType, State, UpdateFut, RemoveFut>
 where
-    ResourceType: kube::Resource + Clone + Debug + DeserializeOwned + Send + Sync + 'static,
+    ResourceType: kube::Resource
+        + kube::ResourceExt
+        + Clone
+        + Debug
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
     <ResourceType as kube::Resource>::DynamicType: Clone + Debug + Default + Eq + Hash + Unpin,
-    UpdateFut: TryFuture<Ok = Action, Error = Error> + Send + 'static,
-    //UpdateFut::Error: std::error::Error + Send + 'static,
-    //RemoveFut: TryFuture<Ok = Action, Error = crate::Error> + 'static,
-    //RemoveFut::Error: std::error::Error + Send + 'static,
+    UpdateFut: Future<Output = Result<Action, Error>> + Send + Sync + 'static,
+    RemoveFut: Future<Output = Result<Action, Error>> + Send + Sync + 'static,
     State: Send + Sync + 'static,
 {
     pub fn run(self) -> impl Future {
-        async move {
-            let api: Api<ResourceType> = Api::all(self.client.clone());
-            Controller::new(api, kube::runtime::watcher::Config::default())
-                .run(self.update_fn, self.error_policy, self.state)
-                .for_each(|res| async move {
-                    match res {
-                        Ok(_o) => { /*println!("reconciled {:?}", o)*/ }
-                        Err(e) => println!("reconcile failed: {:?}", e),
+        let api: Api<ResourceType> = Api::all(self.client.clone());
+        let remove_fn = Arc::new(self.remove_fn);
+        let update_fn = Arc::new(self.update_fn);
+
+        Controller::new(api, kube::runtime::watcher::Config::default())
+            .run(
+                move |object: Arc<ResourceType>, state: Arc<State>| {
+                    let remove_fn = remove_fn.clone();
+                    let update_fn = update_fn.clone();
+                    async move {
+                        if object.meta().deletion_timestamp.is_some() {
+                            remove_fn(object, state).await
+                        } else {
+                            update_fn(object, state).await
+                        }
                     }
-                })
-                .await
-        }
-
-        /*let reconcile_fn = |object: Arc<Resource>, state: Arc<State>| {
-            let future = if object.meta().deletion_timestamp.is_some() {
-                remove_fn(object, state)
-            } else {
-                update_fn(object, state)
-            };
-            async { future.await }
-        };
-
-
-        t*/
+                },
+                self.error_policy,
+                self.state,
+            )
+            .for_each(|res| async move {
+                match res {
+                    Ok(_o) => { /*println!("reconciled {:?}", o)*/ }
+                    Err(e) => println!("reconcile failed: {:?}", e),
+                }
+            })
     }
 
     async fn reconcile(_image: Arc<ResourceType>, _ctx: Arc<State>) -> Result<Action, Error> {
@@ -197,53 +205,36 @@ fn ensure_removed(name: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Handle updates to images in the cluster
-/*
-async fn reconcile(image: Arc<Image>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
-/
+async fn update_fn(image: Arc<Image>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
+    // To get a mutable copy to allow finalizer addition
     let mut image = (*image).clone();
+
     let name = image.name_prefixed_with_namespace();
     let source = image.spec.source.clone();
 
-    if image.metadata.deletion_timestamp.is_some() {
-        println!("ceph: Image {name} waiting for deletion");
-        ensure_removed(&name)?;
-        image
-            .remove_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
-            .await?;
-        println!("ceph: Image {name} deleted");
-    } else {
-        println!("ceph: Image {name} updated");
-        image
-            .ensure_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
-            .await?;
-        ensure_exists(&name, &source)?;
-        println!("ceph: Image {name} update success");
-    }
-
+    println!("ceph: Image {name} updated");
+    image
+        .ensure_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
+        .await?;
+    ensure_exists(&name, &source)?;
+    println!("ceph: Image {name} update success");
     Ok(Action::requeue(Duration::from_secs(600)))
 }
 
+async fn remove_fn(image: Arc<Image>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
+    // To get a mutable copy to allow finalizer deletion
+    let mut image = (*image).clone();
 
-fn error_policy(_object: Arc<Image>, _error: &Error, _ctx: Arc<DefaultState>) -> Action {
-    Action::requeue(Duration::from_secs(15))
-}
+    let name = image.name_prefixed_with_namespace();
 
-pub async fn create(client: Client) -> Result<(), Error> {
-    let context = Arc::new(State {
-        client: client.clone(),
-    });
-    let images: Api<Image> = Api::all(client.clone());
-    println!("ceph: Starting controller");
-    create_controller!(images, reconcile, error_policy, context);
-    Ok(())
-}*/
+    println!("ceph: Image {name} waiting for deletion");
+    ensure_removed(&name)?;
 
-async fn update_fn(_image: Arc<Image>, _state: Arc<DefaultState>) -> Result<Action, Error> {
-    Ok(Action::requeue(Duration::from_secs(600)))
-}
+    image
+        .remove_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
+        .await?;
+    println!("ceph: Image {name} deleted");
 
-async fn remove_fn(_image: Arc<Image>, _state: Arc<DefaultState>) -> Result<Action, Error> {
     Ok(Action::requeue(Duration::from_secs(600)))
 }
 
