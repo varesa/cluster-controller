@@ -31,13 +31,13 @@ pub struct Builder {}
 
 // And crafts a controller which stores the callback function:
 pub struct MyControllerWhichDoesNotWork<UpdateFut> {
-    update_fn: Box<dyn Fn(Arc<Pod>, Arc<State>) -> UpdateFut>,
+    update_fn: Box<dyn Fn(Arc<Pod>, Arc<State>) -> UpdateFut + Send>,
 }
 
 // The real version of this would take multiple functions, but here simplified to a single one:
 impl Builder {
     pub fn with_functions<UpdateFut>(
-        update_fn: impl Fn(Arc<Pod>, Arc<State>) -> UpdateFut + 'static,
+        update_fn: impl Fn(Arc<Pod>, Arc<State>) -> UpdateFut + Send + 'static,
     ) -> MyControllerWhichDoesNotWork<UpdateFut>
     // focus point: Here, as far as I understand, I am restricting UpdateFut to,
     // and thus telling the compiler that UpdateFut will be Send
