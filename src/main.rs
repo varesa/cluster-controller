@@ -20,6 +20,9 @@ const KEYRING_SECRET: &str = "ceph-client.libvirt";
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    let subscriber = tracing_subscriber::FmtSubscriber::new();
+    tracing::subscriber::set_global_default(subscriber)?;
+
     let args: Vec<String> = env::args().collect();
 
     if args.contains(&String::from("--version")) {

@@ -53,6 +53,10 @@ pub enum Error {
     #[error("Task join error {0}")]
     JoinFailure(#[from] tokio::task::JoinError),
 
+    // Tracing
+    #[error("Setting global default subscriber: {0}")]
+    TracingSetGlobalDefault(#[from] tracing::dispatcher::SetGlobalDefaultError),
+
     // Kubernetes
     #[error("Kubernetes error {0}")]
     Kube(#[from] kube::Error),
