@@ -1,0 +1,128 @@
+use kube::runtime::controller::Action;
+use kube::{
+    api::{Api, PostParams},
+    Client, Resource, ResourceExt,
+};
+use serde_json::json;
+use std::sync::Arc;
+use tokio::time::Duration;
+
+use crate::cluster::ovn::logicalswitch::LogicalSwitch;
+use crate::cluster::ovn::{
+    common::OvnBasicActions, common::OvnNamedGetters, dhcpoptions::DhcpOptions,
+    logicalrouter::LogicalRouter, lowlevel::Ovn,
+};
+use crate::crd::ovn::{DhcpOptions as DhcpOptionsCrd, Network, NetworkStatus, RouterAttachment};
+use crate::errors::Error;
+use crate::utils::extend_traits::ExtendResource;
+use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
+use crate::{create_set_status, ok_and_requeue};
+
+create_set_status!(Network, NetworkStatus, set_network_status);
+
+fn ensure_dhcp(name: &str, dhcp: &DhcpOptionsCrd) -> Result<(), Error> {
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    let mut dhcp_opts = match DhcpOptions::get_by_cidr(ovn.clone(), &dhcp.cidr) {
+        Ok(opts) => Ok(opts),
+        Err(Error::OvnNotFound(_, _)) => DhcpOptions::create(ovn, &dhcp.cidr),
+        Err(e) => Err(e),
+    }?;
+
+    // Lazily try to always update, effectively noop if current value are already correct
+    dhcp_opts.set_options(dhcp)?;
+
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    LogicalSwitch::get_by_name(ovn, name)?.set_cidr(&dhcp.cidr)?;
+    Ok(())
+}
+
+fn ensure_router_attachment(
+    network: &Network,
+    router_attachment: &RouterAttachment,
+) -> Result<(), Error> {
+    let network_ns = ResourceExt::namespace(network).expect("Get network ns");
+
+    let split: Vec<String> = router_attachment
+        .name
+        .split('/')
+        .map(String::from)
+        .collect();
+    let (namespace, name) = match split.len() {
+        1 => (&network_ns, split.get(0).unwrap()),
+        2 => (split.get(0).unwrap(), split.get(1).unwrap()),
+        _ => panic!("Malformed router name (todo: error)"),
+    };
+
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    let lr_name = format!("{}-{}", &namespace, &name);
+    let mut lr = LogicalRouter::get_by_name(ovn.clone(), &lr_name)?;
+
+    let ls_name = network.name_prefixed_with_namespace();
+    let mut ls = LogicalSwitch::get_by_name(ovn, &ls_name)?;
+
+    super::connect_router_to_ls(&mut lr, &mut ls, &router_attachment.address)?;
+
+    Ok(())
+}
+
+fn delete_network(name: &str) -> Result<(), Error> {
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    LogicalSwitch::get_by_name(ovn, name)?.delete()
+}
+
+/// Handle updates to networks in the cluster
+async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
+    let mut network = (*network).clone();
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    let client = ctx.client.clone();
+    let name = network.name_prefixed_with_namespace();
+
+    println!("ovn: update for network {name}");
+    network
+        .ensure_finalizer("ovn", client.clone(), &super::FIELD_MANAGER)
+        .await?;
+    LogicalSwitch::create_if_missing(ovn, &name)?;
+    if let Some(dhcp_options) = network.spec.dhcp.as_ref() {
+        ensure_dhcp(&name, dhcp_options)?;
+    }
+
+    if let Some(routers) = network.spec.routers.as_ref() {
+        for router in routers {
+            ensure_router_attachment(&network, router)?;
+        }
+    }
+
+    println!("ovn: update for network {name} successful");
+
+    let status = NetworkStatus { is_created: true };
+    set_network_status(&network, status, client.clone()).await?;
+
+    ok_and_requeue!(600)
+}
+
+/// Handle updates to networks in the cluster
+async fn remove_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
+    let mut network = (*network).clone();
+    let client = ctx.client.clone();
+    let name = network.name_prefixed_with_namespace();
+
+    println!("ovn: Network {} waiting for deletion", name);
+    delete_network(&name)?;
+    network
+        .remove_finalizer("ovn", client, &super::FIELD_MANAGER)
+        .await?;
+    println!("ovn: Network {} deleted", name);
+
+    ok_and_requeue!(600)
+}
+
+pub async fn create(client: Client) -> Result<(), Error> {
+    println!("ovn.network: Starting controller");
+    ResourceControllerBuilder::new(client)
+        .with_default_state()
+        .with_default_error_policy()
+        .with_functions(update_network, remove_network)
+        .run()
+        .await;
+    Ok(())
+}
