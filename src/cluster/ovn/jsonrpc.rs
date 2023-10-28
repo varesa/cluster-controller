@@ -48,7 +48,7 @@ impl JsonRpcConnection {
                 }
             }
         }
-        error!("no response found");
+        panic!("no response found");
     }
 
     fn next_id(&mut self) -> u64 {
