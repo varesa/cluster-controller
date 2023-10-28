@@ -7,6 +7,7 @@ use std::future::Future;
 use std::hash::Hash;
 use std::sync::Arc;
 use tokio::time::Duration;
+use tracing::{info_span, Instrument};
 
 use crate::errors::Error;
 
@@ -116,13 +117,28 @@ where
                 move |object: Arc<ResourceType>, state: Arc<State>| {
                     let remove_fn = remove_fn.clone();
                     let update_fn = update_fn.clone();
+
+                    let span = info_span!("reconcile resource");
+
+                    span.record(
+                        "object_kind",
+                        ResourceType::kind(&ResourceType::DynamicType::default()).to_string(),
+                    );
+                    span.record("object_namespace", object.meta().namespace.clone());
+                    span.record("object_name", object.meta().name.clone());
+
                     async move {
                         if object.meta().deletion_timestamp.is_some() {
-                            remove_fn(object, state).await
+                            remove_fn(object, state)
+                                .instrument(info_span!("remove_fn"))
+                                .await
                         } else {
-                            update_fn(object, state).await
+                            update_fn(object, state)
+                                .instrument(info_span!("update_fn"))
+                                .await
                         }
                     }
+                    .instrument(span)
                 },
                 self.error_policy,
                 self.state,
