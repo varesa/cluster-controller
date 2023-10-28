@@ -6,9 +6,9 @@ use crate::cluster::ovn::common::{OvnCommon, OvnGetters, OvnNamed, OvnNamedGette
 use crate::cluster::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
 };
-use crate::cluster::ovn::dhcpoptions::DhcpOptions;
-use crate::cluster::ovn::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH, TYPE_LOGICAL_SWITCH_PORT};
+use crate::cluster::ovn::types::dhcpoptions::DhcpOptions;
+use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::Error;
 use crate::Error::OvnConflict;
 

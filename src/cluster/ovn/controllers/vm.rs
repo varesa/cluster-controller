@@ -4,9 +4,9 @@ use kube::runtime::controller::Action;
 use kube::{api::Api, Client, ResourceExt};
 use tokio::time::Duration;
 
-use crate::cluster::ovn::logicalswitch::LogicalSwitch;
+use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
-    common::OvnNamedGetters, logicalswitchport::LogicalSwitchPort, lowlevel::Ovn,
+    common::OvnNamedGetters, lowlevel::Ovn, types::logicalswitchport::LogicalSwitchPort,
 };
 use crate::crd::libvirt::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
 use crate::crd::ovn::Network;

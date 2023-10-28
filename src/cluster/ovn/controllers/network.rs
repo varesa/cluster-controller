@@ -7,10 +7,10 @@ use serde_json::json;
 use std::sync::Arc;
 use tokio::time::Duration;
 
-use crate::cluster::ovn::logicalswitch::LogicalSwitch;
+use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
-    common::OvnBasicActions, common::OvnNamedGetters, dhcpoptions::DhcpOptions,
-    logicalrouter::LogicalRouter, lowlevel::Ovn,
+    common::OvnBasicActions, common::OvnNamedGetters, lowlevel::Ovn,
+    types::dhcpoptions::DhcpOptions, types::logicalrouter::LogicalRouter,
 };
 use crate::crd::ovn::{DhcpOptions as DhcpOptionsCrd, Network, NetworkStatus, RouterAttachment};
 use crate::errors::Error;

@@ -6,8 +6,8 @@ use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnGetters, OvnNamed,
 use crate::cluster::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid, deserialize_uuid_set,
 };
-use crate::cluster::ovn::logicalswitchport::{LogicalSwitchPort, LogicalSwitchPortBuilder};
 use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH};
+use crate::cluster::ovn::types::logicalswitchport::{LogicalSwitchPort, LogicalSwitchPortBuilder};
 use crate::Error;
 
 pub struct LogicalSwitch {

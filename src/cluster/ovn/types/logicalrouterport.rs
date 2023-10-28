@@ -6,8 +6,8 @@ use crate::cluster::ovn::common::{OvnCommon, OvnNamed, OvnNamedGetters};
 use crate::cluster::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
 };
-use crate::cluster::ovn::logicalrouter::LogicalRouter;
 use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_ROUTER, TYPE_LOGICAL_ROUTER_PORT};
+use crate::cluster::ovn::types::logicalrouter::LogicalRouter;
 use crate::Error;
 
 pub struct LogicalRouterPortBuilder<'a> {

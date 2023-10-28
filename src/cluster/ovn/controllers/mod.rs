@@ -1,6 +1,6 @@
 use crate::cluster::ovn::common::OvnNamed;
-use crate::cluster::ovn::logicalrouter::LogicalRouter;
-use crate::cluster::ovn::logicalswitch::LogicalSwitch;
+use crate::cluster::ovn::types::logicalrouter::LogicalRouter;
+use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::utils::strings::field_manager;
 use crate::Error;
 use lazy_static::lazy_static;

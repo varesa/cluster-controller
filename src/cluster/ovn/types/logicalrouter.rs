@@ -6,9 +6,9 @@ use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnGetters, OvnNamed}
 use crate::cluster::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
 };
-use crate::cluster::ovn::logicalrouterport::LogicalRouterPortBuilder;
 use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_ROUTER, TYPE_LOGICAL_ROUTER_STATIC_ROUTE};
-use crate::cluster::ovn::staticroute::StaticRoute;
+use crate::cluster::ovn::types::logicalrouterport::LogicalRouterPortBuilder;
+use crate::cluster::ovn::types::staticroute::StaticRoute;
 use crate::crd::ovn::Route as RouteCrd;
 use crate::Error;
 
