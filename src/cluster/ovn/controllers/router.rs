@@ -12,7 +12,7 @@ use crate::cluster::ovn::{
     common::OvnBasicActions, common::OvnNamed, common::OvnNamedGetters,
     logicalrouter::LogicalRouter, lowlevel::Ovn,
 };
-use crate::crd::ovn::{Route, Router, RouterStatus};
+use crate::crd::ovn::{Router, RouterStatus};
 use crate::errors::Error;
 use crate::metadataservice::deployment::deploy as deploy_mds;
 use crate::utils::extend_traits::ExtendResource;
@@ -21,11 +21,9 @@ use crate::{create_set_status, ok_and_requeue, ok_no_requeue};
 
 create_set_status!(Router, RouterStatus, set_router_status);
 
-fn delete_router(name: &str) -> Result<(), Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
-    LogicalRouter::get_by_name(ovn, name)?.delete()
-}
-
+/// Create network components for the MDS:
+/// - An LS that is connected to the router and has the MDS subnet
+/// - An LSP that the MDS will use
 async fn connect_metadataservice(lr: &mut LogicalRouter) -> Result<(), Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mds_name = format!("mds-{}", lr.name());
@@ -36,11 +34,6 @@ async fn connect_metadataservice(lr: &mut LogicalRouter) -> Result<(), Error> {
         .create_if_missing(&mds_name, None)?
         .set_address("02:00:00:00:00:02")?;
     Ok(())
-}
-
-fn ensure_router_routes(router: &str, routes: &[Route]) -> Result<(), Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
-    LogicalRouter::get_by_name(ovn, router)?.set_routes(routes)
 }
 
 /// Handle updates to routers in the cluster
@@ -61,11 +54,11 @@ async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
         .ensure_finalizer("ovn", client.clone(), &super::FIELD_MANAGER)
         .await?;
 
-    let mut lr = LogicalRouter::create_if_missing(ovn, &name)?;
+    let mut lr = LogicalRouter::create_if_missing(ovn.clone(), &name)?;
     if let Some(routes) = &router.spec.routes {
-        ensure_router_routes(&name, routes)?;
+        LogicalRouter::get_by_name(ovn, &name)?.set_routes(routes)?
     } else {
-        ensure_router_routes(&name, &[])?;
+        LogicalRouter::get_by_name(ovn, &name)?.set_routes(&[])?
     }
 
     if let Some(true) = &router.spec.metadata_service {
@@ -90,12 +83,13 @@ async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
 
 /// Handle updates to routers in the cluster
 async fn remove_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mut router = (*router).clone();
     let client = ctx.client.clone();
     let name = router.name_prefixed_with_namespace();
 
     println!("ovn: Router {} waiting for deletion", name);
-    delete_router(&name)?;
+    LogicalRouter::get_by_name(ovn, &name)?.delete()?;
     router
         .remove_finalizer("ovn", client, &super::FIELD_MANAGER)
         .await?;

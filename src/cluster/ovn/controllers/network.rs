@@ -20,6 +20,11 @@ use crate::{create_set_status, ok_and_requeue};
 
 create_set_status!(Network, NetworkStatus, set_network_status);
 
+/// Attempts to
+/// - configure an DHCP Option set for the prefix
+/// - Apply the DHCP prefix to the LS
+///
+/// no-op if already set correctly
 fn ensure_dhcp(name: &str, dhcp: &DhcpOptionsCrd) -> Result<(), Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mut dhcp_opts = match DhcpOptions::get_by_cidr(ovn.clone(), &dhcp.cidr) {
@@ -36,6 +41,7 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptionsCrd) -> Result<(), Error> {
     Ok(())
 }
 
+/// Connect a router to a logical switch with the given IP address
 fn ensure_router_attachment(
     network: &Network,
     router_attachment: &RouterAttachment,
@@ -63,11 +69,6 @@ fn ensure_router_attachment(
     super::connect_router_to_ls(&mut lr, &mut ls, &router_attachment.address)?;
 
     Ok(())
-}
-
-fn delete_network(name: &str) -> Result<(), Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
-    LogicalSwitch::get_by_name(ovn, name)?.delete()
 }
 
 /// Handle updates to networks in the cluster
@@ -102,12 +103,13 @@ async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
 
 /// Handle updates to networks in the cluster
 async fn remove_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
+    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mut network = (*network).clone();
     let client = ctx.client.clone();
     let name = network.name_prefixed_with_namespace();
 
     println!("ovn: Network {} waiting for deletion", name);
-    delete_network(&name)?;
+    LogicalSwitch::get_by_name(ovn, &name)?.delete()?;
     network
         .remove_finalizer("ovn", client, &super::FIELD_MANAGER)
         .await?;
