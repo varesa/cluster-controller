@@ -5,30 +5,27 @@ use crate::cluster::libvirt::scheduling::{
 use crate::cluster::libvirt::utils::{fill_nics, fill_uuid};
 use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
+use crate::ok_and_requeue;
 use crate::utils::extend_traits::{ExtendResource, TryStatus};
+use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;
-use crate::{create_controller, ok_and_requeue};
-use futures::StreamExt;
-use kube::runtime::controller::{Action, Controller};
-use kube::{api::Api, Client};
+use kube::runtime::controller::Action;
+use kube::Client;
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
-
-/// State available for the reconcile and error_policy functions
-/// called by the Controller
-struct State {
-    client: Client,
-}
 
 lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("libvirt.vm");
     static ref SCHEDULE_MUTEX: Mutex<()> = Mutex::new(());
 }
 
-/// Handle updates to volumes in the cluster
-async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, Error> {
+async fn delete_fn(_vm: Arc<VirtualMachine>, _ctx: Arc<DefaultState>) -> Result<Action, Error> {
+    Ok(Action::await_change())
+}
+
+async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let client = ctx.client.clone();
     let mut vm = vm.as_ref().to_owned();
     let name = vm.name_prefixed_with_namespace();
@@ -98,16 +95,13 @@ async fn reconcile(vm: Arc<VirtualMachine>, ctx: Arc<State>) -> Result<Action, E
     ok_and_requeue!(600)
 }
 
-fn error_policy(_object: Arc<VirtualMachine>, _error: &Error, _ctx: Arc<State>) -> Action {
-    Action::requeue(Duration::from_secs(15))
-}
-
 pub async fn create(client: Client) -> Result<(), Error> {
-    let context = Arc::new(State {
-        client: client.clone(),
-    });
-    let vms: Api<VirtualMachine> = Api::all(client.clone());
     println!("libvirt: Starting vm controller");
-    create_controller!(vms, reconcile, error_policy, context);
+    ResourceControllerBuilder::new(client)
+        .with_default_state()
+        .with_default_error_policy()
+        .with_functions(create_fn, delete_fn)
+        .run()
+        .await;
     Ok(())
 }
