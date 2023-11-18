@@ -26,6 +26,7 @@ impl Ovn {
     }
 
     pub fn transact(&self, operations: &[Value]) -> Vec<Value> {
+        tracing::info!("transact");
         let mut params = vec![Value::String("OVN_Northbound".to_string())];
         params.append(&mut operations.to_owned());
         let response = self
@@ -76,6 +77,7 @@ impl Ovn {
     }
 
     pub fn insert(&self, object_type: &str, params: Map<String, Value>) {
+        tracing::info!("insert");
         let operation = json!({
             "op": "insert",
             "table": object_type,

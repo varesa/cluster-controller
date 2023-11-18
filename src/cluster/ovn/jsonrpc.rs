@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::de::Deserializer;
 use serde_json::Value;
 use std::{io::Write, net::TcpStream};
-use tracing::{debug, error, info_span};
+use tracing::{debug, info_span};
 
 #[derive(Debug)]
 pub struct JsonRpcConnection {
@@ -17,7 +17,14 @@ impl JsonRpcConnection {
     }
 
     pub fn request(&mut self, method: &str, params: &Params) -> Message {
-        let span = info_span!("jsonrpc request");
+        let span = info_span!(
+            "jsonrpc request",
+            "method" = method,
+            "params" = format!("{params:?}")
+        );
+        let _s = span.enter();
+
+        span.record("jsonrpc.method", method);
         let request_id: Value = self.next_id().into();
         let request = Message::Request {
             id: request_id.clone(),

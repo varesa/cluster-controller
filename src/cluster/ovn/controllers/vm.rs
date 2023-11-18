@@ -3,6 +3,7 @@ use std::sync::Arc;
 use kube::runtime::controller::Action;
 use kube::{api::Api, Client, ResourceExt};
 use tokio::time::Duration;
+use tracing::info;
 
 use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
@@ -49,7 +50,7 @@ fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(),
         nic.name.as_ref().expect("No network name set")
     );
     if LogicalSwitchPort::get_by_name(ovn.clone(), nic.ovn_id.as_ref().unwrap()).is_ok() {
-        println!("ovn: lsp exists for NIC, removing");
+        info!("ovn: lsp exists for NIC, removing");
         let mut ls = LogicalSwitch::get_by_name(ovn, &ls_name)?;
         ls.del_lsp(nic.ovn_id.as_ref().unwrap())?;
     }
@@ -74,12 +75,12 @@ async fn update_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
     let name = vm.name_prefixed_with_namespace();
     let client = ctx.client.clone();
 
-    println!("ovn: VM {name} updated");
+    info!("ovn: VM {name} updated");
     vm.ensure_finalizer("ovn", client.clone(), &super::FIELD_MANAGER)
         .await?;
     let mut ip_addresses: Vec<String> = Vec::new();
     for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
-        println!("ovn: connecting NIC {index} for VM {name}");
+        info!("ovn: connecting NIC {index} for VM {name}");
         connect_vm_nic(client.clone(), &vm, nic).await?;
         if let Some(ovn_id) = nic.ovn_id.as_ref() {
             let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
@@ -109,9 +110,9 @@ async fn remove_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
     let name = vm.name_prefixed_with_namespace();
     let client = ctx.client.clone();
 
-    println!("ovn: VM {name} waiting for deletion");
+    info!("ovn: VM {name} waiting for deletion");
     for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
-        println!("ovn: disconnecting NIC {index} for VM {name}");
+        info!("ovn: disconnecting NIC {index} for VM {name}");
         disconnect_vm_nic(&vm, nic)?;
     }
     vm.remove_finalizer("ovn", client, &super::FIELD_MANAGER)
@@ -120,7 +121,7 @@ async fn remove_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
-    println!("ovn.vm: Starting controller");
+    info!("ovn.vm: Starting controller");
     ResourceControllerBuilder::new(client)
         .with_default_state()
         .with_default_error_policy()

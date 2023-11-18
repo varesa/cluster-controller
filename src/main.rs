@@ -1,6 +1,7 @@
 use std::env;
 
 use kube::Client;
+use tracing::info;
 
 use crate::errors::Error;
 use crate::utils::strings::get_version_string;
@@ -20,8 +21,13 @@ const KEYRING_SECRET: &str = "ceph-client.libvirt";
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let subscriber = tracing_subscriber::FmtSubscriber::new();
+    let subscriber = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .pretty()
+        .finish();
     tracing::subscriber::set_global_default(subscriber)?;
+
+    info!("Starting up");
 
     let args: Vec<String> = env::args().collect();
 

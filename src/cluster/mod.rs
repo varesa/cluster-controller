@@ -26,6 +26,7 @@ pub async fn get_running_image(kube: Client) -> Result<String, Error> {
 }
 
 pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
+    tracing::info!("Running in cluster mode");
     let daemonsets: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
 
     // Create cluster CRD

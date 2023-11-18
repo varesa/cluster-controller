@@ -10,6 +10,7 @@ use lazy_static::lazy_static;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::time::Duration;
+use tracing::info;
 
 use crate::crd::ceph::Volume;
 use crate::errors::Error;
@@ -39,7 +40,7 @@ fn ensure_exists(name: &str, size: u64, template: Option<String>) -> Result<(), 
         .find(|&existing| existing == name)
         .map(|_| Ok(()))
         .or_else(|| {
-            println!("ceph: Volume {} does not exist", name);
+            info!("ceph: Volume {} does not exist", name);
             if let Some(template_name) = template {
                 Some(lowlevel::clone_image(
                     volume_pool,
@@ -74,7 +75,7 @@ fn ensure_removed(name: &str) -> Result<(), Error> {
 }
 
 fn get_ceph_keyring() -> Result<String, Error> {
-    println!("ceph: Getting keyring from cluster");
+    info!("ceph: Getting keyring from cluster");
     let cluster = lowlevel::connect()?;
     let key = lowlevel::auth_get_key(cluster, KEYRING.into())?;
     lowlevel::disconnect(cluster);
@@ -83,7 +84,7 @@ fn get_ceph_keyring() -> Result<String, Error> {
 }
 
 async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error> {
-    println!("ceph: Saving keyring in secret");
+    info!("ceph: Saving keyring in secret");
     let secrets: Api<Secret> = Api::namespaced(client, NAMESPACE);
     let secret: Secret = serde_json::from_value(json!({
         "apiVersion": "v1",
@@ -112,14 +113,14 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
     let keyring = secrets.get(KEYRING_SECRET).await;
     match keyring {
         Ok(_) => {
-            println!("ceph: Keyring secret exists");
+            info!("ceph: Keyring secret exists");
             Ok(())
         }
         Err(kube::Error::Api(ErrorResponse { code: 404, .. })) => {
-            println!("ceph: Keyring missing");
+            info!("ceph: Keyring missing");
             let key = get_ceph_keyring()?;
             create_ceph_secret(client.clone(), key).await?;
-            println!("ceph: Keyring saved");
+            info!("ceph: Keyring saved");
             Ok(())
         }
         Err(e) => Err(e.into()),
@@ -133,12 +134,12 @@ async fn update_fn(volume: Arc<Volume>, ctx: Arc<DefaultState>) -> Result<Action
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
     let template = volume.spec.template.clone();
 
-    println!("ceph: Volume {name} updated");
+    info!("ceph: Volume {name} updated");
     volume
         .ensure_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
         .await?;
     ensure_exists(&name, bytes, template)?;
-    println!("ceph: Volume {name} update success");
+    info!("ceph: Volume {name} update success");
 
     Ok(Action::requeue(Duration::from_secs(600)))
 }
@@ -148,19 +149,19 @@ async fn remove_fn(volume: Arc<Volume>, ctx: Arc<DefaultState>) -> Result<Action
     let mut volume = (*volume).clone();
     let name = volume.name_prefixed_with_namespace();
 
-    println!("ceph: Volume {name} waiting for deletion");
+    info!("ceph: Volume {name} waiting for deletion");
     ensure_removed(&name)?;
     volume
         .remove_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
         .await?;
-    println!("ceph: Volume {name} deleted");
+    info!("ceph: Volume {name} deleted");
 
     Ok(Action::requeue(Duration::from_secs(600)))
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
     ensure_keyring(client.clone()).await?;
-    println!("ceph: Starting controller");
+    info!("ceph: Starting controller");
     ResourceControllerBuilder::new(client)
         .with_default_state()
         .with_default_error_policy()

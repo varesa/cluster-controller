@@ -118,14 +118,13 @@ where
                     let remove_fn = remove_fn.clone();
                     let update_fn = update_fn.clone();
 
-                    let span = info_span!("reconcile resource");
-
-                    span.record(
-                        "object_kind",
-                        ResourceType::kind(&ResourceType::DynamicType::default()).to_string(),
+                    let span = info_span!(
+                        "reconcile resource",
+                        "kind" =
+                            ResourceType::kind(&ResourceType::DynamicType::default()).to_string(),
+                        "ns" = object.meta().namespace.clone(),
+                        "name" = object.meta().name.clone()
                     );
-                    span.record("object_namespace", object.meta().namespace.clone());
-                    span.record("object_name", object.meta().name.clone());
 
                     async move {
                         if object.meta().deletion_timestamp.is_some() {

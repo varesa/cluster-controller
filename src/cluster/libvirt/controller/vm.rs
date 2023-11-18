@@ -15,6 +15,7 @@ use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
+use tracing::info;
 
 lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("libvirt.vm");
@@ -29,12 +30,7 @@ async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
     let client = ctx.client.clone();
     let mut vm = vm.as_ref().to_owned();
     let name = vm.name_prefixed_with_namespace();
-    println!("libvirt: beginning to reconcile: {}", name);
-
-    if vm.metadata.deletion_timestamp.is_some() {
-        println!("libvirt: VM {} waiting for deletion", name);
-        return ok_and_requeue!(600);
-    }
+    info!("libvirt: beginning to reconcile: {}", name);
 
     if vm.status.is_none() {
         set_vm_status(
@@ -67,7 +63,7 @@ async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
 
     if !status.scheduled || migration_required || reschedule_required {
         let _mutex = SCHEDULE_MUTEX.lock().await;
-        println!("libvirt: Acquired mutex to schedule: {}", name);
+        info!("libvirt: Acquired mutex to schedule: {}", name);
 
         // Schedule normally
         let schedule_result = scheduling::schedule(&vm, false, client.clone()).await;
@@ -91,12 +87,12 @@ async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
 
     clear_successful_migration(&mut vm, client.clone(), &FIELD_MANAGER).await?;
 
-    println!("libvirt: updated: {}", name);
+    info!("libvirt: updated: {}", name);
     ok_and_requeue!(600)
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
-    println!("libvirt: Starting vm controller");
+    info!("libvirt: Starting vm controller");
     ResourceControllerBuilder::new(client)
         .with_default_state()
         .with_default_error_policy()

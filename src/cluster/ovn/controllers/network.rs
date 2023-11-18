@@ -6,6 +6,7 @@ use kube::{
 use serde_json::json;
 use std::sync::Arc;
 use tokio::time::Duration;
+use tracing::info;
 
 use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
@@ -74,11 +75,12 @@ fn ensure_router_attachment(
 /// Handle updates to networks in the cluster
 async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let mut network = (*network).clone();
+    let name = network.name_prefixed_with_namespace();
+    info!("ovn: update for network {name}");
+
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let client = ctx.client.clone();
-    let name = network.name_prefixed_with_namespace();
 
-    println!("ovn: update for network {name}");
     network
         .ensure_finalizer("ovn", client.clone(), &super::FIELD_MANAGER)
         .await?;
@@ -93,7 +95,7 @@ async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
         }
     }
 
-    println!("ovn: update for network {name} successful");
+    info!("ovn: update for network {name} successful");
 
     let status = NetworkStatus { is_created: true };
     set_network_status(&network, status, client.clone()).await?;
@@ -119,7 +121,7 @@ async fn remove_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
-    println!("ovn.network: Starting controller");
+    info!("ovn.network: Starting controller");
     ResourceControllerBuilder::new(client)
         .with_default_state()
         .with_default_error_policy()

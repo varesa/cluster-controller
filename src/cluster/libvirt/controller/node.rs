@@ -6,6 +6,7 @@ use kube::{
 };
 use std::sync::Arc;
 use tokio::time::Duration;
+use tracing::info;
 
 use crate::cluster::libvirt::controller::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
 use crate::crd::libvirt::VirtualMachine;
@@ -42,7 +43,7 @@ async fn update_fn(node: Arc<Node>, ctx: Arc<DefaultState>) -> Result<Action, Er
     let client = ctx.client.clone();
     let node = node.as_ref().to_owned();
     let name = node.name_unchecked();
-    println!("libvirt: beginning to reconcile: {}", name);
+    info!("libvirt: beginning to reconcile: {}", name);
 
     if let Some(annotations) = node.metadata.annotations.as_ref() {
         if let Some(value) = annotations.get(MAINTENANCE_ANNOTATION) {
@@ -52,12 +53,12 @@ async fn update_fn(node: Arc<Node>, ctx: Arc<DefaultState>) -> Result<Action, Er
         }
     }
 
-    println!("libvirt: updated: {}", name);
+    info!("libvirt: updated: {}", name);
     ok_and_requeue!(600)
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
-    println!("libvirt: Starting node controller");
+    info!("libvirt: Starting node controller");
     ResourceControllerBuilder::new(client)
         .with_default_state()
         .with_default_error_policy()

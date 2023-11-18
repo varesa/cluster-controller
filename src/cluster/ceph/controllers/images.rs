@@ -3,6 +3,7 @@ use kube::Client;
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::time::Duration;
+use tracing::info;
 
 use crate::crd::ceph::Image;
 use crate::errors::Error;
@@ -28,7 +29,7 @@ fn ceph_ensure_image_exists(name: &str, source: &str) -> Result<(), Error> {
         .find(|&existing| existing == name)
         .map(|_| Ok(()))
         .or_else(|| {
-            println!(
+            info!(
                 "ceph: Image {} does not exist, creating from {}",
                 name, source
             );
@@ -64,12 +65,12 @@ async fn update_fn(image: Arc<Image>, ctx: Arc<DefaultState>) -> Result<Action, 
     let name = image.name_prefixed_with_namespace();
     let source = image.spec.source.clone();
 
-    println!("ceph: Image {name} updated");
+    info!("ceph: Image {name} updated");
     image
         .ensure_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
         .await?;
     ceph_ensure_image_exists(&name, &source)?;
-    println!("ceph: Image {name} update success");
+    info!("ceph: Image {name} update success");
     Ok(Action::requeue(Duration::from_secs(600)))
 }
 
@@ -79,13 +80,13 @@ async fn remove_fn(image: Arc<Image>, ctx: Arc<DefaultState>) -> Result<Action, 
 
     let name = image.name_prefixed_with_namespace();
 
-    println!("ceph: Image {name} waiting for deletion");
+    info!("ceph: Image {name} waiting for deletion");
     ceph_ensure_image_removed(&name)?;
 
     image
         .remove_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
         .await?;
-    println!("ceph: Image {name} deleted");
+    info!("ceph: Image {name} deleted");
 
     Ok(Action::requeue(Duration::from_secs(600)))
 }
