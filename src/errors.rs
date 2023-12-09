@@ -56,6 +56,8 @@ pub enum Error {
     // Tracing
     #[error("Setting global default subscriber: {0}")]
     TracingSetGlobalDefault(#[from] tracing::dispatcher::SetGlobalDefaultError),
+    #[error("OpenTelemetry trace error: {0}")]
+    OpenTelemetryTrace(#[from] opentelemetry::trace::TraceError),
 
     // Kubernetes
     #[error("Kubernetes error {0}")]
