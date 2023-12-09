@@ -1,5 +1,6 @@
 use kube::Client;
 use tokio::sync::mpsc::channel;
+use tracing::{error, info};
 
 use crate::metadataservice::backend::MetadataBackend;
 use crate::metadataservice::proxy::MetadataProxy;
@@ -45,9 +46,9 @@ pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
         );
     });
 
-    println!("supervisor: keeping a watch on the threads");
+    info!("supervisor: keeping a watch on the threads");
     let _ = tokio::try_join!(proxy_task, backend_task);
 
-    eprintln!("supervisor: ERROR: One of the threads died, killing the rest of the application");
+    error!("supervisor: ERROR: One of the threads died, killing the rest of the application");
     std::process::exit(1);
 }

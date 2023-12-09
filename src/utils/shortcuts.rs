@@ -6,7 +6,7 @@ macro_rules! create_controller {
             .for_each(|res| async move {
                 match res {
                     Ok(_o) => { /*println!("reconciled {:?}", o)*/ }
-                    Err(e) => println!("reconcile failed: {:?}", e),
+                    Err(e) => error!("reconcile failed: {:?}", e),
                 }
             })
             .await

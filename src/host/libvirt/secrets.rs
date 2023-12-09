@@ -4,6 +4,7 @@ use crate::{Client, Error, KEYRING_SECRET, NAMESPACE};
 use askama::Template;
 use k8s_openapi::api::core::v1::Secret;
 use kube::Api;
+use tracing::info;
 use virt::secret::Secret as LibvirtSecret;
 
 const CEPH_SECRET_UUID: &str = "8e22b0ac-b429-4ad1-8783-6d792db31349";
@@ -24,10 +25,10 @@ fn create_secret(key: &[u8], libvirt: &Libvirt) -> Result<(), Error> {
 
 pub async fn ensure_ceph_secret(kube: Client, libvirt: &Libvirt) -> Result<(), Error> {
     if LibvirtSecret::lookup_by_uuid_string(&libvirt.connection, CEPH_SECRET_UUID).is_ok() {
-        println!("Secret found");
+        info!("Secret found");
         return Ok(());
     }
-    println!("Secret missing");
+    info!("Secret missing");
 
     let secrets: Api<Secret> = Api::namespaced(kube.clone(), NAMESPACE);
     let secret = match secrets.get(KEYRING_SECRET).await {
@@ -38,6 +39,6 @@ pub async fn ensure_ceph_secret(kube: Client, libvirt: &Libvirt) -> Result<(), E
     let data = secret.data.unwrap();
     let key = data.get("key").unwrap().0.clone();
     create_secret(key.as_ref(), libvirt)?;
-    println!("Secret created");
+    info!("Secret created");
     Ok(())
 }

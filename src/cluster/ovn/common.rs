@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use serde_json::{Map, Value};
+use tracing::info;
 
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::Error;
@@ -72,7 +73,7 @@ where
     T: OvnBasicType,
 {
     fn create(ovn: Arc<Ovn>, name: &str) -> Result<Self, Error> {
-        tracing::info!("create");
+        info!("create");
         let mut params = Map::new();
         params.insert("name".to_string(), Value::String(name.to_string()));
         ovn.insert(&Self::ovn_type(), params);
@@ -81,11 +82,11 @@ where
     }
 
     fn create_if_missing(ovn: Arc<Ovn>, name: &str) -> Result<Self, Error> {
-        tracing::info!("create_if_missing");
+        info!("create_if_missing");
         match Self::get_by_name(ovn.clone(), name) {
             Ok(ls) => Ok(ls),
             Err(Error::OvnNotFound(_, _)) => {
-                println!("ovn: {} {} doesn't exist, creating", Self::ovn_type(), name);
+                info!("ovn: {} {} doesn't exist, creating", Self::ovn_type(), name);
                 Self::create(ovn, name)
             }
             Err(e) => Err(e),

@@ -5,6 +5,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomRe
 use kube::api::{ListParams, WatchParams};
 use kube::core::WatchEvent;
 use kube::{Api, Client};
+use tracing::{debug, info, instrument};
 
 pub mod extend_traits;
 pub mod resource_controller;
@@ -12,9 +13,10 @@ pub mod strings;
 #[macro_use]
 pub mod shortcuts;
 
+#[instrument]
 pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) -> Result<(), Error> {
     if crds.get(name).await.is_ok() {
-        println!("CRD ok: {}", &name);
+        info!("CRD ok: {}", &name);
         return Ok(());
     }
 
@@ -25,12 +27,12 @@ pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) ->
 
     while let Some(status) = stream.try_next().await? {
         if let WatchEvent::Modified(crd) = status {
-            println!("Modify event for {}", name);
+            debug!("Modify event for {}", name);
             if let Some(status) = crd.status {
                 if let Some(conditions) = status.conditions {
                     if let Some(pcond) = conditions.iter().find(|c| c.type_ == "NamesAccepted") {
                         if pcond.status == "True" {
-                            println!("CRD accepted: {}", name);
+                            info!("CRD accepted: {}", name);
                             return Ok(());
                         }
                     }

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use serde_json::{json, Map, Value};
+use tracing::info;
 
 use crate::cluster::ovn::common::{OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters};
 use crate::cluster::ovn::deserialization::{
@@ -59,7 +60,7 @@ impl LogicalSwitchPortBuilder<'_> {
         match LogicalSwitchPort::get_by_name(self.ovn.clone(), lsp_name) {
             Ok(ls) => Ok(ls),
             Err(Error::OvnNotFound(_, _)) => {
-                println!(
+                info!(
                     "ovn: {} {} doesn't exist, creating",
                     LogicalSwitchPort::ovn_type(),
                     lsp_name

@@ -3,6 +3,7 @@ use crate::crd::libvirt::VirtualMachine;
 use crate::Error::Volumelocked;
 use askama::Template;
 use kube::ResourceExt;
+use tracing::debug;
 use virt::connect::Connect;
 use virt::domain::Domain;
 
@@ -69,7 +70,7 @@ impl Libvirt {
                 ovn_id: nic.ovn_id.clone(),
             })
         }
-        println!("{:?}", &vm);
+        debug!("{:?}", &vm);
         let (memory_amount, memory_unit) = parse_memory(&vm.spec.memory)?;
         let xml = DomainTemplate {
             name: get_domain_name(vm).expect("no domain name specified"),
@@ -84,7 +85,7 @@ impl Libvirt {
         }
         .render()?;
 
-        println!("{}", xml);
+        debug!("{}", xml);
         Domain::create_xml(&self.connection, &xml, 0)?;
         Ok(())
     }

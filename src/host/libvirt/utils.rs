@@ -7,6 +7,7 @@ use kube::{Api, ResourceExt};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::sync::Arc;
+use tracing::warn;
 
 /// Construct the expected
 pub fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
@@ -17,7 +18,7 @@ pub fn get_domain_name(vm: &VirtualMachine) -> Option<String> {
             let namespace = ResourceExt::namespace(vm)
                 .or_else(|| Some(String::from("<no namespace>")))
                 .unwrap();
-            println!(
+            warn!(
                 "Ignored VM {}/{} with no domain name defined",
                 namespace,
                 vm.metadata.name.as_ref().expect("get VM name")

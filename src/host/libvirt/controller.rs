@@ -4,6 +4,7 @@ use kube::{api::Api, Client};
 use std::env;
 use std::sync::Arc;
 use tokio::time::Duration;
+use tracing::{error, info};
 
 use super::lowlevel::Libvirt;
 use crate::crd::libvirt::VirtualMachine;
@@ -38,7 +39,7 @@ fn get_event_type(vm: &VirtualMachine, ctx: &Arc<State>) -> Result<Event, Error>
     let k8s_vm_name = &vm.metadata.name.clone().expect("VM has no name");
     let is_deleted = &vm.metadata.deletion_timestamp.is_some();
 
-    println!("Received update to {} on {}", k8s_vm_name, my_node_name);
+    info!("Received update to {} on {}", k8s_vm_name, my_node_name);
 
     let libvirt_domain_name = if let Some(name) = get_domain_name(vm) {
         name
@@ -108,7 +109,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
         libvirt,
     });
     let vms: Api<VirtualMachine> = Api::all(client.clone());
-    println!("Starting libvirt host controller");
+    info!("Starting libvirt host controller");
     create_controller!(vms, reconcile, error_policy, context);
     Ok(())
 }

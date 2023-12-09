@@ -110,12 +110,12 @@ async fn remove_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
     let client = ctx.client.clone();
     let name = network.name_prefixed_with_namespace();
 
-    println!("ovn: Network {} waiting for deletion", name);
+    info!("ovn: Network {} waiting for deletion", name);
     LogicalSwitch::get_by_name(ovn, &name)?.delete()?;
     network
         .remove_finalizer("ovn", client, &super::FIELD_MANAGER)
         .await?;
-    println!("ovn: Network {} deleted", name);
+    info!("ovn: Network {} deleted", name);
 
     ok_and_requeue!(600)
 }

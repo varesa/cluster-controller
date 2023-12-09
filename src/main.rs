@@ -57,6 +57,7 @@ fn setup_tracing() -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    println!("Setting up tracing");
     setup_tracing()?;
 
     info!("Starting up");
@@ -71,13 +72,13 @@ async fn main() -> Result<(), Error> {
     let client = Client::try_default().await?;
 
     if args.contains(&String::from("--host")) {
-        println!("Starting host-mode");
+        info!("Starting host-mode");
         host::libvirt::run(client).await?;
     } else if args.contains(&String::from("--metadata-service")) {
-        println!("Staring metadata service mode");
+        info!("Staring metadata service mode");
         metadataservice::run(args, client).await?;
     } else {
-        println!("Starting cluster-mode");
+        info!("Starting cluster-mode");
         cluster::run(client, NAMESPACE).await?;
     }
 

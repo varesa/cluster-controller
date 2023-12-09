@@ -3,6 +3,7 @@ use kube::{
     api::{Patch, PatchParams},
     Api, Client,
 };
+use tracing::error;
 
 use crate::errors::Error;
 use crate::{crd, NAMESPACE};
@@ -65,8 +66,6 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
     });
 
     let _ = tokio::try_join!(ceph_task, libvirt_task, ovn_task);
-    eprintln!(
-        "supervisor: ERROR: One of the controllers died, killing the rest of the application"
-    );
+    error!("supervisor: ERROR: One of the controllers died, killing the rest of the application");
     std::process::exit(1);
 }

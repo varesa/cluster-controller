@@ -6,6 +6,7 @@ use kube::{
 use serde_json::json;
 use std::sync::Arc;
 use tokio::time::Duration;
+use tracing::info;
 
 use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
@@ -49,7 +50,7 @@ async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
         .clone();
     let name = router.name_prefixed_with_namespace();
 
-    println!("ovn: update for router {name}");
+    info!("ovn: update for router {name}");
     router
         .ensure_finalizer("ovn", client.clone(), &super::FIELD_MANAGER)
         .await?;
@@ -73,7 +74,7 @@ async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
         connect_metadataservice(&mut lr).await?;
     }
 
-    println!("ovn: update for router {name} successful");
+    info!("ovn: update for router {name} successful");
 
     let status = RouterStatus { is_created: true };
     set_router_status(&router, status, client.clone()).await?;
@@ -88,18 +89,18 @@ async fn remove_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
     let client = ctx.client.clone();
     let name = router.name_prefixed_with_namespace();
 
-    println!("ovn: Router {} waiting for deletion", name);
+    info!("ovn: Router {} waiting for deletion", name);
     LogicalRouter::get_by_name(ovn, &name)?.delete()?;
     router
         .remove_finalizer("ovn", client, &super::FIELD_MANAGER)
         .await?;
-    println!("ovn: Router {} deleted", name);
+    info!("ovn: Router {} deleted", name);
 
     ok_no_requeue!()
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {
-    println!("ovn.router: Starting controller");
+    info!("ovn.router: Starting controller");
     ResourceControllerBuilder::new(client)
         .with_default_state()
         .with_default_error_policy()

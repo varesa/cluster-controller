@@ -1,7 +1,6 @@
-use kube::Client;
-
 use crate::crd;
 use crate::errors::Error;
+use kube::Client;
 
 pub mod common;
 mod controllers;
@@ -12,7 +11,6 @@ pub(crate) mod types;
 
 pub async fn run(client: Client) -> Result<(), Error> {
     crd::ovn::create(client.clone()).await?;
-    println!("OVN: CRD created");
 
     let client_clone = client.clone();
     let network_task = tokio::task::spawn(async {

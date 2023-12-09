@@ -9,6 +9,7 @@ use kube::runtime::controller::Action;
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::time::Duration;
+use tracing::{error, info};
 use virt::domain::Domain;
 
 pub const FINALIZER: &str = "libvirt-host";
@@ -24,16 +25,16 @@ lazy_static! {
 pub async fn handle_delete(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, Error> {
     let mut vm = (*vm).clone();
     let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
-    println!("VM {} waiting for deletion by host controller", vm_name);
+    info!("VM {} waiting for deletion by host controller", vm_name);
 
     match Domain::lookup_by_name(&ctx.libvirt.connection, &vm_name) {
         Ok(domain) => {
-            println!("Domain {vm_name} exists, destroying");
+            info!("Domain {vm_name} exists, destroying");
             domain.destroy()?;
-            println!("Domain {vm_name} destroyed");
+            info!("Domain {vm_name} destroyed");
         }
         Err(_) => {
-            println!("Domain {vm_name} doesn't exist, ignoring");
+            error!("Domain {vm_name} doesn't exist, ignoring");
         }
     };
     vm.remove_finalizer(FINALIZER, ctx.kube.clone(), &FIELD_MANAGER)
@@ -61,7 +62,7 @@ pub async fn handle_add(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, 
     };
     set_vm_status(&vm, status, ctx.kube.clone()).await?;
 
-    println!("Updated: {}", vm_name);
+    info!("Updated: {}", vm_name);
     ok_and_requeue!(600)
 }
 

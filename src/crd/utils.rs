@@ -2,6 +2,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomRe
 use kube::api::{Patch, PatchParams, PostParams};
 use kube::Api;
 use serde_json::json;
+use tracing::info;
 
 use crate::{Client, Error};
 
@@ -41,6 +42,6 @@ pub async fn remove_crd_version(
     let mut crd = crds.get(crd_name).await?;
     crd.spec.versions.retain(|v| v.name != crd_version);
     crds.replace(crd_name, &PostParams::default(), &crd).await?;
-    println!("CRD: Patching {:?}", &crd);
+    info!("CRD: Patching {:?}", &crd);
     Ok(())
 }

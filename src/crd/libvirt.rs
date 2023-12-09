@@ -8,6 +8,7 @@ use kube::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tracing::{debug, info};
 
 use crate::crd::utils;
 use crate::errors::Error;
@@ -137,7 +138,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
             .map(|version| version.name)
             .collect();
         if current_versions == [String::from(latest::VERSION)] {
-            println!("CRD virtualmachines: no migrations required");
+            info!("CRD virtualmachines: no migrations required");
 
             let latest_crd = latest::VirtualMachine::crd();
             crds.patch(CRD_NAME, &patch_params, &Patch::Apply(&latest_crd))
@@ -177,9 +178,9 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
     let status = vm_crd.status.expect("CRD has no status").clone();
 
     for version in status.stored_versions.clone().unwrap_or_default() {
-        println!("CRD virtualmachines: checking version {}", &version);
+        debug!("CRD virtualmachines: checking version {}", &version);
         if &version == "v1beta2" {
-            println!("CRD virtualmachines: upgrading {}", &version);
+            info!("CRD virtualmachines: upgrading {}", &version);
             for namespace in get_namespace_names(client.clone()).await? {
                 let api_v1beta2: Api<v1beta2::VirtualMachine> =
                     Api::namespaced(client.clone(), &namespace);
@@ -188,7 +189,7 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
 
                 let vms_v1beta2 = api_v1beta2.list(&ListParams::default()).await?;
                 for vm in vms_v1beta2 {
-                    println!(
+                    debug!(
                         "CRD virtualmachines: Upgrading {} {}/{}",
                         &version,
                         &namespace,
@@ -208,7 +209,7 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
                         .await?;
                 }
             }
-            println!("CRD virtualmachines: removing version {}", &version);
+            debug!("CRD virtualmachines: removing version {}", &version);
             utils::remove_crd_version(CRD_NAME, &version, client.clone()).await?;
         }
     }

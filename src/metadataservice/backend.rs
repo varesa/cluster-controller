@@ -3,6 +3,7 @@ use kube::api::ListParams;
 use kube::{Api, Client, Resource};
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
+use tracing::{error, info};
 
 use crate::cluster::ovn::common::OvnNamed;
 use crate::cluster::ovn::lowlevel::Ovn;
@@ -23,7 +24,7 @@ impl MetadataBackend {
         channel_endpoint: Receiver<MetadataRequest>,
         client: Client,
     ) -> Result<(), Error> {
-        println!("backend: Starting metadata backend");
+        info!("backend: Starting metadata backend");
         let mut mb = MetadataBackend {
             channel_endpoint,
             client,
@@ -38,7 +39,7 @@ impl MetadataBackend {
 
                 let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
                 let ports = LogicalSwitchPort::get_by_ip(ovn, ip.to_string())?;
-                println!("backend: Ports for {}: {:#?}", ip, ports);
+                info!("backend: Ports for {}: {:#?}", ip, ports);
 
                 let port = if ports.len() == 1 {
                     ports.first().unwrap()
@@ -55,7 +56,7 @@ impl MetadataBackend {
                     continue;
                 };
 
-                println!("backend: Selected {}", port.name());
+                info!("backend: Selected {}", port.name());
 
                 let vms_api: Api<VirtualMachine> = Api::all(self.client.clone());
                 let vms = vms_api.list(&ListParams::default()).await?;
@@ -70,7 +71,7 @@ impl MetadataBackend {
                     .collect();
                 assert_eq!(matching_vms.len(), 1);
                 let vm = matching_vms.first().unwrap();
-                println!("backend: Matched VM {:?}", vm);
+                info!("backend: Matched VM {:?}", vm);
 
                 if let Some(userdata_name) = &vm.spec.userdata {
                     let cm_api: Api<ConfigMap> =
@@ -81,7 +82,7 @@ impl MetadataBackend {
                         .await
                         .as_ref()
                         .map_err(|e| {
-                            println!("backend: {:?}", e);
+                            info!("backend: {:?}", e);
                             Error::ConfigMapNotFound(userdata_name.to_string())
                         })
                         .and_then(|config_map| {
@@ -112,7 +113,7 @@ impl MetadataBackend {
                                 .await?;
                         }
                         Err(e) => {
-                            println!("backend: error fetching metadata for {}: {:?}", &msg.ip, e);
+                            error!("backend: error fetching metadata for {}: {:?}", &msg.ip, e);
                             msg.return_channel
                                 .send(MetadataResponse {
                                     ip: msg.ip,
@@ -122,7 +123,7 @@ impl MetadataBackend {
                         }
                     }
                 } else {
-                    println!("backend: No userdata specified in vm spec");
+                    info!("backend: No userdata specified in vm spec");
                     msg.return_channel
                         .send(MetadataResponse {
                             ip: msg.ip,

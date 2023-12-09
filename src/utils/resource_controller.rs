@@ -7,7 +7,7 @@ use std::future::Future;
 use std::hash::Hash;
 use std::sync::Arc;
 use tokio::time::Duration;
-use tracing::{info_span, Instrument};
+use tracing::{error, info_span, Instrument};
 
 use crate::errors::Error;
 
@@ -145,7 +145,7 @@ where
             .for_each(|res| async move {
                 match res {
                     Ok(_o) => { /*println!("reconciled {:?}", o)*/ }
-                    Err(e) => println!("reconcile failed: {:?}", e),
+                    Err(e) => error!("reconcile failed: {:?}", e),
                 }
             })
     }
