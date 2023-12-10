@@ -119,11 +119,12 @@ where
                     let update_fn = update_fn.clone();
 
                     let span = info_span!(
+                        parent: None,
                         "reconcile resource",
                         "kind" =
                             ResourceType::kind(&ResourceType::DynamicType::default()).to_string(),
                         "ns" = object.meta().namespace.clone(),
-                        "name" = object.meta().name.clone()
+                        "name" = object.meta().name.clone(),
                     );
 
                     async move {
