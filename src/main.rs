@@ -1,10 +1,13 @@
 use kube::Client;
 use opentelemetry::trace::TracerProvider as _;
+use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::trace::{Tracer, TracerProvider};
+use opentelemetry_sdk::{trace, Resource};
 use std::env;
 use tracing::info;
 use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing_subscriber::filter::FilterExt;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
@@ -40,17 +43,18 @@ fn setup_otlp_layer(endpoint: &str) -> Result<OpenTelemetryLayer<Registry, Trace
 }
 
 fn setup_tracing() -> Result<(), Error> {
-    let console_layer = tracing_subscriber::fmt::layer()
-        .compact()
-        .with_filter(tracing_subscriber::EnvFilter::from_default_env());
+    /*let console_layer = tracing_subscriber::fmt::layer()
+    .compact()
+    .with_filter(tracing_subscriber::EnvFilter::from_default_env());*/
 
     let subscriber = Registry::default();
     let mut layers = Vec::new();
 
     if let Ok(endpoint) = env::var("OTLP_ENDPOINT") {
+        println!("Adding OTLP export");
         layers.push(setup_otlp_layer(&endpoint)?.boxed());
     }
-    layers.push(console_layer.boxed());
+    //layers.push(console_layer.boxed());
 
     tracing::subscriber::set_global_default(subscriber.with(layers))?;
 
@@ -68,7 +72,46 @@ async fn main() -> Result<(), Error> {
     }
 
     println!("Setting up tracing");
-    setup_tracing()?;
+    //setup_tracing()?;
+
+    /*let console_layer = tracing_subscriber::fmt::layer()
+    .compact()
+    .with_filter(tracing_subscriber::EnvFilter::from_default_env());*/
+
+    let subscriber = Registry::default();
+    let mut layers = Vec::new();
+
+    let otlp_exporter = opentelemetry_otlp::new_exporter()
+        .tonic()
+        .with_endpoint(&env::var("OTLP_ENDPOINT").unwrap())
+        .build_span_exporter()?;
+
+    let provider = TracerProvider::builder()
+        .with_simple_exporter(otlp_exporter)
+        .with_config(
+            trace::config().with_resource(Resource::new(vec![KeyValue::new(
+                "service.name",
+                "example",
+            )])),
+        )
+        .build();
+
+    let tracer = provider.tracer("cluster-controller");
+
+    let layer = tracing_opentelemetry::layer()
+        .with_tracer(tracer)
+        .with_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .boxed();
+
+    /*if let Ok(endpoint) = env::var("OTLP_ENDPOINT") {
+        println!("Adding OTLP export");
+        layers.push(setup_otlp_layer(&endpoint)?.boxed());
+    }*/
+    //layers.push(console_layer.boxed());
+    layers.push(layer);
+
+    tracing::subscriber::set_global_default(subscriber.with(layers))?;
+
     info!("Starting up");
 
     let client = Client::try_default().await?;
