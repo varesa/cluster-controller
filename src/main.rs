@@ -41,6 +41,7 @@ fn setup_otlp_layer(endpoint: &str) -> Result<OpenTelemetryLayer<Registry, Trace
 
 fn setup_tracing() -> Result<(), Error> {
     let console_layer = tracing_subscriber::fmt::layer()
+        .compact()
         .with_filter(tracing_subscriber::EnvFilter::from_default_env());
 
     let subscriber = Registry::default();
@@ -50,7 +51,8 @@ fn setup_tracing() -> Result<(), Error> {
         layers.push(setup_otlp_layer(&endpoint)?.boxed());
     }
     layers.push(console_layer.boxed());
-    tracing::subscriber::set_global_default(subscriber)?;
+
+    tracing::subscriber::set_global_default(subscriber.with(layers))?;
 
     Ok(())
 }
