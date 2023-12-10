@@ -6,7 +6,7 @@ use kube::{
 use serde_json::json;
 use std::sync::Arc;
 use tokio::time::Duration;
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
@@ -26,6 +26,7 @@ create_set_status!(Network, NetworkStatus, set_network_status);
 /// - Apply the DHCP prefix to the LS
 ///
 /// no-op if already set correctly
+#[instrument]
 fn ensure_dhcp(name: &str, dhcp: &DhcpOptionsCrd) -> Result<(), Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mut dhcp_opts = match DhcpOptions::get_by_cidr(ovn.clone(), &dhcp.cidr) {
@@ -43,6 +44,7 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptionsCrd) -> Result<(), Error> {
 }
 
 /// Connect a router to a logical switch with the given IP address
+#[instrument]
 fn ensure_router_attachment(
     network: &Network,
     router_attachment: &RouterAttachment,

@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::time::Duration;
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::crd::ceph::Volume;
 use crate::errors::Error;
@@ -30,6 +30,7 @@ lazy_static! {
 
 /// Check if an volume already exists in the cluster and
 /// create if it doesn't.
+#[instrument]
 fn ensure_exists(name: &str, size: u64, template: Option<String>) -> Result<(), Error> {
     let cluster = lowlevel::connect()?;
     let volume_pool = lowlevel::get_pool(cluster, POOL_VOLUMES.into())?;
@@ -61,6 +62,7 @@ fn ensure_exists(name: &str, size: u64, template: Option<String>) -> Result<(), 
     Ok(())
 }
 
+#[instrument]
 fn ensure_removed(name: &str) -> Result<(), Error> {
     let cluster = lowlevel::connect()?;
     let pool = lowlevel::get_pool(cluster, POOL_VOLUMES.into())?;
@@ -74,6 +76,7 @@ fn ensure_removed(name: &str) -> Result<(), Error> {
     Ok(())
 }
 
+#[instrument]
 fn get_ceph_keyring() -> Result<String, Error> {
     info!("ceph: Getting keyring from cluster");
     let cluster = lowlevel::connect()?;
@@ -83,6 +86,7 @@ fn get_ceph_keyring() -> Result<String, Error> {
     Ok(key)
 }
 
+#[instrument(skip(client))]
 async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error> {
     info!("ceph: Saving keyring in secret");
     let secrets: Api<Secret> = Api::namespaced(client, NAMESPACE);
@@ -108,6 +112,7 @@ async fn create_ceph_secret(client: Client, secret: String) -> Result<(), Error>
 }
 
 /// Ensure that we have a ceph key for libvirt
+#[instrument(skip(client))]
 async fn ensure_keyring(client: Client) -> Result<(), Error> {
     let secrets: Api<Secret> = Api::namespaced(client.clone(), NAMESPACE);
     let keyring = secrets.get(KEYRING_SECRET).await;
@@ -159,6 +164,7 @@ async fn remove_fn(volume: Arc<Volume>, ctx: Arc<DefaultState>) -> Result<Action
     Ok(Action::requeue(Duration::from_secs(600)))
 }
 
+#[instrument(skip(client))]
 pub async fn create(client: Client) -> Result<(), Error> {
     ensure_keyring(client.clone()).await?;
     info!("ceph: Starting controller");

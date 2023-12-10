@@ -12,6 +12,7 @@ use crate::cluster::ovn::types::staticroute::StaticRoute;
 use crate::crd::ovn::Route as RouteCrd;
 use crate::Error;
 
+#[derive(Debug)]
 pub struct LogicalRouter {
     ovn: Arc<Ovn>,
     uuid: String,

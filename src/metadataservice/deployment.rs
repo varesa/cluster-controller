@@ -5,6 +5,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::api::{Patch, PatchParams};
 use kube::{Api, Client, ResourceExt};
 use serde_json::json;
+use tracing::instrument;
 
 use crate::cluster::get_running_image;
 use crate::Error;
@@ -130,6 +131,7 @@ pub fn make_deployment(image: &str, namespace: &str, router: &str) -> Result<Dep
     Ok(ds)
 }
 
+#[instrument(skip(client))]
 pub async fn create_rbac(client: Client, namespace: &str, controller: &str) -> Result<(), Error> {
     let service_accounts: Api<ServiceAccount> = Api::namespaced(client.clone(), namespace);
     let sa = make_service_account(namespace);
@@ -163,6 +165,7 @@ pub async fn create_rbac(client: Client, namespace: &str, controller: &str) -> R
     Ok(())
 }
 
+#[instrument(skip(client))]
 pub async fn create_deployment(
     client: Client,
     controller: &str,
@@ -182,6 +185,7 @@ pub async fn create_deployment(
     Ok(())
 }
 
+#[instrument(skip(client))]
 pub async fn deploy(
     client: Client,
     controller: &str,

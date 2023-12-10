@@ -13,6 +13,7 @@ use tracing::{debug, info};
 use crate::crd::utils;
 use crate::errors::Error;
 use crate::utils::{get_namespace_names, wait_crd_ready};
+use tracing::instrument;
 
 const CRD_NAME: &str = "virtualmachines.cluster-virt.acl.fi";
 

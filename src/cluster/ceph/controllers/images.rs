@@ -3,7 +3,7 @@ use kube::Client;
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::time::Duration;
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::crd::ceph::Image;
 use crate::errors::Error;
@@ -91,6 +91,7 @@ async fn remove_fn(image: Arc<Image>, ctx: Arc<DefaultState>) -> Result<Action, 
     Ok(Action::requeue(Duration::from_secs(600)))
 }
 
+#[instrument(skip(client))]
 pub async fn create(client: Client) -> Result<(), Error> {
     ResourceControllerBuilder::new(client)
         .with_default_state()

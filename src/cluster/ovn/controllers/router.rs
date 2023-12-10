@@ -6,7 +6,7 @@ use kube::{
 use serde_json::json;
 use std::sync::Arc;
 use tokio::time::Duration;
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
@@ -25,6 +25,7 @@ create_set_status!(Router, RouterStatus, set_router_status);
 /// Create network components for the MDS:
 /// - An LS that is connected to the router and has the MDS subnet
 /// - An LSP that the MDS will use
+#[instrument]
 async fn connect_metadataservice(lr: &mut LogicalRouter) -> Result<(), Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mds_name = format!("mds-{}", lr.name());

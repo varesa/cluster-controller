@@ -6,6 +6,7 @@ use kube::core::object::HasStatus;
 use kube::{Api, Client, CustomResourceExt, Resource, ResourceExt};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use tracing::instrument;
 
 pub trait TryStatus {
     type Status;
@@ -89,6 +90,7 @@ where
             .is_some()
     }
 
+    #[instrument(skip(client))]
     async fn ensure_finalizer(
         &mut self,
         finalizer_name: &str,
@@ -108,6 +110,7 @@ where
         Ok(())
     }
 
+    #[instrument(skip(client))]
     async fn remove_finalizer(
         &mut self,
         finalizer_name: &str,

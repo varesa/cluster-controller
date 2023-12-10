@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use serde_json::{Map, Value};
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::Error;
@@ -60,6 +60,7 @@ impl<T> OvnNamedGetters for T
 where
     T: OvnNamed,
 {
+    #[instrument]
     fn get_by_name(ovn: Arc<Ovn>, name: &str) -> Result<Self, Error> {
         Self::list(ovn)?
             .into_iter()
@@ -81,6 +82,7 @@ where
         Self::get_by_name(ovn, name)
     }
 
+    #[instrument]
     fn create_if_missing(ovn: Arc<Ovn>, name: &str) -> Result<Self, Error> {
         info!("create_if_missing");
         match Self::get_by_name(ovn.clone(), name) {

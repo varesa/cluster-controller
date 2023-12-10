@@ -12,6 +12,7 @@ use librbd_sys::{
     rbd_clone, rbd_close, rbd_create, rbd_get_features, rbd_image_t, rbd_list, rbd_list_lockers,
     rbd_open, rbd_open_read_only, rbd_remove,
 };
+use tracing::instrument;
 
 use crate::errors::{Error, RadosError};
 
@@ -46,6 +47,7 @@ macro_rules! drop_cstring {
     }
 }
 
+#[instrument]
 pub fn connect() -> Result<rados_t, Error> {
     unsafe {
         let mut cluster: rados_t = 0 as rados_t;
@@ -74,6 +76,7 @@ pub fn connect() -> Result<rados_t, Error> {
     }
 }
 
+#[instrument]
 pub fn disconnect(cluster: rados_t) {
     unsafe {
         rados_shutdown(cluster);
@@ -105,6 +108,7 @@ pub fn get_pools(cluster: rados_t) -> Result<Vec<String>, Error> {
     Ok(pools)
 }
 
+#[instrument]
 pub fn get_pool(cluster: rados_t, pool_name: String) -> Result<rados_ioctx_t, Error> {
     let mut pool: rados_ioctx_t = 0 as rados_ioctx_t;
 
@@ -125,12 +129,14 @@ pub fn get_pool(cluster: rados_t, pool_name: String) -> Result<rados_ioctx_t, Er
     Ok(pool)
 }
 
+#[instrument]
 pub fn close_pool(pool: rados_ioctx_t) {
     unsafe {
         rados_ioctx_destroy(pool);
     }
 }
 
+#[instrument]
 pub fn get_images(pool: rados_ioctx_t) -> Result<Vec<String>, Error> {
     let mut buffer = vec![0u8; 1024];
     let mut buffer_len: libc::size_t = buffer.len();
@@ -344,10 +350,10 @@ pub fn has_locks(pool: rados_ioctx_t, image_name: &str) -> Result<bool, Error> {
 
     match code {
         0 => Ok(false),
-        NEG_ERANGE => { 
+        NEG_ERANGE => {
             let locks = clients_len > 0 || cookies_len > 0 || addrs_len > 0;
             Ok(locks)
-        },
+        }
         _ => Err(RadosError {
             operation: String::from("rbd_list_lockers"),
             code,
