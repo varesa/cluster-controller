@@ -7,7 +7,6 @@ use opentelemetry_sdk::{trace, Resource};
 use std::env;
 use tracing::info;
 use tracing_opentelemetry::OpenTelemetryLayer;
-use tracing_subscriber::filter::FilterExt;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
@@ -27,6 +26,10 @@ const NAMESPACE: &str = "virt-controller";
 const GROUP_NAME: &str = "cluster-virt.acl.fi";
 const KEYRING_SECRET: &str = "ceph-client.libvirt";
 
+/// Create a tracing_subscriber layer which exports traces to the given OTLP endpoint.
+/// In addition to the tracing_subscriber layer, it also returns a TracerProvider which should be
+/// kept in scope in order for the exporter to stay alive. Dropping that will cause the exporter
+/// to silenty stop sending traces
 fn setup_otlp_layer(
     endpoint: &str,
 ) -> Result<(TracerProvider, OpenTelemetryLayer<Registry, Tracer>), Error> {
@@ -40,7 +43,7 @@ fn setup_otlp_layer(
         .with_config(
             trace::config().with_resource(Resource::new(vec![KeyValue::new(
                 "service.name",
-                "example",
+                "cluster-controller",
             )])),
         )
         .build();
@@ -52,24 +55,29 @@ fn setup_otlp_layer(
     Ok((provider, layer))
 }
 
-fn setup_tracing() -> Result<(), Error> {
-    /*let console_layer = tracing_subscriber::fmt::layer()
-    .compact()
-    .with_filter(tracing_subscriber::EnvFilter::from_default_env());*/
+fn setup_tracing() -> Result<Option<TracerProvider>, Error> {
+    let console_layer = tracing_subscriber::fmt::layer()
+        .compact()
+        .with_filter(tracing_subscriber::EnvFilter::from_default_env());
 
     let subscriber = Registry::default();
     let mut layers = Vec::new();
 
+    let mut provider = None;
     if let Ok(endpoint) = env::var("OTLP_ENDPOINT") {
         println!("Adding OTLP export");
-        let (_provider, exporter_layer) = setup_otlp_layer(&endpoint)?;
-        layers.push(exporter_layer.boxed());
+        let (tracer_provider, exporter_layer) = setup_otlp_layer(&endpoint)?;
+        layers.push(
+            exporter_layer
+                .with_filter(tracing_subscriber::EnvFilter::from_default_env())
+                .boxed(),
+        );
+        provider = Some(tracer_provider);
     }
-    //layers.push(console_layer.boxed());
-
+    layers.push(console_layer.boxed());
     tracing::subscriber::set_global_default(subscriber.with(layers))?;
 
-    Ok(())
+    Ok(provider)
 }
 
 #[tokio::main]
@@ -83,29 +91,7 @@ async fn main() -> Result<(), Error> {
     }
 
     println!("Setting up tracing");
-    //setup_tracing()?;
-
-    /*let console_layer = tracing_subscriber::fmt::layer()
-    .compact()
-    .with_filter(tracing_subscriber::EnvFilter::from_default_env());*/
-
-    let subscriber = Registry::default();
-    let mut layers = Vec::new();
-
-    /*if let Ok(endpoint) = env::var("OTLP_ENDPOINT") {
-        println!("Adding OTLP export");
-        layers.push(setup_otlp_layer(&endpoint)?.boxed());
-    }*/
-    //layers.push(console_layer.boxed());
-
-    let (_provider, exporter_layer) = setup_otlp_layer(&env::var("OTLP_ENDPOINT").unwrap())?;
-    let layer = exporter_layer
-        .with_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .boxed();
-
-    layers.push(layer);
-
-    tracing::subscriber::set_global_default(subscriber.with(layers))?;
+    let _provider = setup_tracing()?;
 
     info!("Starting up");
 
