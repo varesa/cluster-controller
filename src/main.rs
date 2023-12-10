@@ -27,7 +27,9 @@ const NAMESPACE: &str = "virt-controller";
 const GROUP_NAME: &str = "cluster-virt.acl.fi";
 const KEYRING_SECRET: &str = "ceph-client.libvirt";
 
-fn setup_otlp_layer(endpoint: &str) -> Result<OpenTelemetryLayer<Registry, Tracer>, Error> {
+fn setup_otlp_layer(
+    endpoint: &str,
+) -> Result<(TracerProvider, OpenTelemetryLayer<Registry, Tracer>), Error> {
     let otlp_exporter = opentelemetry_otlp::new_exporter()
         .tonic()
         .with_endpoint(endpoint)
@@ -35,11 +37,19 @@ fn setup_otlp_layer(endpoint: &str) -> Result<OpenTelemetryLayer<Registry, Trace
 
     let provider = TracerProvider::builder()
         .with_simple_exporter(otlp_exporter)
+        .with_config(
+            trace::config().with_resource(Resource::new(vec![KeyValue::new(
+                "service.name",
+                "example",
+            )])),
+        )
         .build();
 
     let tracer = provider.tracer("cluster-controller");
+    let layer = tracing_opentelemetry::layer().with_tracer(tracer);
 
-    Ok(tracing_opentelemetry::layer().with_tracer(tracer))
+    // We must return provider to prevent it from being dropped
+    Ok((provider, layer))
 }
 
 fn setup_tracing() -> Result<(), Error> {
@@ -52,7 +62,8 @@ fn setup_tracing() -> Result<(), Error> {
 
     if let Ok(endpoint) = env::var("OTLP_ENDPOINT") {
         println!("Adding OTLP export");
-        layers.push(setup_otlp_layer(&endpoint)?.boxed());
+        let (_provider, exporter_layer) = setup_otlp_layer(&endpoint)?;
+        layers.push(exporter_layer.boxed());
     }
     //layers.push(console_layer.boxed());
 
@@ -81,33 +92,17 @@ async fn main() -> Result<(), Error> {
     let subscriber = Registry::default();
     let mut layers = Vec::new();
 
-    let otlp_exporter = opentelemetry_otlp::new_exporter()
-        .tonic()
-        .with_endpoint(&env::var("OTLP_ENDPOINT").unwrap())
-        .build_span_exporter()?;
-
-    let provider = TracerProvider::builder()
-        .with_simple_exporter(otlp_exporter)
-        .with_config(
-            trace::config().with_resource(Resource::new(vec![KeyValue::new(
-                "service.name",
-                "example",
-            )])),
-        )
-        .build();
-
-    let tracer = provider.tracer("cluster-controller");
-
-    let layer = tracing_opentelemetry::layer()
-        .with_tracer(tracer)
-        .with_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .boxed();
-
     /*if let Ok(endpoint) = env::var("OTLP_ENDPOINT") {
         println!("Adding OTLP export");
         layers.push(setup_otlp_layer(&endpoint)?.boxed());
     }*/
     //layers.push(console_layer.boxed());
+
+    let (_provider, exporter_layer) = setup_otlp_layer(&env::var("OTLP_ENDPOINT").unwrap())?;
+    let layer = exporter_layer
+        .with_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .boxed();
+
     layers.push(layer);
 
     tracing::subscriber::set_global_default(subscriber.with(layers))?;
