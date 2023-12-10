@@ -4,6 +4,7 @@ use crate::utils::extend_traits::{ExtendResource, TryStatus};
 use kube::Client;
 use serde_json::json;
 use sha2::{Digest, Sha256};
+use tracing::instrument;
 use uuid::Uuid;
 
 const PREFIX: &str = "52:54:00";
@@ -42,6 +43,7 @@ fn find_matching_network<'a>(
 
 /// For every network in the VM spec, add MAC addresses and OVN port IDs where necessary and not
 /// specified. Save the extra information in the status subresource
+#[instrument(skip(client))]
 pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
     let vm_name = vm.name_prefixed_with_namespace();
 
@@ -91,6 +93,7 @@ pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Er
 }
 
 /// Create a libvirt UUID for a VM if not yet set
+#[instrument(skip(client))]
 pub async fn fill_uuid(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
     if vm.spec.uuid.is_none() {
         vm.spec.uuid = Some(

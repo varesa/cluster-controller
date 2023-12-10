@@ -59,6 +59,7 @@ where
         + Send,
     <T as Resource>::DynamicType: Default,
 {
+    #[instrument(skip(client))]
     async fn commit(&mut self, client: Client, field_manager: &str) -> Result<(), Error> {
         let api: Api<Self> = if let Some(namespace) = self.namespace() {
             Api::namespaced(client, &namespace)

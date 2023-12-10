@@ -15,7 +15,7 @@ use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
-use tracing::info;
+use tracing::{info, info_span, Instrument};
 
 lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("libvirt.vm");
@@ -62,7 +62,10 @@ async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
     let reschedule_required = is_uncompliant(&vm, client.clone()).await?;
 
     if !status.scheduled || migration_required || reschedule_required {
-        let _mutex = SCHEDULE_MUTEX.lock().await;
+        let _mutex = SCHEDULE_MUTEX
+            .lock()
+            .instrument(info_span!("wait for scheduler mutex"))
+            .await;
         info!("libvirt: Acquired mutex to schedule: {}", name);
 
         // Schedule normally

@@ -5,12 +5,14 @@ use kube::{
     Client,
 };
 use rand::seq::SliceRandom;
+use tracing::instrument;
 
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
 use crate::utils::extend_traits::{ExtendResource, TryStatus};
 
 /// Find all VMs registered to the k8s apiserver with the given label set to the given value
+#[instrument(skip(client))]
 async fn get_vms_with_label(
     client: Client,
     label: &str,
@@ -26,6 +28,7 @@ async fn get_vms_with_label(
 }
 
 /// Return all VMs except self in the same anti-affinity group as the given VM
+#[instrument(skip(client))]
 async fn get_others_in_affinity_group(
     client: Client,
     ref_vm: &VirtualMachine,
@@ -41,6 +44,7 @@ async fn get_others_in_affinity_group(
 }
 
 /// Check for compliance with anti-affinity groups
+#[instrument(skip(client))]
 pub async fn is_uncompliant(vm: &VirtualMachine, client: Client) -> Result<bool, Error> {
     let status = vm.try_status()?.clone();
 
@@ -77,6 +81,7 @@ pub fn migration_requested(vm: &VirtualMachine) -> bool {
 
 /// Checks if the VM has the annotation signaling a migration request set, and if it points to some
 /// other node as a result of a completed migration. Clear the label in that case.
+#[instrument(skip(client))]
 pub async fn clear_successful_migration(
     vm: &mut VirtualMachine,
     client: Client,
@@ -99,6 +104,7 @@ fn get_vm_node(vm: &VirtualMachine) -> Option<String> {
 }
 
 /// Return all nodes that have a VM scheduled with the given label
+#[instrument(skip(client))]
 async fn get_nodes_with_label_scheduled(
     client: Client,
     label: &str,
@@ -130,6 +136,7 @@ const ANTI_AFFINITY_LABEL: &str = "antiAffinity";
 ///
 /// ignore_affinity allows temporarily bypassing anti-affinity rules which can be useful in case
 /// of e.g. host maintenance
+#[instrument(skip(client))]
 pub(crate) async fn schedule(
     vm: &VirtualMachine,
     ignore_affinity: bool,
