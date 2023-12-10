@@ -57,17 +57,17 @@ fn setup_tracing() -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    println!("Setting up tracing");
-    setup_tracing()?;
-
-    info!("Starting up");
-
     let args: Vec<String> = env::args().collect();
 
     if args.contains(&String::from("--version")) {
+        // This is used by packaging scripts, ensure no other output gets printed
         println!("{}", get_version_string());
         return Ok(());
     }
+
+    println!("Setting up tracing");
+    setup_tracing()?;
+    info!("Starting up");
 
     let client = Client::try_default().await?;
 
