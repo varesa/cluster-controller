@@ -13,6 +13,24 @@ use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{Layer, Registry};
 
+trait GetAttribute {
+    fn get_attribute(&self, name: &str) -> Option<Cow<str>>;
+}
+
+impl GetAttribute for SpanData {
+    fn get_attribute(&self, name: &str) -> Option<Cow<str>> {
+        self.attributes
+            .iter()
+            .filter_map(|kv: &KeyValue| {
+                if kv.key.as_str() == name {
+                    Some(kv.value.as_str())
+                } else {
+                    None
+                }
+            })
+            .next()
+    }
+}
 #[derive(Debug)]
 struct Wrapper(opentelemetry_otlp::SpanExporter);
 
@@ -24,18 +42,15 @@ impl SpanExporter for Wrapper {
                 let mut span_data = span_data.clone();
                 if span_data.name == "reconcile resource" {
                     let resource_type = span_data
-                        .attributes
-                        .iter()
-                        .filter_map(|kv: &KeyValue| {
-                            if kv.key.as_str() == "kind" {
-                                Some(kv.value.as_str())
-                            } else {
-                                None
-                            }
-                        })
-                        .next()
+                        .get_attribute("kind")
                         .unwrap_or(Cow::from("unknown"));
                     span_data.name = Cow::from(format!("reconcile {resource_type}"));
+                }
+                if span_data.name == "get_by_name" {
+                    let resource_type = span_data
+                        .get_attribute("kind")
+                        .unwrap_or(Cow::from("unknown"));
+                    span_data.name = Cow::from(format!("get_by_name {resource_type}"));
                 }
                 span_data
             })

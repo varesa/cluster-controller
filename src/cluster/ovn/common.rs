@@ -60,7 +60,7 @@ impl<T> OvnNamedGetters for T
 where
     T: OvnNamed,
 {
-    #[instrument]
+    #[instrument(fields(kind = Self::ovn_type()))]
     fn get_by_name(ovn: Arc<Ovn>, name: &str) -> Result<Self, Error> {
         Self::list(ovn)?
             .into_iter()
