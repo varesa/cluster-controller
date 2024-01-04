@@ -23,6 +23,7 @@ pub struct NetworkInterfaceTemplate {
     pub bridge: String,
     pub mac: String,
     pub ovn_id: Option<String>,
+    pub model: String,
 }
 
 #[derive(Template)]
@@ -33,6 +34,7 @@ pub struct StorageTemplate {
     pub device: String,
     pub bootdevice: bool,
     pub bus_slot: u8,
+    pub bus: String,
 }
 
 #[derive(Template)]

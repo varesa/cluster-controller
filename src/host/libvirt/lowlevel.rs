@@ -42,15 +42,30 @@ impl Libvirt {
 
     pub fn create_domain(&self, vm: &VirtualMachine, cluster: &Cluster) -> Result<(), Error> {
         let namespace = ResourceExt::namespace(vm).expect("VM without namespace?");
+
+        let storage_device_prefix;
+        let storage_bus;
+        let network_model;
+        if vm.spec.compatibility_mode.unwrap_or(false) {
+            storage_device_prefix = "sd";
+            storage_bus = "sata";
+            network_model = "e1000";
+        } else {
+            storage_device_prefix = "vd";
+            storage_bus = "virtio";
+            network_model = "virtio";
+        }
+
         let mut volumes = Vec::new();
         for (index, volume) in vm.spec.volumes.iter().enumerate() {
             let drive_index: u8 = index.try_into().expect("Volume index overflows u8");
             volumes.push(StorageTemplate {
                 pool: String::from("volumes"),
                 image: format!("{}-{}", namespace, volume.name),
-                device: format!("vd{}", (b'a' + drive_index) as char),
+                device: format!("{}{}", &storage_device_prefix, (b'a' + drive_index) as char),
                 bus_slot: drive_index,
                 bootdevice: volumes.is_empty(), // First device is the boot device
+                bus: storage_bus.to_string(),
             });
         }
 
@@ -68,6 +83,7 @@ impl Libvirt {
                 bridge,
                 mac: nic.mac_address.clone().expect("MAC to be set"),
                 ovn_id: nic.ovn_id.clone(),
+                model: network_model.to_string(),
             })
         }
         debug!("{:?}", &vm);

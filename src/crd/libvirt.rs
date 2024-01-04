@@ -112,6 +112,7 @@ pub mod v1beta3 {
         pub networks: Vec<NetworkAttachment>,
         pub uuid: Option<String>,
         pub userdata: Option<String>,
+        pub compatibility_mode: Option<bool>,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]

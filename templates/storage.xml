@@ -8,7 +8,7 @@
         <host name='10.4.2.32' port='6789'/>
         <host name='10.4.2.33' port='6789'/>
     </source>
-    <target dev='{{device}}' bus='virtio'/>
+    <target dev='{{device}}' bus='{{bus}}'/>
     {% if bootdevice %}
     <boot order='1'/>
     {% endif %}

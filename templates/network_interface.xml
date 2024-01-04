@@ -9,5 +9,5 @@
             <source bridge='{{bridge}}'/>
     {% endmatch %}
     <mac address="{{mac}}"/>
-    <model type="virtio"/>
+    <model type="{{model}}"/>
 </interface>
