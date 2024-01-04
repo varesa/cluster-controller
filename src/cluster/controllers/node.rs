@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::info;
 
-use crate::cluster::libvirt::controller::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
+use crate::cluster::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
 use crate::ok_and_requeue;

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use kube::runtime::controller::Action;
 use kube::{api::Api, Client, ResourceExt};
+use lazy_static::lazy_static;
 use tokio::time::Duration;
 use tracing::info;
 
@@ -14,7 +15,12 @@ use crate::crd::ovn::Network;
 use crate::errors::Error;
 use crate::utils::extend_traits::ExtendResource;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
+use crate::utils::strings::field_manager;
 use crate::{ok_and_requeue, ok_no_requeue};
+
+lazy_static! {
+    static ref FIELD_MANAGER: String = field_manager("ovn");
+}
 
 async fn connect_vm_nic(
     client: Client,
@@ -76,7 +82,7 @@ async fn update_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
     let client = ctx.client.clone();
 
     info!("ovn: VM {name} updated");
-    vm.ensure_finalizer("ovn", client.clone(), &super::FIELD_MANAGER)
+    vm.ensure_finalizer("ovn", client.clone(), &FIELD_MANAGER)
         .await?;
     let mut ip_addresses: Vec<String> = Vec::new();
     for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
@@ -115,8 +121,7 @@ async fn remove_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
         info!("ovn: disconnecting NIC {index} for VM {name}");
         disconnect_vm_nic(&vm, nic)?;
     }
-    vm.remove_finalizer("ovn", client, &super::FIELD_MANAGER)
-        .await?;
+    vm.remove_finalizer("ovn", client, &FIELD_MANAGER).await?;
     ok_no_requeue!()
 }
 

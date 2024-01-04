@@ -107,7 +107,7 @@ where
     RemoveFut: Future<Output = Result<Action, Error>> + Send + 'static,
     State: Send + Sync + 'static,
 {
-    pub fn run(self) -> impl Future {
+    pub async fn run(self) {
         let api: Api<ResourceType> = Api::all(self.client.clone());
         let remove_fn = Arc::new(self.remove_fn);
         let update_fn = Arc::new(self.update_fn);
@@ -149,5 +149,7 @@ where
                     Err(e) => error!("reconcile failed: {:?}", e),
                 }
             })
+            .await;
+        unreachable!("Controller should never exit");
     }
 }

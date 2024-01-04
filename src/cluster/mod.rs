@@ -6,14 +6,17 @@ use kube::{
 use tracing::error;
 
 use crate::errors::Error;
+use crate::host::daemonset;
 use crate::{crd, NAMESPACE};
 
-mod ceph;
-mod daemonset;
+mod controllers;
 mod libvirt;
 pub mod ovn;
 
 const DEPLOYMENT_NAME: &str = "cluster-controller";
+
+pub const MAINTENANCE_ANNOTATION: &str = "cluster-virt.acl.fi/maintenance";
+pub const MIGRATION_REQUEST_ANNOTATION: &str = "cluster-virt.acl.fi/migration-required";
 
 pub async fn get_running_image(kube: Client) -> Result<String, Error> {
     let deployments: Api<Deployment> = Api::namespaced(kube, NAMESPACE);
@@ -44,28 +47,7 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
         )
         .await?;
 
-    // Create ceph cluster controller
-    let client_clone = client.clone();
-    let ceph_task = tokio::task::spawn(async {
-        panic!("Ceph task exited: {:?}", ceph::run(client_clone).await);
-    });
-
-    // Create libvirt cluster controller
-    let client_clone = client.clone();
-    let libvirt_task = tokio::task::spawn(async {
-        panic!(
-            "Libvirt task exited: {:?}",
-            libvirt::run(client_clone).await
-        );
-    });
-
-    // Create libvirt cluster controller
-    let client_clone = client.clone();
-    let ovn_task = tokio::task::spawn(async {
-        panic!("OVN task exited: {:?}", ovn::run(client_clone).await);
-    });
-
-    let _ = tokio::try_join!(ceph_task, libvirt_task, ovn_task);
-    error!("supervisor: ERROR: One of the controllers died, killing the rest of the application");
+    let result = controllers::run(client).await;
+    error!("supervisor: ERROR: One of the controllers died, killing the rest of the application: {result:#?}");
     std::process::exit(1);
 }

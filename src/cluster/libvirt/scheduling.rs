@@ -1,4 +1,4 @@
-use crate::cluster::libvirt::controller::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
+use crate::cluster::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
 use k8s_openapi::api::core::v1::Node;
 use kube::{
     api::{Api, ListParams, ResourceExt},

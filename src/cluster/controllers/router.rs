@@ -3,12 +3,14 @@ use kube::{
     api::{Api, PostParams},
     Client, Resource, ResourceExt,
 };
+use lazy_static::lazy_static;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{info, instrument};
 
 use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
+use crate::cluster::ovn::utils::connect_router_to_ls;
 use crate::cluster::ovn::{
     common::OvnBasicActions, common::OvnNamed, common::OvnNamedGetters, lowlevel::Ovn,
     types::logicalrouter::LogicalRouter,
@@ -18,7 +20,12 @@ use crate::errors::Error;
 use crate::metadataservice::deployment::deploy as deploy_mds;
 use crate::utils::extend_traits::ExtendResource;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
+use crate::utils::strings::field_manager;
 use crate::{create_set_status, ok_and_requeue, ok_no_requeue};
+
+lazy_static! {
+    static ref FIELD_MANAGER: String = field_manager("ovn");
+}
 
 create_set_status!(Router, RouterStatus, set_router_status);
 
@@ -30,7 +37,7 @@ async fn connect_metadataservice(lr: &mut LogicalRouter) -> Result<(), Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mds_name = format!("mds-{}", lr.name());
     let mut ls = LogicalSwitch::create_if_missing(ovn, &mds_name)?;
-    super::connect_router_to_ls(lr, &mut ls, "169.254.169.253/30")?;
+    connect_router_to_ls(lr, &mut ls, "169.254.169.253/30")?;
 
     ls.lsp()
         .create_if_missing(&mds_name, None)?
@@ -53,7 +60,7 @@ async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
 
     info!("ovn: update for router {name}");
     router
-        .ensure_finalizer("ovn", client.clone(), &super::FIELD_MANAGER)
+        .ensure_finalizer("ovn", client.clone(), &FIELD_MANAGER)
         .await?;
 
     let mut lr = LogicalRouter::create_if_missing(ovn.clone(), &name)?;
@@ -93,7 +100,7 @@ async fn remove_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
     info!("ovn: Router {} waiting for deletion", name);
     LogicalRouter::get_by_name(ovn, &name)?.delete()?;
     router
-        .remove_finalizer("ovn", client, &super::FIELD_MANAGER)
+        .remove_finalizer("ovn", client, &FIELD_MANAGER)
         .await?;
     info!("ovn: Router {} deleted", name);
 

@@ -3,12 +3,14 @@ use kube::{
     api::{Api, PostParams},
     Client, Resource, ResourceExt,
 };
+use lazy_static::lazy_static;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{info, instrument};
 
 use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
+use crate::cluster::ovn::utils::connect_router_to_ls;
 use crate::cluster::ovn::{
     common::OvnBasicActions, common::OvnNamedGetters, lowlevel::Ovn,
     types::dhcpoptions::DhcpOptions, types::logicalrouter::LogicalRouter,
@@ -17,7 +19,12 @@ use crate::crd::ovn::{DhcpOptions as DhcpOptionsCrd, Network, NetworkStatus, Rou
 use crate::errors::Error;
 use crate::utils::extend_traits::ExtendResource;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
+use crate::utils::strings::field_manager;
 use crate::{create_set_status, ok_and_requeue};
+
+lazy_static! {
+    static ref FIELD_MANAGER: String = field_manager("ovn");
+}
 
 create_set_status!(Network, NetworkStatus, set_network_status);
 
@@ -69,7 +76,7 @@ fn ensure_router_attachment(
     let ls_name = network.name_prefixed_with_namespace();
     let mut ls = LogicalSwitch::get_by_name(ovn, &ls_name)?;
 
-    super::connect_router_to_ls(&mut lr, &mut ls, &router_attachment.address)?;
+    connect_router_to_ls(&mut lr, &mut ls, &router_attachment.address)?;
 
     Ok(())
 }
@@ -84,7 +91,7 @@ async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
     let client = ctx.client.clone();
 
     network
-        .ensure_finalizer("ovn", client.clone(), &super::FIELD_MANAGER)
+        .ensure_finalizer("ovn", client.clone(), &FIELD_MANAGER)
         .await?;
     LogicalSwitch::create_if_missing(ovn, &name)?;
     if let Some(dhcp_options) = network.spec.dhcp.as_ref() {
@@ -115,7 +122,7 @@ async fn remove_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
     info!("ovn: Network {} waiting for deletion", name);
     LogicalSwitch::get_by_name(ovn, &name)?.delete()?;
     network
-        .remove_finalizer("ovn", client, &super::FIELD_MANAGER)
+        .remove_finalizer("ovn", client, &FIELD_MANAGER)
         .await?;
     info!("ovn: Network {} deleted", name);
 

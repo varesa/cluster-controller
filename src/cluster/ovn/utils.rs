@@ -1,20 +1,10 @@
 use crate::cluster::ovn::common::OvnNamed;
 use crate::cluster::ovn::types::logicalrouter::LogicalRouter;
 use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
-use crate::utils::strings::field_manager;
-use crate::Error;
-use lazy_static::lazy_static;
+use crate::errors::Error;
 use serde_json::json;
 
-pub mod network;
-pub mod router;
-pub mod vm;
-
-lazy_static! {
-    static ref FIELD_MANAGER: String = field_manager("ovn");
-}
-
-fn connect_router_to_ls(
+pub fn connect_router_to_ls(
     router: &mut LogicalRouter,
     switch: &mut LogicalSwitch,
     address: &str,
