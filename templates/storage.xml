@@ -1,15 +1,15 @@
 <disk type='network' device='disk'>
-            <driver name='qemu' type='raw'/>
-            <auth username='libvirt'>
-                <secret type='ceph' uuid='8e22b0ac-b429-4ad1-8783-6d792db31349'/>
-            </auth>
-            <source protocol='rbd' name='{{pool}}/{{image}}' index='2'>
-                <host name='10.4.2.31' port='6789'/>
-                <host name='10.4.2.32' port='6789'/>
-                <host name='10.4.2.33' port='6789'/>
-            </source>
-            <target dev='{{device}}' bus='virtio'/>
-            {% if bootdevice %}
-            <boot order='1'/>
-            {% endif %}
-        </disk>
+    <driver name='qemu' type='raw'/>
+    <auth username='libvirt'>
+        <secret type='ceph' uuid='8e22b0ac-b429-4ad1-8783-6d792db31349'/>
+    </auth>
+    <source protocol='rbd' name='{{pool}}/{{image}}' index='2'>
+        <host name='10.4.2.31' port='6789'/>
+        <host name='10.4.2.32' port='6789'/>
+        <host name='10.4.2.33' port='6789'/>
+    </source>
+    <target dev='{{device}}' bus='virtio'/>
+    {% if bootdevice %}
+    <boot order='1'/>
+    {% endif %}
+</disk>
