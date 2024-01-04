@@ -18,7 +18,7 @@ use tokio::time::Duration;
 use tracing::{info, info_span, Instrument};
 
 lazy_static! {
-    static ref FIELD_MANAGER: String = field_manager("libvirt.vm");
+    static ref FIELD_MANAGER: String = field_manager("vm");
     static ref SCHEDULE_MUTEX: Mutex<()> = Mutex::new(());
 }
 
@@ -32,15 +32,31 @@ async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
     let name = vm.name_prefixed_with_namespace();
     info!("libvirt: beginning to reconcile: {}", name);
 
+    initialize_status(&client, &mut vm, &name).await?;
+
+    fill_nics(&mut vm, client.clone()).await?;
+    fill_uuid(&mut vm, client.clone()).await?;
+
+    scheduling_and_migrations(client, &mut vm, &name).await?;
+
+    info!("libvirt: updated: {}", name);
+    ok_and_requeue!(600)
+}
+
+async fn initialize_status(
+    client: &Client,
+    vm: &mut VirtualMachine,
+    name: &str,
+) -> Result<(), Error> {
     if vm.status.is_none() {
         set_vm_status(
-            &vm,
+            vm,
             VirtualMachineStatus {
                 scheduled: false,
                 running: false,
                 migration_pending: false,
                 node: None,
-                domain_name: name.clone(),
+                domain_name: name.to_string(),
                 ip_addresses: None,
                 ip_addresses_string: None,
                 networks: vec![],
@@ -49,17 +65,21 @@ async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
         )
         .await?;
     }
+    Ok(())
+}
 
-    fill_nics(&mut vm, client.clone()).await?;
-    fill_uuid(&mut vm, client.clone()).await?;
-
+async fn scheduling_and_migrations(
+    client: Client,
+    vm: &mut VirtualMachine,
+    name: &str,
+) -> Result<(), Error> {
     let mut status = vm.try_status()?.clone();
 
     // Check if we have a pending migration request
-    let migration_required = migration_requested(&vm);
+    let migration_required = migration_requested(vm);
 
     // Check if we are non-compliant with anti-affinity groups
-    let reschedule_required = is_uncompliant(&vm, client.clone()).await?;
+    let reschedule_required = is_uncompliant(vm, client.clone()).await?;
 
     if !status.scheduled || migration_required || reschedule_required {
         let _mutex = SCHEDULE_MUTEX
@@ -69,11 +89,11 @@ async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
         info!("libvirt: Acquired mutex to schedule: {}", name);
 
         // Schedule normally
-        let schedule_result = scheduling::schedule(&vm, false, client.clone()).await;
+        let schedule_result = scheduling::schedule(vm, false, client.clone()).await;
         // If scheduling failed and we have requested a migration, allow bypassing of affinity
         // so that we can temporarily remove a hypervisor when N(affinity group) == N(hypervisors)
         let node = if migration_required && schedule_result.is_err() {
-            scheduling::schedule(&vm, true, client.clone()).await?
+            scheduling::schedule(vm, true, client.clone()).await?
         } else {
             schedule_result?
         };
@@ -85,13 +105,11 @@ async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
         }
 
         // Status must be updated before we release the scheduling mutex
-        set_vm_status(&vm, status, client.clone()).await?;
+        set_vm_status(vm, status, client.clone()).await?;
     }
 
-    clear_successful_migration(&mut vm, client.clone(), &FIELD_MANAGER).await?;
-
-    info!("libvirt: updated: {}", name);
-    ok_and_requeue!(600)
+    clear_successful_migration(vm, client.clone(), &FIELD_MANAGER).await?;
+    Ok(())
 }
 
 pub async fn create(client: Client) -> Result<(), Error> {

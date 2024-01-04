@@ -19,7 +19,7 @@ use crate::utils::strings::field_manager;
 use crate::{ok_and_requeue, ok_no_requeue};
 
 lazy_static! {
-    static ref FIELD_MANAGER: String = field_manager("ovn");
+    static ref FIELD_MANAGER: String = field_manager("vm.ovn");
 }
 
 async fn connect_vm_nic(
