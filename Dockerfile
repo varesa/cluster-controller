@@ -20,13 +20,10 @@ RUN cargo install --path .
 
 # Run
 
-FROM docker.io/library/rockylinux:8
+FROM quay.io/centos/centos:stream9
 
 RUN dnf update -y && \
-    dnf install -y \
-      centos-release-ceph-pacific \
-      https://repos.fedorapeople.org/repos/openstack/openstack-xena/rdo-release-xena-1.el8.noarch.rpm && \
-    sed -i 's/enabled=1/enabled=0/' /etc/yum.repos.d/messaging.repo && \
+    dnf install -y centos-release-ceph-reef centos-nfv-openvswitch && \
     dnf install -y libvirt-libs librbd1 librados2 iproute openvswitch2.17 tcpdump
 
 COPY --from=builder /usr/local/cargo/bin/cluster-controller /usr/local/bin/cluster-controller
