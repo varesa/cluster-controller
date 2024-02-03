@@ -12,7 +12,7 @@ use librbd_sys::{
     rbd_clone, rbd_close, rbd_create, rbd_get_features, rbd_image_t, rbd_list, rbd_list_lockers,
     rbd_open, rbd_open_read_only, rbd_remove,
 };
-use tracing::instrument;
+use tracing::{instrument, warn};
 
 use crate::errors::{Error, RadosError};
 
@@ -20,6 +20,9 @@ macro_rules! call {
     ($operation:literal, $rados_call:expr) => {
         let code = $rados_call;
         if code < 0 {
+            if code == -34 {
+                warn!("Not enough buffer space?");
+            }
             return Err(RadosError {
                 operation: String::from($operation),
                 code,
