@@ -138,7 +138,7 @@ pub fn close_pool(pool: rados_ioctx_t) {
 
 #[instrument]
 pub fn get_images(pool: rados_ioctx_t) -> Result<Vec<String>, Error> {
-    let mut buffer = vec![0u8; 1024];
+    let mut buffer = vec![0u8; 32768];
     let mut buffer_len: libc::size_t = buffer.len();
 
     unsafe {
