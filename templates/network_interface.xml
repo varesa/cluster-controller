@@ -8,6 +8,11 @@
         {% when None %}
             <source bridge='{{bridge}}'/>
     {% endmatch %}
+    {% match queues %}
+        {% when Some with (no_queues) %}
+            <driver name="vhost" queues="{{no_queues}}"/>
+        {% when None %}
+    {% endmatch %}
     <mac address="{{mac}}"/>
     <model type="{{model}}"/>
 </interface>

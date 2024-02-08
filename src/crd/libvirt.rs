@@ -36,6 +36,9 @@ pub struct NetworkAttachment {
     pub mac_address: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub queues: Option<u8>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ovn_id: Option<String>,
 }
 
