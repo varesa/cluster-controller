@@ -150,6 +150,20 @@ pub(crate) async fn schedule(
     // Remove nodes in maintenance
     remove_nodes_in_maintenance(&mut candidates.items);
 
+    if let Some(requested_node) = &vm.spec.node {
+        if let Some(node) = candidates.iter().find(|candidate| {
+            candidate.metadata.name.as_ref().unwrap_or(&String::new()) == requested_node
+        }) {
+            return Ok(node.clone());
+        } else {
+            return Err(Error::ScheduleFailed(format!(
+                "{} requested node {} which is not available",
+                vm.name_unchecked(),
+                requested_node
+            )));
+        }
+    }
+
     // Remove a node we are migrating away from (most of then same as a node in maintenance)
     if let Some(source_node) = vm.annotations().get(MIGRATION_REQUEST_ANNOTATION) {
         remove_candidate_nodes(&mut candidates.items, &vec![source_node.clone()])

@@ -111,8 +111,12 @@ pub mod v1beta3 {
         pub volumes: Vec<VolumeAttachment>,
         pub networks: Vec<NetworkAttachment>,
         pub uuid: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub userdata: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub compatibility_mode: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub node: Option<String>,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
