@@ -84,7 +84,7 @@ impl Libvirt {
                 mac: nic.mac_address.clone().expect("MAC to be set"),
                 ovn_id: nic.ovn_id.clone(),
                 model: network_model.to_string(),
-                queues: nic.queues,
+                queues: nic.queues.unwrap_or(1),
             })
         }
         debug!("{:?}", &vm);

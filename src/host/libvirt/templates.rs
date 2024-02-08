@@ -24,7 +24,7 @@ pub struct NetworkInterfaceTemplate {
     pub mac: String,
     pub ovn_id: Option<String>,
     pub model: String,
-    pub queues: Option<u8>,
+    pub queues: u8,
 }
 
 #[derive(Template)]

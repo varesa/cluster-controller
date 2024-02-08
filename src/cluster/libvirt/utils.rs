@@ -59,6 +59,9 @@ pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Er
                 ..NetworkAttachment::default()
             });
 
+        // Update number of queues
+        nic_status.queues = nic_spec.queues;
+
         // Generate a new MAC address if not set
         if nic_spec.mac_address.is_some() {
             nic_status.mac_address = nic_spec.mac_address.clone();
