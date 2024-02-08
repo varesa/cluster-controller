@@ -35,6 +35,14 @@ pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                     "valueFrom": {
                       "fieldRef": { "fieldPath": "spec.nodeName" }
                     }
+                  },
+                  {
+                    "name": "RUST_LOG",
+                    "value": "cluster_controller=debug"
+                  },
+                  {
+                    "name": "OTLP_ENDPOINT",
+                    "value": "http://10.4.131.101:4317"
                   }
                 ],
                 "volumeMounts": [
