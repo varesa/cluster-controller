@@ -92,7 +92,11 @@ impl Libvirt {
             name: get_domain_name(vm).expect("no domain name specified"),
             uuid: vm.spec.uuid.clone().expect("VM has no UUID"),
             machine_type: cluster.spec.machine_type.clone(),
-            cpu: cluster.spec.cpu.clone(),
+            cpu: vm
+                .spec
+                .cpu_model
+                .clone()
+                .unwrap_or(cluster.spec.cpu.clone()),
             cpus: vm.spec.cpus,
             memory: memory_amount,
             memory_unit,

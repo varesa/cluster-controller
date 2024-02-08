@@ -106,6 +106,8 @@ pub mod v1beta3 {
     )]
     pub struct VirtualMachineSpec {
         pub cpus: usize,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub cpu_model: Option<String>,
         // String to allow suffixes like '1 Gi'
         pub memory: String,
         pub volumes: Vec<VolumeAttachment>,
