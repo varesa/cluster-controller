@@ -98,10 +98,8 @@ pub fn make_deployment(image: &str, namespace: &str, router: &str) -> Result<Dep
                 "command": ["cluster-controller", "--metadata-service", format!("{}/{}", namespace, router)],
                 "env": [
                   {
-                    "name": "NODE_NAME",
-                    "valueFrom": {
-                      "fieldRef": { "fieldPath": "spec.nodeName" }
-                    }
+                    "name": "RUST_BACKTRACE",
+                    "value": "1"
                   }
                 ],
                 "securityContext": {
