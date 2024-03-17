@@ -16,6 +16,8 @@ pub mod ovn;
 const DEPLOYMENT_NAME: &str = "cluster-controller";
 
 pub const MAINTENANCE_ANNOTATION: &str = "cluster-virt.acl.fi/maintenance";
+
+pub const NO_SCHEDULE_ANNOTATION: &str = "cluster-virt.acl.fi/no-schedule";
 pub const MIGRATION_REQUEST_ANNOTATION: &str = "cluster-virt.acl.fi/migration-required";
 
 pub async fn get_running_image(kube: Client) -> Result<String, Error> {
