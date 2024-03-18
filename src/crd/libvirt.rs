@@ -122,6 +122,8 @@ pub mod v1beta3 {
         pub compatibility_mode: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub node: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub power_action: Option<PowerAction>, 
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
@@ -134,6 +136,24 @@ pub mod v1beta3 {
         pub ip_addresses: Option<Vec<String>>,
         pub ip_addresses_string: Option<String>,
         pub networks: Vec<NetworkAttachment>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+    pub enum PowerAction {
+        PowerOn,
+        Shutdown,
+        PowerOff,
+        Manual,
+    }
+
+    impl VirtualMachineSpec {
+        pub fn get_power_action(&self) -> PowerAction {
+            if let Some(action) = self.power_action.as_ref() {
+                action.clone()
+            } else {
+                PowerAction::PowerOn
+            }
+        }
     }
 }
 

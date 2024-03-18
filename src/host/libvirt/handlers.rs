@@ -1,3 +1,4 @@
+use crate::crd::libvirt::v1beta3::PowerAction;
 use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::host::libvirt::controller::State;
 use crate::host::libvirt::utils::{get_cluster, get_domain_name};
@@ -50,6 +51,11 @@ pub async fn handle_add(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, 
     let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
     vm.ensure_finalizer(FINALIZER, ctx.kube.clone(), &FIELD_MANAGER)
         .await?;
+
+    if vm.spec.get_power_action() != PowerAction::PowerOn {
+        info!("VM not requested to power on: {}", vm_name);
+        return ok_and_requeue!(600)
+    }
 
     // Get cluster capabilities / definition
     let cluster = get_cluster(&ctx).await?;
