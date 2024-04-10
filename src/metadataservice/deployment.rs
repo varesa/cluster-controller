@@ -100,6 +100,13 @@ pub fn make_deployment(image: &str, namespace: &str, router: &str) -> Result<Dep
                   {
                     "name": "RUST_BACKTRACE",
                     "value": "1"
+                  }, {
+                    "name": "RUST_LOG",
+                    "value": "cluster_controller=debug"
+                  },
+                  {
+                    "name": "OTLP_ENDPOINT",
+                    "value": "http://10.4.131.101:4317"
                   }
                 ],
                 "securityContext": {
