@@ -63,10 +63,12 @@ impl MetadataBackend {
                 let matching_vms: Vec<&VirtualMachine> = vms
                     .iter()
                     .filter(|vm| {
-                        vm.spec
+                        if let Some(status) = vm.status.as_ref() {
+                            status
                             .networks
                             .iter()
                             .any(|network| network.ovn_id == Some(port.name()))
+                        } else { false }
                     })
                     .collect();
                 assert_eq!(matching_vms.len(), 1);
