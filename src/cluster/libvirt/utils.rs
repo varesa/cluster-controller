@@ -64,7 +64,7 @@ pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Er
 
         // Generate a new MAC address if not set
         if nic_spec.mac_address.is_some() {
-            nic_status.mac_address = nic_spec.mac_address.clone();
+            nic_status.mac_address.clone_from(&nic_spec.mac_address);
         } else if nic_status.mac_address.is_none() {
             nic_status.mac_address = Some(generate_mac_address(&vm_name, nic_spec, index));
         }
@@ -72,7 +72,7 @@ pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Er
         // Generate a new OVN port ID if not set and using OVN network
         if nic_spec.name.is_some() {
             if nic_spec.ovn_id.is_some() {
-                nic_status.ovn_id = nic_spec.ovn_id.clone();
+                nic_status.ovn_id.clone_from(&nic_spec.ovn_id);
             } else if nic_status.ovn_id.is_none() {
                 nic_status.ovn_id = Some(
                     Uuid::new_v4()

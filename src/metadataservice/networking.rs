@@ -14,7 +14,7 @@ fn command(executable: &str, args: Vec<&str>) -> Result<(), Error> {
         .expect("failed to run command");
 
     if !output.status.success() {
-        return Err(Error::CommandError(
+        return Err(Error::CommandFailed(
             args.into_iter().map(|s| s.to_owned()).collect(),
             String::from_utf8(output.stderr).expect("stderr not valid UTF-8"),
         ));
@@ -39,7 +39,7 @@ pub fn create_ns(ns_name: &str) -> Result<File, Error> {
     println!("proxy: Trying to open {}", &ns_path_str);
 
     ip_command(vec!["netns", "add", ns_name]).map_err(|e| match e {
-        Error::CommandError(_cmd, msg) => Error::NetnsCreateFailed(msg),
+        Error::CommandFailed(_cmd, msg) => Error::NetnsCreateFailed(msg),
         e => e,
     })?;
     File::open(ns_path).map_err(Error::NetnsOpenFailed)
@@ -80,7 +80,7 @@ pub fn create_interface(ns_name: &str, router_name: &str) -> Result<(), Error> {
     ip_command(vec!["link", "set", &if_host, "up"])?;
 
     command("/usr/bin/ovs-vsctl", vec!["add-port", "br-int", &if_host]).or_else(|err| {
-        if let Error::CommandError(_cmd, msg) = &err {
+        if let Error::CommandFailed(_cmd, msg) = &err {
             if msg == &format!("ovs-vsctl: cannot create a port named {} because a port named {} already exists on bridge br-int\n", if_host, if_host) {
                 return Ok(())
             }

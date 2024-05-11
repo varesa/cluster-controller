@@ -64,8 +64,8 @@ fn ensure_router_attachment(
         .map(String::from)
         .collect();
     let (namespace, name) = match split.len() {
-        1 => (&network_ns, split.get(0).unwrap()),
-        2 => (split.get(0).unwrap(), split.get(1).unwrap()),
+        1 => (&network_ns, split.first().unwrap()),
+        2 => (split.first().unwrap(), split.get(1).unwrap()),
         _ => panic!("Malformed router name (todo: error)"),
     };
 

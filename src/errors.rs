@@ -65,7 +65,7 @@ pub enum Error {
     #[error("Resource watcher error {0}")]
     KubeWatcher(#[from] kube::runtime::watcher::Error),
     #[error("CRD version merge error {0}")]
-    CrdMergeError(#[from] kube::core::crd::MergeError),
+    CrdMerge(#[from] kube::core::crd::MergeError),
     #[error("Resource {0} has no status")]
     NoStatusSubresource(String),
 
@@ -101,9 +101,9 @@ pub enum Error {
 
     // Metadata proxy
     #[error("Failed to send metadata request between threads")]
-    RequestSendError(#[from] tokio::sync::mpsc::error::SendError<MetadataRequest>),
+    RequestSendFailed(#[from] tokio::sync::mpsc::error::SendError<MetadataRequest>),
     #[error("Failed to send metadata response between threads")]
-    ResponseSendError(#[from] tokio::sync::mpsc::error::SendError<MetadataResponse>),
+    ResponseSendFailed(#[from] tokio::sync::mpsc::error::SendError<MetadataResponse>),
     #[error("Failed to create network namespace: {0}")]
     NetnsCreateFailed(String),
     #[error("Failed to open network namespace: {0}")]
@@ -111,7 +111,7 @@ pub enum Error {
     #[error("Failed to change network namespace: {0}")]
     NetnsChangeFailed(#[from] nix::errno::Errno),
     #[error("Command {0:?} failed: {1}")]
-    CommandError(Vec<String>, String),
+    CommandFailed(Vec<String>, String),
     #[error("Failed to determine instance for metadata: {0}")]
     InstanceMatchFailed(String),
     #[error("Userdata not specified")]

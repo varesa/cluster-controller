@@ -32,7 +32,7 @@ pub fn deserialize_uuid_set(
         .get(field)
         .and_then(|a| a.as_array())
         .map(|set| {
-            let subtype = set.get(0).and_then(|v| v.as_str()).unwrap_or("unknown");
+            let subtype = set.first().and_then(|v| v.as_str()).unwrap_or("unknown");
             let uuids = match subtype {
                 "uuid" => vec![set
                     .get(1)
@@ -49,7 +49,7 @@ pub fn deserialize_uuid_set(
                         let array = uuid
                             .as_array()
                             .expect("each set element should be an array");
-                        assert_eq!(array.get(0).unwrap(), "uuid");
+                        assert_eq!(array.first().unwrap(), "uuid");
                         array
                             .get(1)
                             .expect("\"uuid\" should be followed by an uuid")

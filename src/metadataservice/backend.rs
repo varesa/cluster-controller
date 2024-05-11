@@ -65,10 +65,12 @@ impl MetadataBackend {
                     .filter(|vm| {
                         if let Some(status) = vm.status.as_ref() {
                             status
-                            .networks
-                            .iter()
-                            .any(|network| network.ovn_id == Some(port.name()))
-                        } else { false }
+                                .networks
+                                .iter()
+                                .any(|network| network.ovn_id == Some(port.name()))
+                        } else {
+                            false
+                        }
                     })
                     .collect();
                 assert_eq!(matching_vms.len(), 1);
@@ -103,7 +105,7 @@ impl MetadataBackend {
                                 )
                             })
                         })
-                        .map(|userdata_ref| userdata_ref.clone());
+                        .cloned();
 
                     match maybe_userdata {
                         Ok(userdata) => {
