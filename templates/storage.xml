@@ -1,4 +1,4 @@
-<disk type='network' device='disk'>
+<disk type='{{source.disk_type()}}' device='disk'>
     {% match source %}
 
     {% when StorageSource::Ceph with (ceph) %}

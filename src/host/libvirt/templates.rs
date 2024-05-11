@@ -27,22 +27,34 @@ pub struct NetworkInterfaceTemplate {
     pub queues: u8,
 }
 
+#[derive(Debug)]
 pub struct CephSource {
     pub pool: String,
     pub image: String,
 }
 
+#[derive(Debug)]
 pub struct FilesystemSource {
     pub format: String,
     pub location: String,
 }
 
+#[derive(Debug)]
 pub enum StorageSource {
     Ceph(CephSource),
     Filesystem(FilesystemSource),
 }
 
-#[derive(Template)]
+impl StorageSource {
+    pub fn disk_type(&self) -> String {
+        match self {
+            StorageSource::Ceph(_) => String::from("network"),
+            StorageSource::Filesystem(_) => String::from("file"),
+        }
+    }
+}
+
+#[derive(Debug, Template)]
 #[template(path = "storage.xml", escape = "none")]
 pub struct StorageTemplate {
     pub source: StorageSource,
