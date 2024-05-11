@@ -1,6 +1,6 @@
 # Build
 
-FROM docker.io/library/rust:buster as builder
+FROM docker.io/library/rust:bookworm as builder
 
 WORKDIR /usr/src/cluster-controller
 
