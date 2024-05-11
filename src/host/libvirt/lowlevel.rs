@@ -8,7 +8,9 @@ use virt::connect::Connect;
 use virt::domain::Domain;
 
 use crate::errors::Error;
-use crate::host::libvirt::templates::{DomainTemplate, NetworkInterfaceTemplate, StorageTemplate};
+use crate::host::libvirt::templates::{
+    CephSource, DomainTemplate, NetworkInterfaceTemplate, StorageSource, StorageTemplate,
+};
 use crate::host::libvirt::utils::{get_domain_name, parse_memory};
 use crate::shared::ceph;
 use crate::utils::extend_traits::TryStatus;
@@ -59,9 +61,12 @@ impl Libvirt {
         let mut volumes = Vec::new();
         for (index, volume) in vm.spec.volumes.iter().enumerate() {
             let drive_index: u8 = index.try_into().expect("Volume index overflows u8");
-            volumes.push(StorageTemplate {
+            let ceph_source = CephSource {
                 pool: String::from("volumes"),
                 image: format!("{}-{}", namespace, volume.name),
+            };
+            volumes.push(StorageTemplate {
+                source: StorageSource::Ceph(ceph_source),
                 device: format!("{}{}", &storage_device_prefix, (b'a' + drive_index) as char),
                 bus_slot: drive_index,
                 bootdevice: volumes.is_empty(), // First device is the boot device
@@ -121,8 +126,10 @@ impl Libvirt {
 
 fn volumes_locked(volumes: &Vec<StorageTemplate>) -> Result<bool, Error> {
     for volume in volumes {
-        if ceph::has_locks(&volume.pool, &volume.image)? {
-            return Ok(true);
+        if let StorageSource::Ceph(ceph_source) = &volume.source {
+            if ceph::has_locks(&ceph_source.pool, &ceph_source.image)? {
+                return Ok(true);
+            }
         }
     }
     Ok(false)

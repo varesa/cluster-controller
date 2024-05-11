@@ -27,11 +27,24 @@ pub struct NetworkInterfaceTemplate {
     pub queues: u8,
 }
 
+pub struct CephSource {
+    pub pool: String,
+    pub image: String,
+}
+
+pub struct FilesystemSource {
+    pub location: String,
+}
+
+pub enum StorageSource {
+    Ceph(CephSource),
+    Filesystem(FilesystemSource),
+}
+
 #[derive(Template)]
 #[template(path = "storage.xml", escape = "none")]
 pub struct StorageTemplate {
-    pub pool: String,
-    pub image: String,
+    pub source: StorageSource,
     pub device: String,
     pub bootdevice: bool,
     pub bus_slot: u8,

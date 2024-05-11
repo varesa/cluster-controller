@@ -1,14 +1,24 @@
 <disk type='network' device='disk'>
+    {% match source %}
+
+    {% when StorageSource::Ceph with (ceph) %}
     <driver name='qemu' type='raw'/>
     <auth username='libvirt'>
         <secret type='ceph' uuid='8e22b0ac-b429-4ad1-8783-6d792db31349'/>
     </auth>
-    <source protocol='rbd' name='{{pool}}/{{image}}' index='2'>
+    <source protocol='rbd' name='{{ceph.pool}}/{{ceph.image}}' index='2'>
         <host name='10.4.2.31' port='6789'/>
         <host name='10.4.2.32' port='6789'/>
         <host name='10.4.2.33' port='6789'/>
     </source>
+
+    {% when StorageSource::Filesystem with (fs) %}
+    <!-- TODO -->
+
+    {% endmatch %}
+
     <target dev='{{device}}' bus='{{bus}}'/>
+
     {% if bootdevice %}
     <boot order='1'/>
     {% endif %}
