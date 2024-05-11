@@ -12,6 +12,7 @@ pub mod resource_controller;
 pub mod strings;
 #[macro_use]
 pub mod shortcuts;
+pub mod libvirt_storage;
 
 #[instrument]
 pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) -> Result<(), Error> {

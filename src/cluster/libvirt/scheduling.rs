@@ -12,6 +12,7 @@ use tracing::instrument;
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
 use crate::utils::extend_traits::{ExtendResource, TryStatus};
+use crate::utils::libvirt_storage::{parse_storage_location, StorageType};
 
 /// Find all VMs registered to the k8s apiserver with the given label set to the given value
 #[instrument(skip(client))]
@@ -131,11 +132,25 @@ fn remove_nodes_in_maintenance(candidates: &mut Vec<Node>) {
     });
 }
 
-// Remove all nodes which have the noschedule annotation
+/// Remove all nodes which have the noschedule annotation
 fn remove_nodes_with_no_schedule(candidates: &mut Vec<Node>) {
     candidates.retain(|candidate| {
         candidate.annotations().get(NO_SCHEDULE_ANNOTATION) != Some(&String::from("true"))
     });
+}
+
+/// If local volumes are present, remove all other nodes except the one hosting the volumes
+fn apply_local_volumes(vm: &VirtualMachine, candidates: &mut Vec<Node>) -> Result<(), Error> {
+    for volume in &vm.spec.volumes {
+        let (storage_type, node, _path) = parse_storage_location(&volume.name)?;
+        if storage_type != StorageType::Filesystem {
+            continue;
+        }
+
+        candidates.retain(|candidate| candidate.metadata.name.as_ref().unwrap() == &node)
+    }
+
+    Ok(())
 }
 
 const ANTI_AFFINITY_LABEL: &str = "antiAffinity";
@@ -173,6 +188,9 @@ pub(crate) async fn schedule(
             )));
         }
     }
+
+    // Get node specified by local volumes
+    apply_local_volumes(&vm, &mut candidates.items)?;
 
     // Do not automatically schedule to nodes with no-schedule annotation
     remove_nodes_with_no_schedule(&mut candidates.items);

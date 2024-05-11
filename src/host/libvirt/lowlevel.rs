@@ -15,6 +15,7 @@ use crate::host::libvirt::templates::{
 use crate::host::libvirt::utils::{get_domain_name, parse_memory};
 use crate::shared::ceph;
 use crate::utils::extend_traits::TryStatus;
+use crate::utils::libvirt_storage::{parse_storage_location, StorageType};
 
 pub struct Libvirt {
     pub connection: Connect,
@@ -34,30 +35,8 @@ impl Drop for Libvirt {
     }
 }
 
-enum StorageType {
-    Ceph,
-    Filesystem,
-}
-
-/// foo-bar => (Ceph, "foo-bar")
-/// ceph:foo-bar => (Ceph, "foo-bar")
-/// node1:/foo-bar => (Filesystem, "/foo-bar")
-fn parse_storage_location(location: &str) -> Result<(StorageType, String), Error> {
-    let uri_parts: Vec<&str> = location.split(':').collect();
-    if uri_parts.len() == 1 || uri_parts.first().unwrap() == &"ceph" {
-        Ok((StorageType::Ceph, String::from(*uri_parts.first().unwrap())))
-    } else if uri_parts.len() == 2 && uri_parts.first().unwrap() != &"ceph" {
-        Ok((
-            StorageType::Filesystem,
-            String::from(*uri_parts.get(1).unwrap()),
-        ))
-    } else {
-        Err(Error::StorageLocationParse(String::from(location)))
-    }
-}
-
 fn to_storage_source(volume: &VolumeAttachment, namespace: &str) -> Result<StorageSource, Error> {
-    let (schema, location) = parse_storage_location(&volume.name)?;
+    let (schema, _node, location) = parse_storage_location(&volume.name)?;
     let source = match schema {
         StorageType::Ceph => StorageSource::Ceph(CephSource {
             pool: String::from("volumes"),
