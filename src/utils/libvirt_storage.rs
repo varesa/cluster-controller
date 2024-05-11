@@ -8,22 +8,22 @@ pub enum StorageType {
 
 /// foo-bar => (Ceph, "foo-bar")
 /// ceph:foo-bar => (Ceph, "foo-bar")
-/// node1:/foo-bar => (Filesystem, "/foo-bar")
-pub fn parse_storage_location(location: &str) -> Result<(StorageType, String, String), Error> {
+/// fs:/foo-bar => (Filesystem, "/foo-bar")
+pub fn parse_storage_location(location: &str) -> Result<(StorageType, String), Error> {
     let uri_parts: Vec<&str> = location.split(':').collect();
-    if uri_parts.len() == 1 || uri_parts.first().unwrap() == &"ceph" {
-        Ok((
-            StorageType::Ceph,
-            String::from(""),
-            String::from(*uri_parts.first().unwrap()),
-        ))
-    } else if uri_parts.len() == 2 && uri_parts.first().unwrap() != &"ceph" {
-        Ok((
-            StorageType::Filesystem,
-            String::from(*uri_parts.first().unwrap()),
-            String::from(*uri_parts.get(1).unwrap()),
-        ))
-    } else {
-        Err(Error::StorageLocationParse(String::from(location)))
+    if uri_parts.len() == 1 {
+        return Ok((StorageType::Ceph, String::from(*uri_parts.first().unwrap())));
     }
+
+    if uri_parts.len() != 2 {
+        return Err(Error::StorageLocationParse(String::from(location)));
+    }
+
+    let schema = match *uri_parts.first().unwrap() {
+        "ceph" => StorageType::Ceph,
+        "fs" => StorageType::Filesystem,
+        _ => return Err(Error::StorageLocationParse(String::from(location))),
+    };
+
+    Ok((schema, String::from(*uri_parts.get(1).unwrap())))
 }

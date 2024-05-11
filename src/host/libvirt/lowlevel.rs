@@ -36,7 +36,7 @@ impl Drop for Libvirt {
 }
 
 fn to_storage_source(volume: &VolumeAttachment, namespace: &str) -> Result<StorageSource, Error> {
-    let (schema, _node, location) = parse_storage_location(&volume.name)?;
+    let (schema, location) = parse_storage_location(&volume.name)?;
     let source = match schema {
         StorageType::Ceph => StorageSource::Ceph(CephSource {
             pool: String::from("volumes"),
