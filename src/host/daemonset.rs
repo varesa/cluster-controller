@@ -17,6 +17,12 @@ pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
             "name": "libvirt-host-controller"
           }
         },
+        "updateStrategy": {
+          "type": "RollingUpdate",
+          "rollingUpdate": {
+            "maxUnavailable": 3
+          }
+        },
         "template": {
           "metadata": {
             "labels": {
