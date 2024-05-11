@@ -33,6 +33,7 @@ pub struct CephSource {
 }
 
 pub struct FilesystemSource {
+    pub format: String,
     pub location: String,
 }
 

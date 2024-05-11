@@ -1,5 +1,5 @@
 use crate::crd::cluster::Cluster;
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::libvirt::{VirtualMachine, VolumeAttachment};
 use crate::Error::Volumelocked;
 use askama::Template;
 use kube::ResourceExt;
@@ -9,7 +9,8 @@ use virt::domain::Domain;
 
 use crate::errors::Error;
 use crate::host::libvirt::templates::{
-    CephSource, DomainTemplate, NetworkInterfaceTemplate, StorageSource, StorageTemplate,
+    CephSource, DomainTemplate, FilesystemSource, NetworkInterfaceTemplate, StorageSource,
+    StorageTemplate,
 };
 use crate::host::libvirt::utils::{get_domain_name, parse_memory};
 use crate::shared::ceph;
@@ -31,6 +32,50 @@ impl Drop for Libvirt {
     fn drop(&mut self) {
         self.connection.close().expect("close libvirt connection");
     }
+}
+
+enum StorageType {
+    Ceph,
+    Filesystem,
+}
+
+/// foo-bar => (Ceph, "foo-bar")
+/// ceph:foo-bar => (Ceph, "foo-bar")
+/// node1:/foo-bar => (Filesystem, "/foo-bar")
+fn parse_storage_location(location: &str) -> Result<(StorageType, String), Error> {
+    let uri_parts: Vec<&str> = location.split(':').collect();
+    if uri_parts.len() == 1 || uri_parts.first().unwrap() == &"ceph" {
+        Ok((StorageType::Ceph, String::from(*uri_parts.first().unwrap())))
+    } else if uri_parts.len() == 2 && uri_parts.first().unwrap() != &"ceph" {
+        Ok((
+            StorageType::Filesystem,
+            String::from(*uri_parts.get(1).unwrap()),
+        ))
+    } else {
+        Err(Error::StorageLocationParse(String::from(location)))
+    }
+}
+
+fn to_storage_source(volume: &VolumeAttachment, namespace: &str) -> Result<StorageSource, Error> {
+    let (schema, location) = parse_storage_location(&volume.name)?;
+    let source = match schema {
+        StorageType::Ceph => StorageSource::Ceph(CephSource {
+            pool: String::from("volumes"),
+            image: format!("{}-{}", namespace, volume.name),
+        }),
+        StorageType::Filesystem => {
+            let format = if location.ends_with(".qcow2") {
+                "qcow2"
+            } else {
+                "raw"
+            };
+            StorageSource::Filesystem(FilesystemSource {
+                format: String::from(format),
+                location,
+            })
+        }
+    };
+    Ok(source)
 }
 
 impl Libvirt {
@@ -61,12 +106,8 @@ impl Libvirt {
         let mut volumes = Vec::new();
         for (index, volume) in vm.spec.volumes.iter().enumerate() {
             let drive_index: u8 = index.try_into().expect("Volume index overflows u8");
-            let ceph_source = CephSource {
-                pool: String::from("volumes"),
-                image: format!("{}-{}", namespace, volume.name),
-            };
             volumes.push(StorageTemplate {
-                source: StorageSource::Ceph(ceph_source),
+                source: to_storage_source(volume, &namespace)?,
                 device: format!("{}{}", &storage_device_prefix, (b'a' + drive_index) as char),
                 bus_slot: drive_index,
                 bootdevice: volumes.is_empty(), // First device is the boot device

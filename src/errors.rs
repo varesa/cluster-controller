@@ -80,6 +80,8 @@ pub enum Error {
     Libvirt(#[from] virt::error::Error),
     #[error("no candidates left to schedule: {0}")]
     ScheduleFailed(String),
+    #[error("failed to parse storage location: {0}")]
+    StorageLocationParse(String),
 
     // OVN
     #[error("Object {1} of type {0} not found")]

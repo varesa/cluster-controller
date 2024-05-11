@@ -13,7 +13,8 @@
     </source>
 
     {% when StorageSource::Filesystem with (fs) %}
-    <!-- TODO -->
+    <driver name="qemu" type="{{fs.format}}"/>
+    <source file="{{fs.location}}" index="1"/>
 
     {% endmatch %}
 
