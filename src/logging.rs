@@ -2,12 +2,10 @@ use crate::errors::Error;
 use futures::future::BoxFuture;
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry::KeyValue;
-use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::export::trace::{ExportResult, SpanData, SpanExporter};
 use opentelemetry_sdk::trace::{Tracer, TracerProvider};
 use opentelemetry_sdk::{trace, Resource};
 use std::borrow::Cow;
-use std::env;
 use std::fmt::Debug;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::prelude::*;
@@ -71,16 +69,13 @@ impl SpanExporter for Wrapper {
 /// In addition to the tracing_subscriber layer, it also returns a TracerProvider which should be
 /// kept in scope in order for the exporter to stay alive. Dropping that will cause the exporter
 /// to silenty stop sending traces
-fn setup_otlp_layer(
-    endpoint: &str,
-) -> Result<(TracerProvider, OpenTelemetryLayer<Registry, Tracer>), Error> {
+fn setup_otlp_layer() -> Result<(TracerProvider, OpenTelemetryLayer<Registry, Tracer>), Error> {
     let otlp_exporter = opentelemetry_otlp::new_exporter()
         .http()
-        .with_endpoint(endpoint)
         .build_span_exporter()?;
 
     let provider = TracerProvider::builder()
-        .with_simple_exporter(Wrapper(otlp_exporter))
+        .with_batch_exporter(Wrapper(otlp_exporter), opentelemetry_sdk::runtime::Tokio)
         .with_config(
             trace::config().with_resource(Resource::new(vec![KeyValue::new(
                 "service.name",
@@ -104,17 +99,15 @@ pub fn setup_tracing() -> Result<Option<TracerProvider>, Error> {
     let subscriber = Registry::default();
     let mut layers = Vec::new();
 
-    let mut provider = None;
-    if let Ok(endpoint) = env::var("OTLP_ENDPOINT") {
-        println!("Adding OTLP export");
-        let (tracer_provider, exporter_layer) = setup_otlp_layer(&endpoint)?;
-        layers.push(
-            exporter_layer
-                .with_filter(tracing_subscriber::EnvFilter::from_default_env())
-                .boxed(),
-        );
-        provider = Some(tracer_provider);
-    }
+    println!("Adding OTLP export");
+    let (tracer_provider, exporter_layer) = setup_otlp_layer()?;
+    layers.push(
+        exporter_layer
+            .with_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .boxed(),
+    );
+    let provider = Some(tracer_provider);
+
     layers.push(console_layer.boxed());
     tracing::subscriber::set_global_default(subscriber.with(layers))?;
 
