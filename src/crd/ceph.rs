@@ -5,6 +5,7 @@ use kube::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 use crate::errors::Error;
 use crate::utils::wait_crd_ready;
@@ -61,6 +62,7 @@ pub struct ImageStatus {
     import_in_progress: bool,
 }
 
+#[instrument(skip(client))]
 pub async fn create(client: Client) -> Result<(), Error> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     let patch_params = PatchParams::apply("cluster-manager.ceph").force();

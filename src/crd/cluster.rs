@@ -5,6 +5,7 @@ use kube::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 use crate::errors::Error;
 use crate::utils::wait_crd_ready;
@@ -33,6 +34,7 @@ pub struct ClusterSpec {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ClusterStatus {}
 
+#[instrument(skip(client))]
 pub async fn create(client: Client) -> Result<(), Error> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     let patch_params = PatchParams::apply("virt-controller").force();

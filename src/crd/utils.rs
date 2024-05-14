@@ -2,10 +2,11 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomRe
 use kube::api::{Patch, PatchParams, PostParams};
 use kube::Api;
 use serde_json::json;
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::{Client, Error};
 
+#[instrument(skip(client))]
 pub async fn remove_crd_version(
     crd_name: &str,
     crd_version: &str,

@@ -123,7 +123,7 @@ pub mod v1beta3 {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub node: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub power_action: Option<PowerAction>, 
+        pub power_action: Option<PowerAction>,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
@@ -157,6 +157,7 @@ pub mod v1beta3 {
     }
 }
 
+#[instrument(skip(client))]
 pub async fn create(client: Client) -> Result<(), Error> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
     let patch_params = PatchParams::apply("cluster-manager.libvirt").force();
@@ -200,6 +201,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
     Ok(())
 }
 
+#[instrument(skip(client))]
 pub async fn run_migrations(client: Client) -> Result<(), Error> {
     const CRD_NAME: &str = "virtualmachines.cluster-virt.acl.fi";
     let patch_params = PatchParams::apply("cluster-manager.libvirt");
