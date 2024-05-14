@@ -15,17 +15,19 @@ use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
-use tracing::{info, info_span, Instrument};
+use tracing::{info, info_span, instrument, Instrument};
 
 lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("vm");
     static ref SCHEDULE_MUTEX: Mutex<()> = Mutex::new(());
 }
 
+#[instrument(skip(_ctx))]
 async fn delete_fn(_vm: Arc<VirtualMachine>, _ctx: Arc<DefaultState>) -> Result<Action, Error> {
     Ok(Action::await_change())
 }
 
+#[instrument(skip(ctx))]
 async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let client = ctx.client.clone();
     let mut vm = vm.as_ref().to_owned();
@@ -43,6 +45,7 @@ async fn create_fn(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
     ok_and_requeue!(600)
 }
 
+#[instrument(skip(client))]
 async fn initialize_status(
     client: &Client,
     vm: &mut VirtualMachine,
@@ -68,6 +71,7 @@ async fn initialize_status(
     Ok(())
 }
 
+#[instrument(skip(client))]
 async fn scheduling_and_migrations(
     client: Client,
     vm: &mut VirtualMachine,

@@ -82,6 +82,7 @@ fn ensure_router_attachment(
 }
 
 /// Handle updates to networks in the cluster
+#[instrument(skip(ctx))]
 async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let mut network = (*network).clone();
     let name = network.name_prefixed_with_namespace();
@@ -113,6 +114,7 @@ async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
 }
 
 /// Handle updates to networks in the cluster
+#[instrument(skip(ctx))]
 async fn remove_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mut network = (*network).clone();
@@ -129,6 +131,7 @@ async fn remove_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
     ok_and_requeue!(600)
 }
 
+#[instrument(skip(client))]
 pub async fn create(client: Client) -> Result<(), Error> {
     info!("ovn.network: Starting controller");
     ResourceControllerBuilder::new(client)

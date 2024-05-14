@@ -4,7 +4,7 @@ use kube::runtime::controller::Action;
 use kube::{api::Api, Client, ResourceExt};
 use lazy_static::lazy_static;
 use tokio::time::Duration;
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
@@ -22,6 +22,7 @@ lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("vm.ovn");
 }
 
+#[instrument(skip(client))]
 async fn connect_vm_nic(
     client: Client,
     vm: &VirtualMachine,
@@ -48,6 +49,7 @@ async fn connect_vm_nic(
     Ok(())
 }
 
+#[instrument]
 fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let ls_name = format!(
@@ -63,6 +65,7 @@ fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(),
     Ok(())
 }
 
+#[instrument]
 fn get_vm_ovn_nics(vm: &VirtualMachine) -> Vec<NetworkAttachment> {
     match &vm.status {
         Some(status) => status
@@ -76,6 +79,7 @@ fn get_vm_ovn_nics(vm: &VirtualMachine) -> Vec<NetworkAttachment> {
 }
 
 /// Handle updates to VMs in the cluster
+#[instrument(skip(ctx))]
 async fn update_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let mut vm = (*vm).clone();
     let name = vm.name_prefixed_with_namespace();
@@ -111,6 +115,7 @@ async fn update_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
 }
 
 /// Handle updates to VMs in the cluster
+#[instrument(skip(ctx))]
 async fn remove_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let mut vm = (*vm).clone();
     let name = vm.name_prefixed_with_namespace();

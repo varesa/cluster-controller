@@ -46,6 +46,7 @@ async fn connect_metadataservice(lr: &mut LogicalRouter) -> Result<(), Error> {
 }
 
 /// Handle updates to routers in the cluster
+#[instrument(skip(ctx))]
 async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let mut router = (*router).clone();
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
@@ -91,6 +92,7 @@ async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
 }
 
 /// Handle updates to routers in the cluster
+#[instrument(skip(ctx))]
 async fn remove_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let mut router = (*router).clone();
@@ -107,6 +109,7 @@ async fn remove_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
     ok_no_requeue!()
 }
 
+#[instrument(skip(client))]
 pub async fn create(client: Client) -> Result<(), Error> {
     info!("ovn.router: Starting controller");
     ResourceControllerBuilder::new(client)

@@ -133,6 +133,7 @@ async fn ensure_keyring(client: Client) -> Result<(), Error> {
 }
 
 /// Handle updates to volumes in the cluster
+#[instrument(skip(ctx))]
 async fn update_fn(volume: Arc<Volume>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let mut volume = (*volume).clone();
     let name = volume.name_prefixed_with_namespace();
@@ -150,6 +151,7 @@ async fn update_fn(volume: Arc<Volume>, ctx: Arc<DefaultState>) -> Result<Action
 }
 
 /// Handle updates to volumes in the cluster
+#[instrument(skip(ctx))]
 async fn remove_fn(volume: Arc<Volume>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let mut volume = (*volume).clone();
     let name = volume.name_prefixed_with_namespace();

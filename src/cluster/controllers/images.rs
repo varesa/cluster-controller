@@ -20,6 +20,7 @@ lazy_static! {
 
 /// Check if an image already exists in the cluster and
 /// create if it doesn't.
+#[instrument]
 fn ceph_ensure_image_exists(name: &str, source: &str) -> Result<(), Error> {
     let cluster = lowlevel::connect()?;
     let template_pool = lowlevel::get_pool(cluster, POOL_TEMPLATES.into())?;
@@ -45,6 +46,7 @@ fn ceph_ensure_image_exists(name: &str, source: &str) -> Result<(), Error> {
 }
 
 /// Check if the template pool has the named image and delete from the pool if it exists
+#[instrument]
 fn ceph_ensure_image_removed(name: &str) -> Result<(), Error> {
     let cluster = lowlevel::connect()?;
     let pool = lowlevel::get_pool(cluster, POOL_TEMPLATES.into())?;
@@ -58,6 +60,7 @@ fn ceph_ensure_image_removed(name: &str) -> Result<(), Error> {
     Ok(())
 }
 
+#[instrument(skip(ctx))]
 async fn update_fn(image: Arc<Image>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     // To get a mutable copy to allow finalizer addition
     let mut image = (*image).clone();
@@ -74,6 +77,7 @@ async fn update_fn(image: Arc<Image>, ctx: Arc<DefaultState>) -> Result<Action, 
     Ok(Action::requeue(Duration::from_secs(600)))
 }
 
+#[instrument(skip(ctx))]
 async fn remove_fn(image: Arc<Image>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     // To get a mutable copy to allow finalizer deletion
     let mut image = (*image).clone();

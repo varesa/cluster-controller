@@ -6,7 +6,7 @@ use kube::{
 };
 use std::sync::Arc;
 use tokio::time::Duration;
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::cluster::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
 use crate::crd::libvirt::VirtualMachine;
@@ -15,10 +15,12 @@ use crate::ok_and_requeue;
 use crate::utils::extend_traits::{ExtendResource, TryStatus};
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 
+#[instrument(skip(_ctx))]
 async fn delete_fn(_vm: Arc<Node>, _ctx: Arc<DefaultState>) -> Result<Action, Error> {
     Ok(Action::await_change())
 }
 
+#[instrument(skip(client))]
 async fn request_reschedule_node_vms(node: &Node, client: Client) -> Result<(), Error> {
     let vms: Api<VirtualMachine> = Api::all(client.clone());
     if let Ok(mut list) = vms.list(&ListParams::default()).await {
@@ -39,6 +41,7 @@ async fn request_reschedule_node_vms(node: &Node, client: Client) -> Result<(), 
 }
 
 /// Handle updates to nodes in the cluster
+#[instrument(skip(ctx))]
 async fn update_fn(node: Arc<Node>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let client = ctx.client.clone();
     let node = node.as_ref().to_owned();
@@ -57,6 +60,7 @@ async fn update_fn(node: Arc<Node>, ctx: Arc<DefaultState>) -> Result<Action, Er
     ok_and_requeue!(600)
 }
 
+#[instrument(skip(client))]
 pub async fn create(client: Client) -> Result<(), Error> {
     info!("libvirt: Starting node controller");
     ResourceControllerBuilder::new(client)
