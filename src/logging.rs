@@ -36,7 +36,8 @@ struct Wrapper(opentelemetry_otlp::SpanExporter);
 
 impl SpanExporter for Wrapper {
     fn export(&mut self, batch: Vec<SpanData>) -> BoxFuture<'static, ExportResult> {
-        let new_batch = batch
+        self.0.export(batch)
+        /*let new_batch = batch
             .iter()
             .map(|span_data: &SpanData| {
                 let mut span_data = span_data.clone();
@@ -55,7 +56,7 @@ impl SpanExporter for Wrapper {
                 span_data
             })
             .collect();
-        self.0.export(new_batch)
+        self.0.export(new_batch)*/
     }
 
     fn shutdown(&mut self) {
@@ -75,7 +76,7 @@ fn setup_otlp_layer(
     endpoint: &str,
 ) -> Result<(TracerProvider, OpenTelemetryLayer<Registry, Tracer>), Error> {
     let otlp_exporter = opentelemetry_otlp::new_exporter()
-        .tonic()
+        .http()
         .with_endpoint(endpoint)
         .build_span_exporter()?;
 
