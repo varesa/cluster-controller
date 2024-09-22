@@ -92,11 +92,18 @@ impl MetadataProxy {
                     )
                 });
 
+        let version = warp::path!("openstack").map(|| {
+            String::from("latest")
+        });
+
         let userdata = warp::path!("openstack" / "latest" / "user_data")
             .and(self.fetch_metadata())
             .map(|params: (Ipv4Addr, String)| params.1);
 
-        let app = root.or(userdata).with(warp::log("api"));
+        let app = root
+            .or(userdata)
+            .or(version)
+            .with(warp::log("api"));
         warp::serve(app).run(([0, 0, 0, 0], 80)).await;
         Err(Error::UnexpectedExit(String::from(
             "metadata proxy HTTP API (warp) died",
