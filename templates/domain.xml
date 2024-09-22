@@ -6,14 +6,6 @@
     <memory unit="{{memory_unit}}">{{memory}}</memory>
     <currentMemory unit="{{memory_unit}}">{{memory}}</currentMemory>
 
-    <sysinfo type='smbios'>
-        <system>
-            <!-- We play OpenStack to fool cloud-init -->
-            <entry name='product'>OpenStack Nova</entry>
-        </system>
-    </sysinfo>
-
-
     {% include "features.xml" %}
 
     <devices>

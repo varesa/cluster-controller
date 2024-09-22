@@ -6,7 +6,15 @@
 
     <os>
         <type arch='x86_64' machine='{{machine_type}}'>hvm</type>
+        <smbios mode="sysinfo"/>
     </os>
+
+    <sysinfo type='smbios'>
+        <system>
+            <!-- We play OpenStack to fool cloud-init -->
+            <entry name='product'>OpenStack Nova</entry>
+        </system>
+    </sysinfo>
 
     {{ cpu }}
 
