@@ -96,12 +96,17 @@ impl MetadataProxy {
             String::from("latest")
         });
 
+        let metadata = warp::path!("openstack" / "latest" / "meta_data.json").map(|| {
+            String::from("{}")
+        });
+
         let userdata = warp::path!("openstack" / "latest" / "user_data")
             .and(self.fetch_metadata())
             .map(|params: (Ipv4Addr, String)| params.1);
 
         let app = root
             .or(userdata)
+            .or(metadata)
             .or(version)
             .with(warp::log("api"));
         warp::serve(app).run(([0, 0, 0, 0], 80)).await;
