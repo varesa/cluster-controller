@@ -88,6 +88,7 @@ pub async fn handle_outbound_migration(
         virt::sys::VIR_MIGRATE_PEER2PEER
             | virt::sys::VIR_MIGRATE_LIVE
             | virt::sys::VIR_MIGRATE_AUTO_CONVERGE,
+        None,
         NO_BW_LIMIT,
     )?;
     ok_and_requeue!(10)

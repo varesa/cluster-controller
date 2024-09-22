@@ -59,7 +59,7 @@ fn to_storage_source(volume: &VolumeAttachment, namespace: &str) -> Result<Stora
 
 impl Libvirt {
     pub fn new(uri: &str) -> Result<Self, Error> {
-        let connection = Connect::open(uri);
+        let connection = Connect::open(Some(uri));
         match connection {
             Ok(connection) => Ok(Self { connection }),
             Err(err) => Err(err.into()),

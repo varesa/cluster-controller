@@ -47,7 +47,7 @@ librbd-sys = "0.1.0"
 
 # libvirt
 #virt = { git = "https://github.com/varesa/libvirt-rust.git", branch = "hack" }
-virt = "0.3.1"
+virt = "0.3.2"
 
 # metadata proxy
 nix = "0.26.2"
