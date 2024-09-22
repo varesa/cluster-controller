@@ -125,6 +125,7 @@ where
                             ResourceType::kind(&ResourceType::DynamicType::default()).to_string(),
                         "ns" = object.meta().namespace.clone(),
                         "name" = object.meta().name.clone(),
+                        "entity.name" = object.meta().name.clone(),
                     );
 
                     async move {
