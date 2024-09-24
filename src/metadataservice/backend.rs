@@ -1,6 +1,6 @@
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::api::ListParams;
-use kube::{Api, Client, Resource};
+use kube::{Api, Client, Resource, ResourceExt};
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 use tracing::{error, info};
@@ -9,7 +9,7 @@ use crate::cluster::ovn::common::OvnNamed;
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::cluster::ovn::types::logicalswitchport::LogicalSwitchPort;
 use crate::crd::libvirt::VirtualMachine;
-use crate::metadataservice::protocol::{MetadataRequest, MetadataResponse};
+use crate::metadataservice::protocol::{MetadataPayload, MetadataRequest, MetadataResponse};
 use crate::Error;
 
 pub struct MetadataBackend {
@@ -46,7 +46,6 @@ impl MetadataBackend {
                 } else {
                     msg.return_channel
                         .send(MetadataResponse {
-                            ip: msg.ip,
                             metadata: Box::new(Err(Error::InstanceMatchFailed(format!(
                                 "Matched {} instances",
                                 ports.len()
@@ -109,10 +108,16 @@ impl MetadataBackend {
 
                     match maybe_userdata {
                         Ok(userdata) => {
+                            let metadata_payload = MetadataPayload {
+                                ip: msg.ip,
+                                hostname: vm.name_unchecked(),
+                                instance_id: vm.spec.uuid.as_ref().unwrap().clone(),
+                                user_data: userdata,
+                            };
+
                             msg.return_channel
                                 .send(MetadataResponse {
-                                    ip: msg.ip,
-                                    metadata: Box::new(Ok(userdata)),
+                                    metadata: Box::new(Ok(metadata_payload)),
                                 })
                                 .await?;
                         }
@@ -120,7 +125,6 @@ impl MetadataBackend {
                             error!("backend: error fetching metadata for {}: {:?}", &msg.ip, e);
                             msg.return_channel
                                 .send(MetadataResponse {
-                                    ip: msg.ip,
                                     metadata: Box::new(Err(e)),
                                 })
                                 .await?;
@@ -130,7 +134,6 @@ impl MetadataBackend {
                     info!("backend: No userdata specified in vm spec");
                     msg.return_channel
                         .send(MetadataResponse {
-                            ip: msg.ip,
                             metadata: Box::new(Err(Error::UserdataNotSpecified)),
                         })
                         .await?;

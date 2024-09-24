@@ -9,7 +9,14 @@ pub struct MetadataRequest {
 
 #[derive(Debug)]
 pub struct MetadataResponse {
-    pub ip: std::net::Ipv4Addr,
     // box to break recursive type via Error
-    pub metadata: Box<Result<String, Error>>,
+    pub metadata: Box<Result<MetadataPayload, Error>>,
+}
+
+#[derive(Debug)]
+pub struct MetadataPayload {
+    pub ip: std::net::Ipv4Addr,
+    pub instance_id: String,
+    pub hostname: String,
+    pub user_data: String,
 }
