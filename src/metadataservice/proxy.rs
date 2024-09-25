@@ -57,47 +57,9 @@ impl MetadataProxy {
             })
     }
 
-    fn openstack_api(
-        &self,
-    ) -> impl Filter<Extract = (MetadataPayload,), Error = Rejection> + Clone {
-        let openstack_root = warp::path!("openstack").map(|| String::from("latest"));
-
-        let openstack_latest =
-            warp::path!("openstack" / "latest").map(|| String::from("meta_data.json\nuser_data"));
-
-        let openstack_latest_metadata =
-            warp::path!("openstack" / "latest" / "meta_data.json").map(|| String::from("{}"));
-
-        let openstack_latest_userdata = warp::path!("openstack" / "latest" / "user_data")
-            .and(self.addr_to_metadata())
-            .map(|metadata: MetadataPayload| metadata.user_data);
-
-        openstack_root
-            .or(openstack_latest)
-            .or(openstack_latest_metadata)
-            .or(openstack_latest_userdata)
-    }
-
-    fn ec2_api_ver(&self) -> impl Filter<Extract = (MetadataPayload,), Error = Rejection> + Clone {
-        let api_ver_root = warp::path::end().map(|| String::from("meta-data"));
-
-        let metadata_root = warp::path!("meta-data").map(|| String::from("hostname\ninstance-id"));
-
-        let metadata_hostname = warp::path!("meta-data" / "hostname")
-            .and(self.addr_to_metadata())
-            .map(|metadata: MetadataPayload| metadata.hostname);
-
-        let metadata_instanceid = warp::path!("meta-data" / "instance-id")
-            .and(self.addr_to_metadata())
-            .map(|metadata: MetadataPayload| metadata.instance_id);
-
-        api_ver_root
-            .or(metadata_root)
-            .or(metadata_instanceid)
-            .or(metadata_hostname)
-    }
-
     pub async fn main(&mut self) -> Result<(), Error> {
+        // Builtin default page
+
         let root =
             warp::path::end()
                 .and(self.addr_to_metadata())
@@ -112,12 +74,47 @@ impl MetadataProxy {
                     )
                 });
 
-        //let latest = warp::path!("latest").map(|| String::from("meta-data/"));
+        // Build OpenStack API
+
+        let openstack_root = warp::path::end().map(|| String::from("latest"));
+
+        let openstack_latest =
+            warp::path!("latest").map(|| String::from("meta_data.json\nuser_data"));
+
+        let openstack_latest_metadata =
+            warp::path!("latest" / "meta_data.json").map(|| String::from("{}"));
+
+        let openstack_latest_userdata = warp::path!("latest" / "user_data")
+            .and(self.addr_to_metadata())
+            .map(|metadata: MetadataPayload| metadata.user_data);
+
+        let openstack_api = openstack_root
+            .or(openstack_latest)
+            .or(openstack_latest_metadata)
+            .or(openstack_latest_userdata);
+
+        // Build EC2 API
+        let api_ver_root = warp::path::end().map(|| String::from("meta-data"));
+
+        let metadata_root = warp::path!("meta-data").map(|| String::from("hostname\ninstance-id"));
+
+        let metadata_hostname = warp::path!("meta-data" / "hostname")
+            .and(self.addr_to_metadata())
+            .map(|metadata: MetadataPayload| metadata.hostname);
+
+        let metadata_instanceid = warp::path!("meta-data" / "instance-id")
+            .and(self.addr_to_metadata())
+            .map(|metadata: MetadataPayload| metadata.instance_id);
+
+        let ec2_api_ver = api_ver_root
+            .or(metadata_root)
+            .or(metadata_instanceid)
+            .or(metadata_hostname);
 
         let app = root
-            .or(warp::path!("openstack").and(self.openstack_api()))
-            .or(warp::path!("latest").and(self.ec2_api_ver()))
-            .or(warp::path!("2009-04-04").and(self.ec2_api_ver()))
+            .or(warp::path!("openstack").and(openstack_api))
+            .or(warp::path!("latest").and(ec2_api_ver.clone()))
+            .or(warp::path!("2009-04-04").and(ec2_api_ver))
             .with(warp::log("api"));
         warp::serve(app).run(([0, 0, 0, 0], 80)).await;
         Err(Error::UnexpectedExit(String::from(
