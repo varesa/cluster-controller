@@ -37,7 +37,7 @@ impl MetadataProxy {
 
     /// A warp filter which resolves the client IP address into a MetadataPayload
     fn addr_to_metadata(
-        &mut self,
+        &self,
     ) -> impl Filter<Extract = (MetadataPayload,), Error = Rejection> + Clone {
         warp::addr::remote()
             // [0] and_then expects a callable which returns a future
@@ -57,6 +57,46 @@ impl MetadataProxy {
             })
     }
 
+    fn openstack_api(
+        &self,
+    ) -> impl Filter<Extract = (MetadataPayload,), Error = Rejection> + Clone {
+        let openstack_root = warp::path!("openstack").map(|| String::from("latest"));
+
+        let openstack_latest =
+            warp::path!("openstack" / "latest").map(|| String::from("meta_data.json\nuser_data"));
+
+        let openstack_latest_metadata =
+            warp::path!("openstack" / "latest" / "meta_data.json").map(|| String::from("{}"));
+
+        let openstack_latest_userdata = warp::path!("openstack" / "latest" / "user_data")
+            .and(self.addr_to_metadata())
+            .map(|metadata: MetadataPayload| metadata.user_data);
+
+        openstack_root
+            .or(openstack_latest)
+            .or(openstack_latest_metadata)
+            .or(openstack_latest_userdata)
+    }
+
+    fn ec2_api_ver(&self) -> impl Filter<Extract = (MetadataPayload,), Error = Rejection> + Clone {
+        let api_ver_root = warp::path::end().map(|| String::from("meta-data"));
+
+        let metadata_root = warp::path!("meta-data").map(|| String::from("hostname\ninstance-id"));
+
+        let metadata_hostname = warp::path!("meta-data" / "hostname")
+            .and(self.addr_to_metadata())
+            .map(|metadata: MetadataPayload| metadata.hostname);
+
+        let metadata_instanceid = warp::path!("meta-data" / "instance-id")
+            .and(self.addr_to_metadata())
+            .map(|metadata: MetadataPayload| metadata.instance_id);
+
+        api_ver_root
+            .or(metadata_root)
+            .or(metadata_instanceid)
+            .or(metadata_hostname)
+    }
+
     pub async fn main(&mut self) -> Result<(), Error> {
         let root =
             warp::path::end()
@@ -72,40 +112,12 @@ impl MetadataProxy {
                     )
                 });
 
-        let openstack = warp::path!("openstack").map(|| String::from("latest"));
-
-        let openstack_latest =
-            warp::path!("openstack" / "latest").map(|| String::from("meta_data.json\nuser_data"));
-
-        let openstack_latest_metadata =
-            warp::path!("openstack" / "latest" / "meta_data.json").map(|| String::from("{}"));
-
-        let openstack_latest_userdata = warp::path!("openstack" / "latest" / "user_data")
-            .and(self.addr_to_metadata())
-            .map(|metadata: MetadataPayload| metadata.user_data);
-
-        let latest = warp::path!("latest").map(|| String::from("meta-data/"));
-
-        let latest_metadata =
-            warp::path!("latest" / "meta-data").map(|| String::from("hostname\ninstance-id"));
-
-        let latest_metadata_hostname = warp::path!("latest" / "meta-data" / "hostname")
-            .and(self.addr_to_metadata())
-            .map(|metadata: MetadataPayload| metadata.hostname);
-
-        let latest_metadata_instanceid = warp::path!("latest" / "meta-data" / "instance-id")
-            .and(self.addr_to_metadata())
-            .map(|metadata: MetadataPayload| metadata.instance_id);
+        //let latest = warp::path!("latest").map(|| String::from("meta-data/"));
 
         let app = root
-            .or(openstack)
-            .or(openstack_latest)
-            .or(openstack_latest_metadata)
-            .or(openstack_latest_userdata)
-            .or(latest)
-            .or(latest_metadata)
-            .or(latest_metadata_hostname)
-            .or(latest_metadata_instanceid)
+            .or(warp::path!("openstack").and(self.openstack_api()))
+            .or(warp::path!("latest").and(self.ec2_api_ver()))
+            .or(warp::path!("2009-04-04").and(self.ec2_api_ver()))
             .with(warp::log("api"));
         warp::serve(app).run(([0, 0, 0, 0], 80)).await;
         Err(Error::UnexpectedExit(String::from(
