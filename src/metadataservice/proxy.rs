@@ -1,14 +1,14 @@
 use std::net::{Ipv4Addr, SocketAddr};
 use std::os::unix::io::AsRawFd;
 
-use nix::sched::{setns, CloneFlags};
-use tokio::sync::mpsc::{channel, Sender};
-use warp::{Filter, Rejection};
-
 use crate::metadataservice::networking;
 use crate::metadataservice::protocol::{MetadataPayload, MetadataRequest};
 use crate::utils::strings::get_version_string;
 use crate::Error;
+use nix::sched::{setns, CloneFlags};
+use tokio::sync::mpsc::{channel, Sender};
+use warp::filters::BoxedFilter;
+use warp::{Filter, Rejection, Reply};
 
 pub struct MetadataProxy {
     channel_endpoint: Sender<MetadataRequest>,
@@ -74,8 +74,18 @@ impl MetadataProxy {
                     )
                 });
 
-        // Build OpenStack API
+        let app = root
+            .or(warp::path!("openstack").and(self.openstack_api()))
+            .or(warp::path!("latest").and(self.ec2_api()))
+            .or(warp::path!("2009-04-04").and(self.ec2_api()))
+            .with(warp::log("api"));
+        warp::serve(app).run(([0, 0, 0, 0], 80)).await;
+        Err(Error::UnexpectedExit(String::from(
+            "metadata proxy HTTP API (warp) died",
+        )))
+    }
 
+    fn openstack_api(&self) -> BoxedFilter<(impl Reply,)> {
         let openstack_root = warp::path::end().map(|| String::from("latest"));
 
         let openstack_latest =
@@ -88,12 +98,14 @@ impl MetadataProxy {
             .and(self.addr_to_metadata())
             .map(|metadata: MetadataPayload| metadata.user_data);
 
-        let openstack_api = openstack_root
+        openstack_root
             .or(openstack_latest)
             .or(openstack_latest_metadata)
-            .or(openstack_latest_userdata);
+            .or(openstack_latest_userdata)
+            .boxed()
+    }
 
-        // Build EC2 API
+    fn ec2_api(&self) -> BoxedFilter<(impl Reply,)> {
         let api_ver_root = warp::path::end().map(|| String::from("meta-data"));
 
         let metadata_root = warp::path!("meta-data").map(|| String::from("hostname\ninstance-id"));
@@ -106,20 +118,11 @@ impl MetadataProxy {
             .and(self.addr_to_metadata())
             .map(|metadata: MetadataPayload| metadata.instance_id);
 
-        let ec2_api_ver = api_ver_root
+        api_ver_root
             .or(metadata_root)
             .or(metadata_instanceid)
-            .or(metadata_hostname);
-
-        let app = root
-            .or(warp::path!("openstack").and(openstack_api))
-            .or(warp::path!("latest").and(ec2_api_ver.clone()))
-            .or(warp::path!("2009-04-04").and(ec2_api_ver))
-            .with(warp::log("api"));
-        warp::serve(app).run(([0, 0, 0, 0], 80)).await;
-        Err(Error::UnexpectedExit(String::from(
-            "metadata proxy HTTP API (warp) died",
-        )))
+            .or(metadata_hostname)
+            .boxed()
     }
 }
 
