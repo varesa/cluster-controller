@@ -75,9 +75,9 @@ impl MetadataProxy {
                 });
 
         let app = root
-            .or(warp::path!("openstack").and(self.openstack_api()))
-            .or(warp::path!("latest").and(self.ec2_api()))
-            .or(warp::path!("2009-04-04").and(self.ec2_api()))
+            .or(warp::path("openstack").and(self.openstack_api()))
+            .or(warp::path("latest").and(self.ec2_api()))
+            .or(warp::path("2009-04-04").and(self.ec2_api()))
             .with(warp::log("api"));
         warp::serve(app).run(([0, 0, 0, 0], 80)).await;
         Err(Error::UnexpectedExit(String::from(
