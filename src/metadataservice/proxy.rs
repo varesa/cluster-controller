@@ -76,8 +76,6 @@ impl MetadataProxy {
 
         let app = root
             .or(warp::path("openstack").and(self.openstack_api()))
-            .or(warp::path("latest").and(self.ec2_api()))
-            .or(warp::path("2009-04-04").and(self.ec2_api()))
             .with(warp::log("api"));
         warp::serve(app).run(([0, 0, 0, 0], 80)).await;
         Err(Error::UnexpectedExit(String::from(
@@ -102,26 +100,6 @@ impl MetadataProxy {
             .or(openstack_latest)
             .or(openstack_latest_metadata)
             .or(openstack_latest_userdata)
-            .boxed()
-    }
-
-    fn ec2_api(&self) -> BoxedFilter<(impl Reply,)> {
-        let api_ver_root = warp::path::end().map(|| String::from("meta-data"));
-
-        let metadata_root = warp::path!("meta-data").map(|| String::from("hostname\ninstance-id"));
-
-        let metadata_hostname = warp::path!("meta-data" / "hostname")
-            .and(self.addr_to_metadata())
-            .map(|metadata: MetadataPayload| metadata.hostname);
-
-        let metadata_instanceid = warp::path!("meta-data" / "instance-id")
-            .and(self.addr_to_metadata())
-            .map(|metadata: MetadataPayload| metadata.instance_id);
-
-        api_ver_root
-            .or(metadata_root)
-            .or(metadata_instanceid)
-            .or(metadata_hostname)
             .boxed()
     }
 }
