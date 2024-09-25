@@ -6,6 +6,7 @@ use crate::metadataservice::protocol::{MetadataPayload, MetadataRequest};
 use crate::utils::strings::get_version_string;
 use crate::Error;
 use nix::sched::{setns, CloneFlags};
+use serde_json::json;
 use tokio::sync::mpsc::{channel, Sender};
 use warp::filters::BoxedFilter;
 use warp::{Filter, Rejection, Reply};
@@ -89,8 +90,15 @@ impl MetadataProxy {
         let openstack_latest =
             warp::path!("latest").map(|| String::from("meta_data.json\nuser_data"));
 
-        let openstack_latest_metadata =
-            warp::path!("latest" / "meta_data.json").map(|| String::from("{}"));
+        let openstack_latest_metadata = warp::path!("latest" / "meta_data.json")
+            .and(self.addr_to_metadata())
+            .map(|metadata: MetadataPayload| {
+                json!({
+                    "uuid": metadata.instance_id,
+                    "hostname": metadata.hostname
+                })
+                .to_string()
+            });
 
         let openstack_latest_userdata = warp::path!("latest" / "user_data")
             .and(self.addr_to_metadata())
