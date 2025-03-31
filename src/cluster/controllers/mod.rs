@@ -6,6 +6,7 @@ use kube::Client;
 mod images;
 mod network;
 pub mod node;
+mod ovn;
 mod router;
 mod virtualmachine;
 mod volumes;
@@ -17,6 +18,7 @@ pub async fn run(client: Client) -> Result<(), Error> {
 
     let volumes_task = tokio::spawn(volumes::create(client.clone()));
     let images_task = tokio::spawn(images::create(client.clone()));
+    let ovn_task = tokio::spawn(ovn::create(client.clone()));
 
     let network_task = tokio::spawn(network::create(client.clone()));
     let router_task = tokio::spawn(router::create(client.clone()));
@@ -29,6 +31,7 @@ pub async fn run(client: Client) -> Result<(), Error> {
     let results = try_join!(
         volumes_task,
         images_task,
+        ovn_task,
         network_task,
         router_task,
         vm_task1,
@@ -38,6 +41,7 @@ pub async fn run(client: Client) -> Result<(), Error> {
     let (
         result_volumes,
         result_images,
+        result_ovn,
         result_network,
         result_router,
         result_vm1,
@@ -47,6 +51,7 @@ pub async fn run(client: Client) -> Result<(), Error> {
 
     result_volumes?;
     result_images?;
+    result_ovn?;
     result_network?;
     result_router?;
     result_vm1?;
