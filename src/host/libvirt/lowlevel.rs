@@ -88,7 +88,6 @@ impl Libvirt {
             volumes.push(StorageTemplate {
                 source: to_storage_source(volume, &namespace)?,
                 device: format!("{}{}", &storage_device_prefix, (b'a' + drive_index) as char),
-                bus_slot: drive_index,
                 bootdevice: volumes.is_empty(), // First device is the boot device
                 bus: storage_bus.to_string(),
             });
@@ -117,7 +116,11 @@ impl Libvirt {
         let xml = DomainTemplate {
             name: get_domain_name(vm).expect("no domain name specified"),
             uuid: vm.spec.uuid.clone().expect("VM has no UUID"),
-            machine_type: cluster.spec.machine_type.clone(),
+            machine_type: vm
+                .spec
+                .machine_type
+                .clone()
+                .unwrap_or(cluster.spec.machine_type.clone()),
             cpu: vm
                 .spec
                 .cpu_model

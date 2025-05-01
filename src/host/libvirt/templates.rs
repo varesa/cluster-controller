@@ -60,7 +60,6 @@ pub struct StorageTemplate {
     pub source: StorageSource,
     pub device: String,
     pub bootdevice: bool,
-    pub bus_slot: u8,
     pub bus: String,
 }
 

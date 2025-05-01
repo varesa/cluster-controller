@@ -124,6 +124,8 @@ pub mod v1beta3 {
         pub node: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub power_action: Option<PowerAction>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub machine_type: Option<String>,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
