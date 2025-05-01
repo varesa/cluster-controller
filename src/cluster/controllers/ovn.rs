@@ -66,18 +66,11 @@ fn make_ovn_daemonset(image: String) -> Result<DaemonSet, Error> {
                                 ..EnvVar::default()
                             },
                         ]),
-                        volume_mounts: Some(vec![
-                            VolumeMount {
-                                name: "ovs-run".to_string(),
-                                mount_path: "/var/run/openvswitch".to_string(),
-                                ..VolumeMount::default()
-                            },
-                            VolumeMount {
-                                name: "ovn-run".to_string(),
-                                mount_path: "/var/run/ovn".to_string(),
-                                ..VolumeMount::default()
-                            },
-                        ]),
+                        volume_mounts: Some(vec![VolumeMount {
+                            name: "ovs-run".to_string(),
+                            mount_path: "/var/run/openvswitch".to_string(),
+                            ..VolumeMount::default()
+                        }]),
                         security_context: Some(SecurityContext {
                             privileged: Some(true),
                             ..SecurityContext::default()
@@ -85,24 +78,14 @@ fn make_ovn_daemonset(image: String) -> Result<DaemonSet, Error> {
                         ..Container::default()
                     }],
                     node_selector: Some(node_selector),
-                    volumes: Some(vec![
-                        Volume {
-                            name: "ovs-run".to_string(),
-                            host_path: Some(k8s_openapi::api::core::v1::HostPathVolumeSource {
-                                path: "/var/run/openvswitch".to_string(),
-                                type_: Some("Directory".to_string()),
-                            }),
-                            ..Volume::default()
-                        },
-                        Volume {
-                            name: "ovn-run".to_string(),
-                            host_path: Some(k8s_openapi::api::core::v1::HostPathVolumeSource {
-                                path: "/var/run/ovn".to_string(),
-                                type_: Some("Directory".to_string()),
-                            }),
-                            ..Volume::default()
-                        },
-                    ]),
+                    volumes: Some(vec![Volume {
+                        name: "ovs-run".to_string(),
+                        host_path: Some(k8s_openapi::api::core::v1::HostPathVolumeSource {
+                            path: "/var/run/openvswitch".to_string(),
+                            type_: Some("Directory".to_string()),
+                        }),
+                        ..Volume::default()
+                    }]),
                     host_network: Some(true),
                     dns_policy: Some("ClusterFirstWithHostNet".to_string()),
                     ..PodSpec::default()
