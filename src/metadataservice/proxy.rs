@@ -143,7 +143,7 @@ async fn fetch_metadata(
         // Repackage Result<_,Error> into Result<_,Rejection>
         Ok(metadata) => Ok(metadata),
         Err(e) => {
-            println!("proxy: received error {:?}", e);
+            println!("proxy: received error {e:?}");
             Err(warp::reject::not_found())
         }
     }

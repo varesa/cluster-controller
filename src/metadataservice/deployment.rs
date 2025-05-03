@@ -48,7 +48,7 @@ fn make_cluster_role() -> ClusterRole {
 fn make_cluster_role_binding(namespace: &str) -> ClusterRoleBinding {
     ClusterRoleBinding {
         metadata: ObjectMeta {
-            name: Some(format!("metadata-service-{}", namespace)),
+            name: Some(format!("metadata-service-{namespace}")),
             ..ObjectMeta::default()
         },
         role_ref: RoleRef {

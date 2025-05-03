@@ -22,7 +22,7 @@ pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) ->
     }
 
     let watch_params = WatchParams::default()
-        .fields(&format!("metadata.name={}", name))
+        .fields(&format!("metadata.name={name}"))
         .timeout(5);
     let mut stream = crds.watch(&watch_params, "0").await?.boxed();
 
@@ -41,7 +41,7 @@ pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) ->
             }
         }
     }
-    Err(Error::Timeout(format!("Apply CRD {}", name)))
+    Err(Error::Timeout(format!("Apply CRD {name}")))
 }
 
 pub async fn get_namespace_names(client: Client) -> Result<Vec<String>, Error> {

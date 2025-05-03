@@ -15,8 +15,8 @@ fn main() {
         .unwrap();
     let git_count = String::from_utf8(output.stdout).map_or("undetermined".into(), |o| o);
 
-    println!("cargo:rustc-env=GIT_HASH={}", git_hash);
-    println!("cargo:rustc-env=GIT_COUNT={}", git_count);
+    println!("cargo:rustc-env=GIT_HASH={git_hash}");
+    println!("cargo:rustc-env=GIT_COUNT={git_count}");
     println!("cargo:rustc-rerun-if-changed=.git/HEAD");
 
     if let Ok(head) = fs::read_to_string(".git/HEAD") {

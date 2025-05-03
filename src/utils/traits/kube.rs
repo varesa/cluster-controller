@@ -98,7 +98,7 @@ where
         client: Client,
         field_manager: &str,
     ) -> Result<(), Error> {
-        let finalizer_name = format!("{}/{}", GROUP_NAME, finalizer_name);
+        let finalizer_name = format!("{GROUP_NAME}/{finalizer_name}");
 
         if !self.has_finalizer(&finalizer_name) {
             if let Some(finalizers) = self.meta_mut().finalizers.as_mut() {
@@ -118,7 +118,7 @@ where
         client: Client,
         field_manager: &str,
     ) -> Result<(), Error> {
-        let finalizer_name = format!("{}/{}", GROUP_NAME, finalizer_name);
+        let finalizer_name = format!("{GROUP_NAME}/{finalizer_name}");
 
         if self.has_finalizer(&finalizer_name) {
             self.meta_mut()

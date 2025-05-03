@@ -33,7 +33,7 @@ fn ip_command_netns(netns: &str, args: Vec<&str>) -> Result<(), Error> {
 }
 
 pub fn create_ns(ns_name: &str) -> Result<File, Error> {
-    let ns_path_str = format!("/var/run/netns/{}", ns_name);
+    let ns_path_str = format!("/var/run/netns/{ns_name}");
     let ns_path = Path::new(&ns_path_str);
 
     println!("proxy: Trying to open {}", &ns_path_str);
@@ -81,7 +81,7 @@ pub fn create_interface(ns_name: &str, router_name: &str) -> Result<(), Error> {
 
     command("/usr/bin/ovs-vsctl", vec!["add-port", "br-int", &if_host]).or_else(|err| {
         if let Error::CommandFailed(_cmd, msg) = &err {
-            if msg == &format!("ovs-vsctl: cannot create a port named {} because a port named {} already exists on bridge br-int\n", if_host, if_host) {
+            if msg == &format!("ovs-vsctl: cannot create a port named {if_host} because a port named {if_host} already exists on bridge br-int\n") {
                 return Ok(())
             }
         }
@@ -93,7 +93,7 @@ pub fn create_interface(ns_name: &str, router_name: &str) -> Result<(), Error> {
             "set",
             "Interface",
             &if_host,
-            &format!("external_ids:iface-id=mds-{}", router_name),
+            &format!("external_ids:iface-id=mds-{router_name}"),
         ],
     )?;
     Ok(())

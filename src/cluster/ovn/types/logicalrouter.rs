@@ -41,7 +41,7 @@ impl LogicalRouter {
             if !old_routes.iter().any(|old_route| {
                 old_route.ip_prefix == new_route.cidr && old_route.nexthop == new_route.nexthop
             }) {
-                let id = format!("new_route_{}", i);
+                let id = format!("new_route_{i}");
                 i += 1;
                 let create_op = json!({
                     "op": "insert",

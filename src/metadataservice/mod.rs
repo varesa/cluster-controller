@@ -26,7 +26,7 @@ pub async fn run(args: Vec<String>, client: Client) -> Result<(), Error> {
     let split: Vec<&str> = target.split('/').collect();
     let namespace = split.first().unwrap();
     let router = split.get(1).unwrap();
-    let router_name = format!("{}-{}", namespace, router);
+    let router_name = format!("{namespace}-{router}");
 
     let (request_sender, request_receiver) = channel(REQUEST_CHANNEL_BUFFER_SIZE);
 
