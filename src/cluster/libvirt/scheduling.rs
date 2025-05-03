@@ -1,10 +1,10 @@
 use crate::cluster::{
-    MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION, NO_SCHEDULE_ANNOTATION,
+    MIGRATION_REQUEST_ANNOTATION, NO_SCHEDULE_ANNOTATION,
 };
 use k8s_openapi::api::core::v1::Node;
 use kube::{
-    api::{Api, ListParams, ResourceExt},
     Client,
+    api::{Api, ListParams, ResourceExt},
 };
 use rand::seq::SliceRandom;
 use tracing::instrument;
@@ -12,6 +12,7 @@ use tracing::instrument;
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
 use crate::utils::traits::kube::{ExtendResource, TryStatus};
+use crate::utils::traits::node::NodeExt;
 
 /// Find all VMs registered to the k8s apiserver with the given label set to the given value
 #[instrument(skip(client))]
@@ -126,9 +127,7 @@ fn remove_candidate_nodes(candidates: &mut Vec<Node>, nodes_to_remove: &Vec<Stri
 
 /// Remove all nodes which have the maintenance annotation set
 fn remove_nodes_in_maintenance(candidates: &mut Vec<Node>) {
-    candidates.retain(|candidate| {
-        candidate.annotations().get(MAINTENANCE_ANNOTATION) != Some(&String::from("true"))
-    });
+    candidates.retain(|candidate| !candidate.in_maintenance_mode());
 }
 
 /// Remove all nodes which have the noschedule annotation

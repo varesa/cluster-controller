@@ -1,19 +1,20 @@
 use k8s_openapi::api::core::v1::Node;
 use kube::runtime::controller::Action;
 use kube::{
-    api::{Api, ListParams},
     Client, ResourceExt,
+    api::{Api, ListParams},
 };
 use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{info, instrument};
 
-use crate::cluster::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
+use crate::cluster::MIGRATION_REQUEST_ANNOTATION;
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
 use crate::ok_and_requeue;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::traits::kube::{ExtendResource, TryStatus};
+use crate::utils::traits::node::NodeExt;
 
 #[instrument(skip(_ctx))]
 async fn delete_fn(_vm: Arc<Node>, _ctx: Arc<DefaultState>) -> Result<Action, Error> {
@@ -48,12 +49,8 @@ async fn update_fn(node: Arc<Node>, ctx: Arc<DefaultState>) -> Result<Action, Er
     let name = node.name_unchecked();
     info!("libvirt: beginning to reconcile: {}", name);
 
-    if let Some(annotations) = node.metadata.annotations.as_ref() {
-        if let Some(value) = annotations.get(MAINTENANCE_ANNOTATION) {
-            if value.to_lowercase() == "true" {
-                request_reschedule_node_vms(&node, client).await?;
-            }
-        }
+    if node.in_maintenance_mode() {
+        request_reschedule_node_vms(&node, client).await?;
     }
 
     info!("libvirt: updated: {}", name);
