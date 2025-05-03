@@ -58,7 +58,7 @@ impl MetadataProxy {
             })
     }
 
-    pub async fn main(&mut self) -> Result<(), Error> {
+    pub async fn main(self) -> Result<(), Error> {
         // Builtin default page
 
         let root =
