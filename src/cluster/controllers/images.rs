@@ -8,9 +8,9 @@ use tracing::{info, instrument};
 use crate::crd::ceph::Image;
 use crate::errors::Error;
 use crate::shared::ceph::lowlevel;
-use crate::utils::extend_traits::ExtendResource;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;
+use crate::utils::traits::kube::ExtendResource;
 
 const POOL_TEMPLATES: &str = "templates";
 

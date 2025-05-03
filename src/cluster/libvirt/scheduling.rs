@@ -11,7 +11,7 @@ use tracing::instrument;
 
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
-use crate::utils::extend_traits::{ExtendResource, TryStatus};
+use crate::utils::traits::kube::{ExtendResource, TryStatus};
 
 /// Find all VMs registered to the k8s apiserver with the given label set to the given value
 #[instrument(skip(client))]

@@ -2,8 +2,8 @@ use crate::crd::libvirt::v1beta3::PowerAction;
 use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::host::libvirt::controller::State;
 use crate::host::libvirt::utils::{get_cluster, get_domain_name};
-use crate::utils::extend_traits::{ExtendResource, TryStatus};
 use crate::utils::strings::field_manager;
+use crate::utils::traits::kube::{ExtendResource, TryStatus};
 use crate::Error;
 use crate::{ok_and_requeue, ok_no_requeue};
 use kube::runtime::controller::Action;
@@ -54,7 +54,7 @@ pub async fn handle_add(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, 
 
     if vm.spec.get_power_action() != PowerAction::PowerOn {
         info!("VM not requested to power on: {}", vm_name);
-        return ok_and_requeue!(600)
+        return ok_and_requeue!(600);
     }
 
     // Get cluster capabilities / definition

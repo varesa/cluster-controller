@@ -18,9 +18,9 @@ use crate::cluster::ovn::{
 use crate::crd::ovn::{Router, RouterStatus};
 use crate::errors::Error;
 use crate::metadataservice::deployment::deploy as deploy_mds;
-use crate::utils::extend_traits::ExtendResource;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;
+use crate::utils::traits::kube::ExtendResource;
 use crate::{create_set_status, ok_and_requeue, ok_no_requeue};
 
 lazy_static! {

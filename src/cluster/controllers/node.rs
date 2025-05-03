@@ -12,8 +12,8 @@ use crate::cluster::{MAINTENANCE_ANNOTATION, MIGRATION_REQUEST_ANNOTATION};
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
 use crate::ok_and_requeue;
-use crate::utils::extend_traits::{ExtendResource, TryStatus};
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
+use crate::utils::traits::kube::{ExtendResource, TryStatus};
 
 #[instrument(skip(_ctx))]
 async fn delete_fn(_vm: Arc<Node>, _ctx: Arc<DefaultState>) -> Result<Action, Error> {

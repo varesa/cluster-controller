@@ -14,8 +14,8 @@ use crate::host::libvirt::templates::{
 };
 use crate::host::libvirt::utils::{get_domain_name, parse_memory};
 use crate::shared::ceph;
-use crate::utils::extend_traits::TryStatus;
 use crate::utils::libvirt_storage::{parse_storage_location, StorageType};
+use crate::utils::traits::kube::TryStatus;
 
 pub struct Libvirt {
     pub connection: Connect,

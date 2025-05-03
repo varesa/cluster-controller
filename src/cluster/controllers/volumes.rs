@@ -15,9 +15,9 @@ use tracing::{info, instrument};
 use crate::crd::ceph::Volume;
 use crate::errors::Error;
 use crate::shared::ceph::lowlevel;
-use crate::utils::extend_traits::ExtendResource;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;
+use crate::utils::traits::kube::ExtendResource;
 use crate::{KEYRING_SECRET, NAMESPACE};
 
 const POOL_VOLUMES: &str = "volumes";

@@ -17,9 +17,9 @@ use crate::cluster::ovn::{
 };
 use crate::crd::ovn::{DhcpOptions as DhcpOptionsCrd, Network, NetworkStatus, RouterAttachment};
 use crate::errors::Error;
-use crate::utils::extend_traits::ExtendResource;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;
+use crate::utils::traits::kube::ExtendResource;
 use crate::{create_set_status, ok_and_requeue};
 
 lazy_static! {
