@@ -1,13 +1,13 @@
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment};
 use kube::{
-    api::{Patch, PatchParams},
     Api, Client,
+    api::{Patch, PatchParams},
 };
 use tracing::error;
 
 use crate::errors::Error;
 use crate::host::daemonset;
-use crate::{crd, NAMESPACE};
+use crate::{NAMESPACE, crd};
 
 mod controllers;
 mod libvirt;
@@ -16,7 +16,6 @@ pub mod ovn;
 const DEPLOYMENT_NAME: &str = "cluster-controller";
 
 pub const MAINTENANCE_ANNOTATION: &str = "cluster-virt.acl.fi/maintenance";
-
 pub const NO_SCHEDULE_ANNOTATION: &str = "cluster-virt.acl.fi/no-schedule";
 pub const MIGRATION_REQUEST_ANNOTATION: &str = "cluster-virt.acl.fi/migration-required";
 
@@ -50,6 +49,8 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
         .await?;
 
     let result = controllers::run(client).await;
-    error!("supervisor: ERROR: One of the controllers died, killing the rest of the application: {result:#?}");
+    error!(
+        "supervisor: ERROR: One of the controllers died, killing the rest of the application: {result:#?}"
+    );
     std::process::exit(1);
 }

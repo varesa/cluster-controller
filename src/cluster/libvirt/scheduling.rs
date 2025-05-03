@@ -1,6 +1,4 @@
-use crate::cluster::{
-    MIGRATION_REQUEST_ANNOTATION, NO_SCHEDULE_ANNOTATION,
-};
+use crate::cluster::MIGRATION_REQUEST_ANNOTATION;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
     Client,
@@ -132,9 +130,7 @@ fn remove_nodes_in_maintenance(candidates: &mut Vec<Node>) {
 
 /// Remove all nodes which have the noschedule annotation
 fn remove_nodes_with_no_schedule(candidates: &mut Vec<Node>) {
-    candidates.retain(|candidate| {
-        candidate.annotations().get(NO_SCHEDULE_ANNOTATION) != Some(&String::from("true"))
-    });
+    candidates.retain(|candidate| candidate.allows_scheduling());
 }
 
 const ANTI_AFFINITY_LABEL: &str = "antiAffinity";
