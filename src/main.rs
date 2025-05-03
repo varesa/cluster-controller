@@ -1,5 +1,3 @@
-#![feature(if_let)]
-
 use kube::Client;
 use std::env;
 use tracing::info;

@@ -1,13 +1,13 @@
 use std::net::{Ipv4Addr, SocketAddr};
 use std::os::unix::io::AsRawFd;
 
+use crate::Error;
 use crate::metadataservice::networking;
 use crate::metadataservice::protocol::{MetadataPayload, MetadataRequest};
 use crate::utils::strings::get_version_string;
-use crate::Error;
-use nix::sched::{setns, CloneFlags};
+use nix::sched::{CloneFlags, setns};
 use serde_json::json;
-use tokio::sync::mpsc::{channel, Sender};
+use tokio::sync::mpsc::{Sender, channel};
 use warp::filters::BoxedFilter;
 use warp::{Filter, Rejection, Reply};
 
@@ -29,7 +29,7 @@ impl MetadataProxy {
         setns(ns.as_raw_fd(), CloneFlags::CLONE_NEWNET).map_err(Error::NetnsChangeFailed)?;
 
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let mut mp = MetadataProxy { channel_endpoint };
+        let mp = MetadataProxy { channel_endpoint };
         rt.block_on(mp.main())?;
         Err(Error::UnexpectedExit(String::from(
             "metadata proxy HTTP API (async main) died",
@@ -39,7 +39,7 @@ impl MetadataProxy {
     /// A warp filter which resolves the client IP address into a MetadataPayload
     fn addr_to_metadata(
         &self,
-    ) -> impl Filter<Extract = (MetadataPayload,), Error = Rejection> + Clone {
+    ) -> impl Filter<Extract = (MetadataPayload,), Error = Rejection> + Clone + use<> {
         warp::addr::remote()
             // [0] and_then expects a callable which returns a future
             .and_then(extract_ipv4_address)
@@ -84,7 +84,7 @@ impl MetadataProxy {
         )))
     }
 
-    fn openstack_api(&self) -> BoxedFilter<(impl Reply,)> {
+    fn openstack_api(&self) -> BoxedFilter<(impl Reply + use<>,)> {
         let openstack_root = warp::path::end().map(|| String::from("latest"));
 
         let openstack_latest =
