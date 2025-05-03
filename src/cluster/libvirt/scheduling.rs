@@ -1,4 +1,3 @@
-use crate::cluster::MIGRATION_REQUEST_ANNOTATION;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
     Client,
@@ -11,6 +10,7 @@ use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
 use crate::utils::traits::kube::{ExtendResource, TryStatus};
 use crate::utils::traits::node::NodeExt;
+use crate::utils::traits::virtualmachine::VirtualMachineExt;
 
 /// Find all VMs registered to the k8s apiserver with the given label set to the given value
 #[instrument(skip(client))]
@@ -73,7 +73,7 @@ pub async fn is_uncompliant(vm: &VirtualMachine, client: Client) -> Result<bool,
 pub fn migration_requested(vm: &VirtualMachine) -> bool {
     let current_node = get_vm_node(vm);
 
-    if let Some(node_to_leave) = vm.annotations().get(MIGRATION_REQUEST_ANNOTATION) {
+    if let Some(node_to_leave) = vm.migration_requested_from() {
         current_node == Some(node_to_leave.clone())
     } else {
         false
@@ -89,10 +89,10 @@ pub async fn clear_successful_migration(
     field_manager: &str,
 ) -> Result<(), Error> {
     let current_node = get_vm_node(vm);
-    if let Some(node_to_leave) = vm.annotations().get(MIGRATION_REQUEST_ANNOTATION) {
+    if let Some(node_to_leave) = vm.migration_requested_from() {
         if current_node != Some(node_to_leave.clone()) {
-            vm.annotations_mut().remove(MIGRATION_REQUEST_ANNOTATION);
-            vm.commit(client.clone(), field_manager).await?;
+            vm.clear_migration_request(field_manager, client.clone())
+                .await?;
         }
     }
     Ok(())
@@ -173,7 +173,7 @@ pub(crate) async fn schedule(
     remove_nodes_with_no_schedule(&mut candidates.items);
 
     // Remove a node we are migrating away from (most of the time same as a node in maintenance)
-    if let Some(source_node) = vm.annotations().get(MIGRATION_REQUEST_ANNOTATION) {
+    if let Some(source_node) = vm.migration_requested_from() {
         remove_candidate_nodes(&mut candidates.items, &vec![source_node.clone()])
     }
 

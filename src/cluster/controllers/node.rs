@@ -8,13 +8,13 @@ use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{info, instrument};
 
-use crate::cluster::MIGRATION_REQUEST_ANNOTATION;
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
 use crate::ok_and_requeue;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
-use crate::utils::traits::kube::{ExtendResource, TryStatus};
+use crate::utils::traits::kube::TryStatus;
 use crate::utils::traits::node::NodeExt;
+use crate::utils::traits::virtualmachine::VirtualMachineExt;
 
 #[instrument(skip(_ctx))]
 async fn delete_fn(_vm: Arc<Node>, _ctx: Arc<DefaultState>) -> Result<Action, Error> {
@@ -28,12 +28,12 @@ async fn request_reschedule_node_vms(node: &Node, client: Client) -> Result<(), 
         for vm in list.iter_mut() {
             if let Some(scheduled_node) = &vm.try_status()?.node {
                 if scheduled_node == &node.name_unchecked() {
-                    vm.annotations_mut().insert(
-                        String::from(MIGRATION_REQUEST_ANNOTATION),
-                        node.name_unchecked(),
-                    );
-                    vm.commit(client.clone(), "cluster-manager.libvirt.node")
-                        .await?;
+                    vm.request_migration_away_from(
+                        node,
+                        "cluster-manager.libvirt.node",
+                        client.clone(),
+                    )
+                    .await?;
                 }
             }
         }
