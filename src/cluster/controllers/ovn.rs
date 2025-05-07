@@ -1,5 +1,6 @@
 use crate::cluster::get_running_image;
 use crate::errors::Error;
+use crate::labels_and_annotations::OVN_CONTROLLER_MANAGEMENT_LABEL;
 use crate::NAMESPACE;
 use k8s_openapi::api::apps::v1::DaemonSet;
 use k8s_openapi::api::core::v1::{
@@ -16,14 +17,16 @@ use tokio::time::{sleep, Duration};
 use tracing::{info, instrument};
 
 const OVN_CONTROLLER_NAME: &str = "ovn-controller";
-const OVN_MANAGEMENT_LABEL: &str = "cluster-virt.acl.fi/ovn-installation";
 
 fn make_ovn_daemonset(image: String) -> Result<DaemonSet, Error> {
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_string(), OVN_CONTROLLER_NAME.to_string());
 
     let mut node_selector = BTreeMap::new();
-    node_selector.insert(OVN_MANAGEMENT_LABEL.to_string(), "managed".to_string());
+    node_selector.insert(
+        OVN_CONTROLLER_MANAGEMENT_LABEL.to_string(),
+        "managed".to_string(),
+    );
 
     Ok(DaemonSet {
         metadata: ObjectMeta {

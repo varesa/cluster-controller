@@ -1,6 +1,6 @@
-use crate::cluster::MIGRATION_REQUEST_ANNOTATION;
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
+use crate::labels_and_annotations::MIGRATION_REQUEST_ANNOTATION;
 use crate::utils::traits::kube::ExtendResource;
 use k8s_openapi::api::core::v1::Node;
 use kube::{Client, ResourceExt};

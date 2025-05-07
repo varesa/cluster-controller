@@ -1,8 +1,9 @@
 use crate::errors::Error;
+use crate::utils::traits::kube::ApiExt;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Namespace;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-use kube::api::{ListParams, WatchParams};
+use kube::api::WatchParams;
 use kube::core::WatchEvent;
 use kube::{Api, Client};
 use tracing::{debug, info, instrument};
@@ -47,7 +48,7 @@ pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) ->
 pub async fn get_namespace_names(client: Client) -> Result<Vec<String>, Error> {
     let ns_api: Api<Namespace> = Api::all(client);
     let namespaces = ns_api
-        .list(&ListParams::default())
+        .list_default()
         .await?
         .iter()
         .map(|ns| {

@@ -1,9 +1,10 @@
 use crate::errors::Error;
 use crate::GROUP_NAME;
 use async_trait::async_trait;
-use kube::api::PostParams;
+use kube::api::{ListParams, ObjectList, PostParams};
 use kube::core::object::HasStatus;
 use kube::{Api, Client, CustomResourceExt, Resource, ResourceExt};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::instrument;
@@ -140,5 +141,21 @@ where
 
     fn name_prefixed_with_namespace(&self) -> String {
         format!("{}-{}", self.namespace_unchecked(), self.name_unchecked())
+    }
+}
+
+pub trait ApiExt {
+    type K: Clone + DeserializeOwned + Debug;
+    async fn list_default(&self) -> Result<ObjectList<Self::K>, kube::Error>;
+}
+
+impl<K> ApiExt for Api<K>
+where
+    K: Clone + DeserializeOwned + Debug,
+{
+    type K = K;
+
+    async fn list_default(&self) -> Result<ObjectList<Self::K>, kube::Error> {
+        self.list(&ListParams::default()).await
     }
 }

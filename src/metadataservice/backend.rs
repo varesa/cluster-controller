@@ -1,5 +1,4 @@
 use k8s_openapi::api::core::v1::ConfigMap;
-use kube::api::ListParams;
 use kube::{Api, Client, Resource, ResourceExt};
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
@@ -10,6 +9,7 @@ use crate::cluster::ovn::lowlevel::Ovn;
 use crate::cluster::ovn::types::logicalswitchport::LogicalSwitchPort;
 use crate::crd::libvirt::VirtualMachine;
 use crate::metadataservice::protocol::{MetadataPayload, MetadataRequest, MetadataResponse};
+use crate::utils::traits::kube::ApiExt;
 use crate::Error;
 
 pub struct MetadataBackend {
@@ -58,7 +58,7 @@ impl MetadataBackend {
                 info!("backend: Selected {}", port.name());
 
                 let vms_api: Api<VirtualMachine> = Api::all(self.client.clone());
-                let vms = vms_api.list(&ListParams::default()).await?;
+                let vms = vms_api.list_default().await?;
                 let matching_vms: Vec<&VirtualMachine> = vms
                     .iter()
                     .filter(|vm| {

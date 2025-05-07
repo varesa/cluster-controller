@@ -1,14 +1,14 @@
 use k8s_openapi::api::core::v1::Node;
 use kube::{
-    Client,
     api::{Api, ListParams, ResourceExt},
+    Client,
 };
 use rand::seq::SliceRandom;
 use tracing::instrument;
 
 use crate::crd::libvirt::VirtualMachine;
 use crate::errors::Error;
-use crate::utils::traits::kube::{ExtendResource, TryStatus};
+use crate::utils::traits::kube::{ApiExt, ExtendResource, TryStatus};
 use crate::utils::traits::node::NodeExt;
 use crate::utils::traits::virtualmachine::VirtualMachineExt;
 
@@ -149,7 +149,7 @@ pub(crate) async fn schedule(
     let node_api: Api<Node> = Api::all(client.clone());
 
     // Get all nodes
-    let mut candidates = node_api.list(&ListParams::default()).await?;
+    let mut candidates = node_api.list_default().await?;
 
     // Remove nodes in maintenance
     remove_nodes_in_maintenance(&mut candidates.items);

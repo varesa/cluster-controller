@@ -1,9 +1,8 @@
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-use kube::api::ListParams;
 use kube::core::crd::merge_crds;
 use kube::{
-    api::{Patch, PatchParams, PostParams},
-    Api, Client, CustomResource, CustomResourceExt, Resource, ResourceExt,
+    api::{Patch, PatchParams, PostParams}, Api, Client, CustomResource, CustomResourceExt, Resource,
+    ResourceExt,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -12,6 +11,7 @@ use tracing::{debug, info};
 
 use crate::crd::utils;
 use crate::errors::Error;
+use crate::utils::traits::kube::ApiExt;
 use crate::utils::{get_namespace_names, wait_crd_ready};
 use tracing::instrument;
 
@@ -222,7 +222,7 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
                 let api_v1beta3: Api<v1beta3::VirtualMachine> =
                     Api::namespaced(client.clone(), &namespace);
 
-                let vms_v1beta2 = api_v1beta2.list(&ListParams::default()).await?;
+                let vms_v1beta2 = api_v1beta2.list_default().await?;
                 for vm in vms_v1beta2 {
                     debug!(
                         "CRD virtualmachines: Upgrading {} {}/{}",
