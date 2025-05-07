@@ -1,7 +1,7 @@
 use kube::runtime::controller::Action;
 use kube::{
-    api::{Api, PostParams},
-    Client, Resource, ResourceExt,
+    api::{Api, PostParams}, Client, Resource,
+    ResourceExt,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -34,18 +34,16 @@ create_set_status!(Network, NetworkStatus, set_network_status);
 ///
 /// no-op if already set correctly
 #[instrument]
-fn ensure_dhcp(name: &str, dhcp: &DhcpOptionsCrd) -> Result<(), Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+fn ensure_dhcp(name: &str, dhcp: &DhcpOptionsCrd, ovn: Arc<Ovn>) -> Result<(), Error> {
     let mut dhcp_opts = match DhcpOptions::get_by_cidr(ovn.clone(), &dhcp.cidr) {
         Ok(opts) => Ok(opts),
-        Err(Error::OvnNotFound(_, _)) => DhcpOptions::create(ovn, &dhcp.cidr),
+        Err(Error::OvnNotFound(_, _)) => DhcpOptions::create(ovn.clone(), &dhcp.cidr),
         Err(e) => Err(e),
     }?;
 
     // Lazily try to always update, effectively noop if current value are already correct
     dhcp_opts.set_options(dhcp)?;
 
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     LogicalSwitch::get_by_name(ovn, name)?.set_cidr(&dhcp.cidr)?;
     Ok(())
 }
@@ -55,6 +53,7 @@ fn ensure_dhcp(name: &str, dhcp: &DhcpOptionsCrd) -> Result<(), Error> {
 fn ensure_router_attachment(
     network: &Network,
     router_attachment: &RouterAttachment,
+    ovn: Arc<Ovn>,
 ) -> Result<(), Error> {
     let network_ns = ResourceExt::namespace(network).expect("Get network ns");
 
@@ -69,7 +68,6 @@ fn ensure_router_attachment(
         _ => panic!("Malformed router name (todo: error)"),
     };
 
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let lr_name = format!("{}-{}", &namespace, &name);
     let mut lr = LogicalRouter::get_by_name(ovn.clone(), &lr_name)?;
 
@@ -88,20 +86,20 @@ async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
     let name = network.name_prefixed_with_namespace();
     info!("ovn: update for network {name}");
 
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    let ovn = Arc::new(Ovn::try_from_annotations(ctx.client.clone()).await?);
     let client = ctx.client.clone();
 
     network
         .ensure_finalizer("ovn", client.clone(), &FIELD_MANAGER)
         .await?;
-    LogicalSwitch::create_if_missing(ovn, &name)?;
+    LogicalSwitch::create_if_missing(ovn.clone(), &name)?;
     if let Some(dhcp_options) = network.spec.dhcp.as_ref() {
-        ensure_dhcp(&name, dhcp_options)?;
+        ensure_dhcp(&name, dhcp_options, ovn.clone())?;
     }
 
     if let Some(routers) = network.spec.routers.as_ref() {
         for router in routers {
-            ensure_router_attachment(&network, router)?;
+            ensure_router_attachment(&network, router, ovn.clone())?;
         }
     }
 
@@ -116,7 +114,7 @@ async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
 /// Handle updates to networks in the cluster
 #[instrument(skip(ctx))]
 async fn remove_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    let ovn = Arc::new(Ovn::try_from_annotations(ctx.client.clone()).await?);
     let mut network = (*network).clone();
     let client = ctx.client.clone();
     let name = network.name_prefixed_with_namespace();

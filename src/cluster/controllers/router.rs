@@ -1,7 +1,7 @@
 use kube::runtime::controller::Action;
 use kube::{
-    api::{Api, PostParams},
-    Client, Resource, ResourceExt,
+    api::{Api, PostParams}, Client, Resource,
+    ResourceExt,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -33,8 +33,7 @@ create_set_status!(Router, RouterStatus, set_router_status);
 /// - An LS that is connected to the router and has the MDS subnet
 /// - An LSP that the MDS will use
 #[instrument]
-async fn connect_metadataservice(lr: &mut LogicalRouter) -> Result<(), Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+async fn connect_metadataservice(lr: &mut LogicalRouter, ovn: Arc<Ovn>) -> Result<(), Error> {
     let mds_name = format!("mds-{}", lr.name());
     let mut ls = LogicalSwitch::create_if_missing(ovn, &mds_name)?;
     connect_router_to_ls(lr, &mut ls, "169.254.169.253/30")?;
@@ -49,7 +48,7 @@ async fn connect_metadataservice(lr: &mut LogicalRouter) -> Result<(), Error> {
 #[instrument(skip(ctx))]
 async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let mut router = (*router).clone();
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    let ovn = Arc::new(Ovn::try_from_annotations(ctx.client.clone()).await?);
     let client = ctx.client.clone();
     let namespace = router
         .metadata
@@ -66,9 +65,9 @@ async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
 
     let mut lr = LogicalRouter::create_if_missing(ovn.clone(), &name)?;
     if let Some(routes) = &router.spec.routes {
-        LogicalRouter::get_by_name(ovn, &name)?.set_routes(routes)?
+        LogicalRouter::get_by_name(ovn.clone(), &name)?.set_routes(routes)?
     } else {
-        LogicalRouter::get_by_name(ovn, &name)?.set_routes(&[])?
+        LogicalRouter::get_by_name(ovn.clone(), &name)?.set_routes(&[])?
     }
 
     if let Some(true) = &router.spec.metadata_service {
@@ -80,7 +79,7 @@ async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
         )
         .await?;
 
-        connect_metadataservice(&mut lr).await?;
+        connect_metadataservice(&mut lr, ovn.clone()).await?;
     }
 
     info!("ovn: update for router {name} successful");
@@ -94,7 +93,7 @@ async fn update_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Ac
 /// Handle updates to routers in the cluster
 #[instrument(skip(ctx))]
 async fn remove_router(router: Arc<Router>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+    let ovn = Arc::new(Ovn::try_from_annotations(ctx.client.clone()).await?);
     let mut router = (*router).clone();
     let client = ctx.client.clone();
     let name = router.name_prefixed_with_namespace();

@@ -49,6 +49,10 @@ impl std::fmt::Display for ClusterNotFound {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    // stdlib
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
     // Tokio
     #[error("Task join error {0}")]
     JoinFailure(#[from] tokio::task::JoinError),
@@ -84,6 +88,10 @@ pub enum Error {
     StorageLocationParse(String),
 
     // OVN
+    #[error("OVN central nodes not found")]
+    OvnCentralNodesNotFound,
+    #[error("OVN connection error. Last connection attempt: {0}")]
+    OvnConnection(Box<Error>),
     #[error("Object {1} of type {0} not found")]
     OvnNotFound(String, String),
     #[error("Deserialization failed")]

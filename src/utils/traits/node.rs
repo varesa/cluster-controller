@@ -3,6 +3,7 @@ use crate::labels_and_annotations::{
 };
 use k8s_openapi::api::core::v1::Node;
 
+#[derive(Debug, PartialEq)]
 pub enum OvnCentralManagement {
     Managed,
     Unmanaged,
@@ -13,7 +14,7 @@ pub trait NodeExt {
     fn in_maintenance_mode(&self) -> bool;
     fn allows_scheduling(&self) -> bool;
 
-    fn ovn_central_management(&self) -> OvnCentralManagement;
+    fn ovn_central_status(&self) -> OvnCentralManagement;
 }
 
 impl NodeExt for Node {
@@ -35,7 +36,7 @@ impl NodeExt for Node {
             != Some(String::from("true"))
     }
 
-    fn ovn_central_management(&self) -> OvnCentralManagement {
+    fn ovn_central_status(&self) -> OvnCentralManagement {
         match &self
             .metadata
             .annotations

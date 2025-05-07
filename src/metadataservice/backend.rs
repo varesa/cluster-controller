@@ -37,7 +37,7 @@ impl MetadataBackend {
             if let Some(msg) = self.channel_endpoint.recv().await {
                 let ip = msg.ip;
 
-                let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+                let ovn = Arc::new(Ovn::try_from_annotations(self.client.clone()).await?);
                 let ports = LogicalSwitchPort::get_by_ip(ovn, ip.to_string())?;
                 info!("backend: Ports for {}: {:#?}", ip, ports);
 

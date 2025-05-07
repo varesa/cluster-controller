@@ -1,3 +1,4 @@
+use crate::errors::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::de::Deserializer;
 use serde_json::Value;
@@ -11,9 +12,9 @@ pub struct JsonRpcConnection {
 }
 
 impl JsonRpcConnection {
-    pub fn new(host: &str, port: u16) -> Self {
-        let stream = TcpStream::connect((host, port)).expect("Failed to connect");
-        JsonRpcConnection { stream, id: 0 }
+    pub fn try_new(host: &str, port: u16) -> Result<Self, Error> {
+        let stream = TcpStream::connect((host, port))?;
+        Ok(JsonRpcConnection { stream, id: 0 })
     }
 
     pub fn request(&mut self, method: &str, params: &Params) -> Message {

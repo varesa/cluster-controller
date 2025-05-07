@@ -1,10 +1,14 @@
-use std::sync::Mutex;
-
-use serde_json::{json, Map, Value};
-
-use crate::cluster::ovn::jsonrpc::Params;
-
 use super::jsonrpc::{JsonRpcConnection, Message};
+use crate::cluster::ovn::jsonrpc::Params;
+use crate::errors::Error;
+use crate::errors::Error::{OvnCentralNodesNotFound, OvnConnection};
+use crate::utils::traits::kube::ApiExt;
+use crate::utils::traits::node::NodeExt;
+use crate::utils::traits::node::OvnCentralManagement::{Managed, Unmanaged};
+use k8s_openapi::api::core::v1::Node;
+use kube::{Api, Client};
+use serde_json::{json, Map, Value};
+use std::sync::Mutex;
 
 pub const TYPE_LOGICAL_SWITCH: &str = "Logical_Switch";
 pub const TYPE_LOGICAL_SWITCH_PORT: &str = "Logical_Switch_Port";
@@ -19,9 +23,48 @@ pub struct Ovn {
 }
 
 impl Ovn {
-    pub fn new(host: &str, port: u16) -> Self {
-        Ovn {
-            connection: Mutex::new(JsonRpcConnection::new(host, port)),
+    pub fn try_new(host: &str, port: u16) -> Result<Self, Error> {
+        Ok(Ovn {
+            connection: Mutex::new(JsonRpcConnection::try_new(host, port)?),
+        })
+    }
+
+    pub async fn try_from_annotations(client: Client) -> Result<Self, Error> {
+        let node_api: Api<Node> = Api::all(client.clone());
+        let nodes = node_api.list_default().await?;
+        let ovn_central_nodes = nodes.iter().filter(|node| {
+            let ovn_central_status = node.ovn_central_status();
+            ovn_central_status == Managed || ovn_central_status == Unmanaged
+        });
+
+        let mut error = None;
+        for node in ovn_central_nodes {
+            if let Some(addresses) = node
+                .status
+                .as_ref()
+                .and_then(|status| status.addresses.as_ref())
+            {
+                for address in addresses {
+                    if address.type_ == "InternalIP" {
+                        let attempt = Self::try_new(address.address.as_str(), 6641);
+                        if attempt.is_ok() {
+                            return attempt;
+                        } else {
+                            error = Some(attempt.err().unwrap());
+                            tracing::error!(
+                                "Failed to connect to OVN-Central on {:?}: {:?}",
+                                address.address,
+                                error
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(error) = error {
+            Err(OvnConnection(Box::new(error)))
+        } else {
+            Err(OvnCentralNodesNotFound)
         }
     }
 

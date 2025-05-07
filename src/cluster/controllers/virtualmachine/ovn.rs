@@ -27,8 +27,8 @@ async fn connect_vm_nic(
     client: Client,
     vm: &VirtualMachine,
     nic: &NetworkAttachment,
+    ovn: Arc<Ovn>,
 ) -> Result<(), Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
     let namespace = ResourceExt::namespace(vm).expect("Failed to get VM namespace");
     let network_name = nic.name.as_ref().expect("No network name set");
     let mac_address = nic.mac_address.as_ref().expect("MAC address missing");
@@ -50,8 +50,11 @@ async fn connect_vm_nic(
 }
 
 #[instrument]
-fn disconnect_vm_nic(vm: &VirtualMachine, nic: &NetworkAttachment) -> Result<(), Error> {
-    let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
+fn disconnect_vm_nic(
+    vm: &VirtualMachine,
+    nic: &NetworkAttachment,
+    ovn: Arc<Ovn>,
+) -> Result<(), Error> {
     let ls_name = format!(
         "{}-{}",
         ResourceExt::namespace(vm).expect("Failed to get VM namespace"),
@@ -84,6 +87,7 @@ async fn update_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
     let mut vm = (*vm).clone();
     let name = vm.name_prefixed_with_namespace();
     let client = ctx.client.clone();
+    let ovn = Arc::new(Ovn::try_from_annotations(ctx.client.clone()).await?);
 
     info!("ovn: VM {name} updated");
     vm.ensure_finalizer("ovn", client.clone(), &FIELD_MANAGER)
@@ -91,10 +95,9 @@ async fn update_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
     let mut ip_addresses: Vec<String> = Vec::new();
     for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
         info!("ovn: connecting NIC {index} for VM {name}");
-        connect_vm_nic(client.clone(), &vm, nic).await?;
+        connect_vm_nic(client.clone(), &vm, nic, ovn.clone()).await?;
         if let Some(ovn_id) = nic.ovn_id.as_ref() {
-            let ovn = Arc::new(Ovn::new("10.4.3.1", 6641));
-            let lsp = LogicalSwitchPort::get_by_name(ovn, ovn_id)?;
+            let lsp = LogicalSwitchPort::get_by_name(ovn.clone(), ovn_id)?;
             if let Some(ip) = lsp.dynamic_ip() {
                 ip_addresses.push(ip);
             }
@@ -120,11 +123,12 @@ async fn remove_vm(vm: Arc<VirtualMachine>, ctx: Arc<DefaultState>) -> Result<Ac
     let mut vm = (*vm).clone();
     let name = vm.name_prefixed_with_namespace();
     let client = ctx.client.clone();
+    let ovn = Arc::new(Ovn::try_from_annotations(ctx.client.clone()).await?);
 
     info!("ovn: VM {name} waiting for deletion");
     for (index, nic) in get_vm_ovn_nics(&vm).iter().enumerate() {
         info!("ovn: disconnecting NIC {index} for VM {name}");
-        disconnect_vm_nic(&vm, nic)?;
+        disconnect_vm_nic(&vm, nic, ovn.clone())?;
     }
     vm.remove_finalizer("ovn", client, &FIELD_MANAGER).await?;
     ok_no_requeue!()
