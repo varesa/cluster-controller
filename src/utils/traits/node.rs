@@ -39,9 +39,9 @@ impl NodeExt for Node {
     fn ovn_central_status(&self) -> OvnCentralManagement {
         match &self
             .metadata
-            .annotations
+            .labels
             .as_ref()
-            .and_then(|annotations| annotations.get(OVN_CENTRAL_MANAGED_LABEL))
+            .and_then(|labels| labels.get(OVN_CENTRAL_MANAGED_LABEL))
             .map(|v| v.to_lowercase())
         {
             Some(v) if v == "managed" => OvnCentralManagement::Managed,
