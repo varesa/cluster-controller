@@ -53,10 +53,6 @@ pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                 ],
                 "volumeMounts": [
                   {
-                    "name": "libvirt-sock",
-                    "mountPath": "/var/run/libvirt/libvirt-sock"
-                  },
-                  {
                     "name": "virtqemud-sock",
                     "mountPath": "/var/run/libvirt/virtqemud-sock"
                   },
@@ -68,12 +64,6 @@ pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
               }
             ],
             "volumes": [
-              {
-                "name": "libvirt-sock",
-                "hostPath": {
-                  "path": "/var/run/libvirt/libvirt-sock"
-                }
-              },
               {
                 "name": "virtqemud-sock",
                 "hostPath": {
