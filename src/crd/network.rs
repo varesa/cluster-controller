@@ -47,9 +47,19 @@ pub enum NetworkType {
     namespaced
 )]
 pub struct NetworkSpec {
+    /// Configure DHCP service for this network
     pub dhcp: Option<DhcpOptions>,
+    /// Connect routers to this network
     pub routers: Option<Vec<RouterAttachment>>,
+    /// Type of network
+    ///
+    /// Allowed values:
+    /// - Ovn (default)
+    /// - Evpn
     pub network_type: Option<NetworkType>,
+    /// Id of the network.
+    ///
+    /// Meaning depends on the network type, like VLAN ID, EVPN VNI, etc.
     pub network_id: Option<usize>,
 }
 
