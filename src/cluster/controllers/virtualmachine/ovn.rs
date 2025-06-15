@@ -10,7 +10,7 @@ use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
     common::OvnNamedGetters, lowlevel::Ovn, types::logicalswitchport::LogicalSwitchPort,
 };
-use crate::crd::libvirt::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
+use crate::crd::virtualmachine::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
 use crate::crd::ovn::Network;
 use crate::errors::Error;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};

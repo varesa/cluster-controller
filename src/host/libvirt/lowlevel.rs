@@ -1,5 +1,5 @@
 use crate::crd::cluster::Cluster;
-use crate::crd::libvirt::{VirtualMachine, VolumeAttachment};
+use crate::crd::virtualmachine::{VirtualMachine, VolumeAttachment};
 use crate::Error::Volumelocked;
 use askama::Template;
 use kube::ResourceExt;
@@ -132,7 +132,7 @@ impl Libvirt {
             network_interfaces: nics,
             storage_devices: volumes,
         }
-        .render()?;
+            .render()?;
 
         debug!("{}", xml);
         Domain::create_xml(&self.connection, &xml, 0)?;

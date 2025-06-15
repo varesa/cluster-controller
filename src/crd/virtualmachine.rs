@@ -1,8 +1,8 @@
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::core::crd::merge_crds;
 use kube::{
-    api::{Patch, PatchParams, PostParams}, Api, Client, CustomResource, CustomResourceExt, Resource,
-    ResourceExt,
+    Api, Client, CustomResource, CustomResourceExt, Resource, ResourceExt,
+    api::{Patch, PatchParams, PostParams},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -255,4 +255,4 @@ pub async fn run_migrations(client: Client) -> Result<(), Error> {
 pub(crate) type VirtualMachine = latest::VirtualMachine;
 pub(crate) type VirtualMachineStatus = latest::VirtualMachineStatus;
 
-create_set_status!(VirtualMachine, VirtualMachineStatus, set_vm_status);
+create_set_status_namespaced!(VirtualMachine, VirtualMachineStatus, set_vm_status);

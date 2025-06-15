@@ -3,7 +3,7 @@ use crate::cluster::libvirt::scheduling::{
     clear_successful_migration, is_uncompliant, migration_requested,
 };
 use crate::cluster::libvirt::utils::{fill_nics, fill_uuid};
-use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
+use crate::crd::virtualmachine::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
 use crate::ok_and_requeue;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
@@ -66,7 +66,7 @@ async fn initialize_status(
             },
             client.clone(),
         )
-        .await?;
+            .await?;
     }
     Ok(())
 }

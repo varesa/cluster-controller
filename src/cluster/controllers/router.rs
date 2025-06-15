@@ -1,7 +1,7 @@
 use kube::runtime::controller::Action;
 use kube::{
-    api::{Api, PostParams}, Client, Resource,
-    ResourceExt,
+    Client, Resource, ResourceExt,
+    api::{Api, PostParams},
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -21,13 +21,13 @@ use crate::metadataservice::deployment::deploy as deploy_mds;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;
 use crate::utils::traits::kube::ExtendResource;
-use crate::{create_set_status, ok_and_requeue, ok_no_requeue};
+use crate::{create_set_status_namespaced, ok_and_requeue, ok_no_requeue};
 
 lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("ovn");
 }
 
-create_set_status!(Router, RouterStatus, set_router_status);
+create_set_status_namespaced!(Router, RouterStatus, set_router_status);
 
 /// Create network components for the MDS:
 /// - An LS that is connected to the router and has the MDS subnet

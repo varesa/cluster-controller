@@ -6,7 +6,7 @@ use kube::{
 use rand::seq::SliceRandom;
 use tracing::instrument;
 
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::virtualmachine::VirtualMachine;
 use crate::errors::Error;
 use crate::utils::traits::kube::{ApiExt, ExtendResource, TryStatus};
 use crate::utils::traits::node::NodeExt;
@@ -187,7 +187,7 @@ pub(crate) async fn schedule(
                 ANTI_AFFINITY_LABEL,
                 anti_affinity_group,
             )
-            .await?;
+                .await?;
             remove_candidate_nodes(&mut candidates.items, &blocked_nodes);
         }
     }

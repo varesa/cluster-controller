@@ -1,5 +1,5 @@
-use crate::crd::libvirt::v1beta3::PowerAction;
-use crate::crd::libvirt::{set_vm_status, VirtualMachine, VirtualMachineStatus};
+use crate::crd::virtualmachine::v1beta3::PowerAction;
+use crate::crd::virtualmachine::{set_vm_status, VirtualMachine, VirtualMachineStatus};
 use crate::host::libvirt::controller::State;
 use crate::host::libvirt::utils::{get_cluster, get_domain_name};
 use crate::utils::strings::field_manager;

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{info, instrument};
 
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::virtualmachine::VirtualMachine;
 use crate::errors::Error;
 use crate::ok_and_requeue;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
@@ -33,7 +33,7 @@ async fn request_reschedule_node_vms(node: &Node, client: Client) -> Result<(), 
                         "cluster-manager.libvirt.node",
                         client.clone(),
                     )
-                    .await?;
+                        .await?;
                 }
             }
         }

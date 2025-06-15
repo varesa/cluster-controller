@@ -1,4 +1,4 @@
-use crate::crd::libvirt::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
+use crate::crd::virtualmachine::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
 use crate::errors::Error;
 use crate::utils::traits::kube::{ExtendResource, TryStatus};
 use kube::Client;

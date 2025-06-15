@@ -7,7 +7,7 @@ use tracing::{error, info};
 use crate::cluster::ovn::common::OvnNamed;
 use crate::cluster::ovn::lowlevel::Ovn;
 use crate::cluster::ovn::types::logicalswitchport::LogicalSwitchPort;
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::virtualmachine::VirtualMachine;
 use crate::metadataservice::protocol::{MetadataPayload, MetadataRequest, MetadataResponse};
 use crate::utils::traits::kube::ApiExt;
 use crate::Error;

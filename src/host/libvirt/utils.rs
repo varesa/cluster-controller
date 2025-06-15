@@ -1,5 +1,5 @@
 use crate::crd::cluster::Cluster;
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::virtualmachine::VirtualMachine;
 use crate::errors::ClusterNotFound;
 use crate::host::libvirt::controller::State;
 use crate::Error;

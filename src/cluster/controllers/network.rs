@@ -1,7 +1,7 @@
 use kube::runtime::controller::Action;
 use kube::{
-    api::{Api, PostParams}, Client, Resource,
-    ResourceExt,
+    Client, Resource, ResourceExt,
+    api::{Api, PostParams},
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -20,13 +20,13 @@ use crate::errors::Error;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;
 use crate::utils::traits::kube::ExtendResource;
-use crate::{create_set_status, ok_and_requeue};
+use crate::{create_set_status_namespaced, ok_and_requeue};
 
 lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("ovn");
 }
 
-create_set_status!(Network, NetworkStatus, set_network_status);
+create_set_status_namespaced!(Network, NetworkStatus, set_network_status);
 
 /// Attempts to
 /// - configure an DHCP Option set for the prefix

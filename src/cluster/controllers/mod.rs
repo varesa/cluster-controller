@@ -12,7 +12,8 @@ mod virtualmachine;
 mod volumes;
 
 pub async fn run(client: Client) -> Result<(), Error> {
-    crd::libvirt::create(client.clone()).await?;
+    crd::libvirtnode::create(client.clone()).await?;
+    crd::virtualmachine::create(client.clone()).await?;
     crd::ceph::create(client.clone()).await?;
     crd::ovn::create(client.clone()).await?;
 

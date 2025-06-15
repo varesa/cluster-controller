@@ -1,5 +1,6 @@
 mod controller;
 mod handlers;
+mod libvirtnode;
 mod lowlevel;
 mod secrets;
 mod templates;

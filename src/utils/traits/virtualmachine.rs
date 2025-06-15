@@ -1,4 +1,4 @@
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::virtualmachine::VirtualMachine;
 use crate::errors::Error;
 use crate::labels_and_annotations::MIGRATION_REQUEST_ANNOTATION;
 use crate::utils::traits::kube::ExtendResource;

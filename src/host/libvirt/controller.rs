@@ -1,17 +1,17 @@
 use futures::StreamExt;
 use kube::runtime::controller::{Action, Controller};
-use kube::{api::Api, Client};
+use kube::{Client, api::Api};
 use std::env;
 use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{error, info};
 
 use super::lowlevel::Libvirt;
-use crate::crd::libvirt::VirtualMachine;
+use crate::crd::virtualmachine::VirtualMachine;
 use crate::errors::Error;
 use crate::host::libvirt::handlers::LIBVIRT_URI;
 use crate::host::libvirt::utils::get_domain_name;
-use crate::host::libvirt::{handlers, secrets};
+use crate::host::libvirt::{handlers, libvirtnode, secrets};
 use crate::utils::traits::kube::TryStatus;
 use crate::{create_controller, ok_no_requeue};
 
@@ -103,6 +103,7 @@ fn error_policy(_object: Arc<VirtualMachine>, _error: &Error, _ctx: Arc<State>) 
 
 pub async fn create(client: Client) -> Result<(), Error> {
     let libvirt = Libvirt::new(LIBVIRT_URI)?;
+    libvirtnode::update(&libvirt, client.clone()).await?;
     secrets::ensure_ceph_secret(client.clone(), &libvirt).await?;
     let context = Arc::new(State {
         kube: client.clone(),
