@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use kube::runtime::controller::Action;
-use kube::{api::Api, Client, ResourceExt};
+use kube::{Client, ResourceExt, api::Api};
 use lazy_static::lazy_static;
 use tokio::time::Duration;
 use tracing::{info, instrument};
@@ -10,8 +10,10 @@ use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::cluster::ovn::{
     common::OvnNamedGetters, lowlevel::Ovn, types::logicalswitchport::LogicalSwitchPort,
 };
-use crate::crd::virtualmachine::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
-use crate::crd::ovn::Network;
+use crate::crd::network::Network;
+use crate::crd::virtualmachine::{
+    NetworkAttachment, VirtualMachine, VirtualMachineStatus, set_vm_status,
+};
 use crate::errors::Error;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;

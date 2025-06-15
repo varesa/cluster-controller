@@ -15,7 +15,7 @@ use crate::cluster::ovn::{
     common::OvnBasicActions, common::OvnNamed, common::OvnNamedGetters, lowlevel::Ovn,
     types::logicalrouter::LogicalRouter,
 };
-use crate::crd::ovn::{Router, RouterStatus};
+use crate::crd::router::{Router, RouterStatus};
 use crate::errors::Error;
 use crate::metadataservice::deployment::deploy as deploy_mds;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};

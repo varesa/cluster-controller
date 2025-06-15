@@ -15,7 +15,8 @@ pub async fn run(client: Client) -> Result<(), Error> {
     crd::libvirtnode::create(client.clone()).await?;
     crd::virtualmachine::create(client.clone()).await?;
     crd::ceph::create(client.clone()).await?;
-    crd::ovn::create(client.clone()).await?;
+    crd::network::create(client.clone()).await?;
+    crd::router::create(client.clone()).await?;
 
     let volumes_task = tokio::spawn(volumes::create(client.clone()));
     let images_task = tokio::spawn(images::create(client.clone()));

@@ -15,12 +15,14 @@ use crate::cluster::ovn::{
     common::OvnBasicActions, common::OvnNamedGetters, lowlevel::Ovn,
     types::dhcpoptions::DhcpOptions, types::logicalrouter::LogicalRouter,
 };
-use crate::crd::ovn::{DhcpOptions as DhcpOptionsCrd, Network, NetworkStatus, RouterAttachment};
+use crate::crd::network::{
+    DhcpOptions as DhcpOptionsCrd, Network, NetworkStatus, NetworkType, RouterAttachment,
+};
 use crate::errors::Error;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;
 use crate::utils::traits::kube::ExtendResource;
-use crate::{create_set_status_namespaced, ok_and_requeue};
+use crate::{create_set_status_namespaced, ok_and_requeue, ok_no_requeue};
 
 lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("ovn");
@@ -83,6 +85,12 @@ fn ensure_router_attachment(
 #[instrument(skip(ctx))]
 async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
     let mut network = (*network).clone();
+
+    // We are only interested in OVN networks. Ignore other types
+    if network.spec.network_type.clone().unwrap_or_default() != NetworkType::Ovn {
+        return ok_no_requeue!();
+    }
+
     let name = network.name_prefixed_with_namespace();
     info!("ovn: update for network {name}");
 
@@ -114,8 +122,14 @@ async fn update_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
 /// Handle updates to networks in the cluster
 #[instrument(skip(ctx))]
 async fn remove_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result<Action, Error> {
-    let ovn = Arc::new(Ovn::try_from_annotations(ctx.client.clone()).await?);
     let mut network = (*network).clone();
+
+    // We are only interested in OVN networks. Ignore other types
+    if network.spec.network_type.clone().unwrap_or_default() != NetworkType::Ovn {
+        return ok_no_requeue!();
+    }
+
+    let ovn = Arc::new(Ovn::try_from_annotations(ctx.client.clone()).await?);
     let client = ctx.client.clone();
     let name = network.name_prefixed_with_namespace();
 
