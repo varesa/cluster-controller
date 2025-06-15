@@ -57,6 +57,10 @@ pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                     "mountPath": "/var/run/libvirt/libvirt-sock"
                   },
                   {
+                    "name": "virtqemud-sock",
+                    "mountPath": "/var/run/libvirt/virtqemud-sock"
+                  },
+                  {
                     "name": "ceph-config",
                     "mountPath": "/etc/ceph"
                   }
@@ -68,6 +72,12 @@ pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                 "name": "libvirt-sock",
                 "hostPath": {
                   "path": "/var/run/libvirt/libvirt-sock"
+                }
+              },
+              {
+                "name": "virtqemud-sock",
+                "hostPath": {
+                  "path": "/var/run/libvirt/virtqemud-sock"
                 }
               },
               {
