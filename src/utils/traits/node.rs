@@ -1,7 +1,9 @@
 use crate::labels_and_annotations::{
-    MAINTENANCE_ANNOTATION, NO_SCHEDULE_ANNOTATION, OVN_CENTRAL_MANAGED_LABEL,
+    MAINTENANCE_ANNOTATION, NO_SCHEDULE_ANNOTATION, OVN_CENTRAL_IP_ANNOTATION,
+    OVN_CENTRAL_MANAGED_LABEL,
 };
 use k8s_openapi::api::core::v1::Node;
+use kube::Resource;
 
 #[derive(Debug, PartialEq)]
 pub enum OvnCentralManagement {
@@ -15,6 +17,8 @@ pub trait NodeExt {
     fn allows_scheduling(&self) -> bool;
 
     fn ovn_central_status(&self) -> OvnCentralManagement;
+    fn ovn_central_annotated_ip(&self) -> Option<String>;
+    fn internal_ip(&self) -> Option<String>;
 }
 
 impl NodeExt for Node {
@@ -49,5 +53,21 @@ impl NodeExt for Node {
             Some(_) => OvnCentralManagement::NotPresent,
             None => OvnCentralManagement::NotPresent,
         }
+    }
+
+    fn ovn_central_annotated_ip(&self) -> Option<String> {
+        self.metadata
+            .annotations
+            .as_ref()
+            .and_then(|annotations| annotations.get(OVN_CENTRAL_IP_ANNOTATION))
+            .map(|v| v.clone())
+    }
+
+    fn internal_ip(&self) -> Option<String> {
+        self.status
+            .as_ref()
+            .and_then(|status| status.addresses.as_ref())
+            .and_then(|addresses| addresses.iter().find(|addr| addr.type_ == "InternalIP"))
+            .map(|address| address.address.clone())
     }
 }

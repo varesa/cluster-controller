@@ -39,25 +39,20 @@ impl Ovn {
 
         let mut error = None;
         for node in ovn_central_nodes {
-            if let Some(addresses) = node
-                .status
-                .as_ref()
-                .and_then(|status| status.addresses.as_ref())
-            {
-                for address in addresses {
-                    if address.type_ == "InternalIP" {
-                        let attempt = Self::try_new(address.address.as_str(), 6641);
-                        if attempt.is_ok() {
-                            return attempt;
-                        } else {
-                            error = Some(attempt.err().unwrap());
-                            tracing::error!(
-                                "Failed to connect to OVN-Central on {:?}: {:?}",
-                                address.address,
-                                error
-                            );
-                        }
-                    }
+            let ovn_ip = node
+                .ovn_central_annotated_ip()
+                .or_else(|| node.internal_ip());
+            if let Some(address) = ovn_ip {
+                let attempt = Self::try_new(address.as_str(), 6641);
+                if attempt.is_ok() {
+                    return attempt;
+                } else {
+                    error = Some(attempt.err().unwrap());
+                    tracing::error!(
+                        "Failed to connect to OVN-Central on {:?}: {:?}",
+                        address,
+                        error
+                    );
                 }
             }
         }
