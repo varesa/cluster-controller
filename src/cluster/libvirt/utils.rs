@@ -73,7 +73,6 @@ pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Er
             nic_status.mac_address = Some(generate_mac_address(&vm_name, nic_spec, index));
         }
 
-        // Update VLANs if using non-OVN networks
         // Using a named/managed network
         if let Some(name) = &nic_spec.name {
             let network = network_api.get(name).await?;
