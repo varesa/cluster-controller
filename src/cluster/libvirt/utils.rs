@@ -105,6 +105,9 @@ pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Er
 
         new_status_networks.push(nic_status);
     }
+
+    new_status_networks
+        .retain(|net_in_status| find_matching_network(&vm.spec.networks, net_in_status).is_some());
     if json!(status_networks) != json!(new_status_networks) {
         let new_status = VirtualMachineStatus {
             networks: new_status_networks,
