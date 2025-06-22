@@ -58,7 +58,8 @@ pub fn ensure_vni_mapping(vm: &VirtualMachine) -> Result<(), Error> {
             .output()?;
 
         if !set_tunnel_info.status.success()
-            && String::from_utf8_lossy(&set_tunnel_info.stderr) != *"RTNETLINK answers: File exists"
+            && String::from_utf8_lossy(&set_tunnel_info.stderr)
+                != *"RTNETLINK answers: File exists\n"
         {
             return Err(Error::VniMapping(format!(
                 "set_tunnel_info: {}",
