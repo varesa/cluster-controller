@@ -33,39 +33,49 @@ pub enum NetworkType {
     Evpn,
 }
 
-#[derive(
-    CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
-)]
-#[kube(
-    group = "cluster-virt.acl.fi",
-    version = "v1beta",
-    kind = "Network",
-    status = "NetworkStatus",
-    derive = "PartialEq",
-    derive = "Default",
-    shortname = "n",
-    namespaced
-)]
-pub struct NetworkSpec {
-    /// Configure DHCP service for this network
-    pub dhcp: Option<DhcpOptions>,
-    /// Connect routers to this network
-    pub routers: Option<Vec<RouterAttachment>>,
-    /// Type of network
-    ///
-    /// Allowed values:
-    /// - Ovn (default)
-    /// - Evpn
-    pub network_type: Option<NetworkType>,
-    /// Id of the network.
-    ///
-    /// Meaning depends on the network type, like VLAN ID, EVPN VNI, etc.
-    pub network_id: Option<usize>,
+mod latest {
+    pub const VERSION: &str = "v1beta1";
+
+    pub type Network = super::v1beta1::Network;
+    pub type NetworkStatus = super::v1beta1::NetworkStatus;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
-pub struct NetworkStatus {
-    pub is_created: bool,
+pub mod v1beta1 {
+    use super::*;
+    #[derive(
+        CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
+    )]
+    #[kube(
+        group = "cluster-virt.acl.fi",
+        version = "v1beta",
+        kind = "Network",
+        status = "NetworkStatus",
+        derive = "PartialEq",
+        derive = "Default",
+        shortname = "n",
+        namespaced
+    )]
+    pub struct NetworkSpec {
+        /// Configure DHCP service for this network
+        pub dhcp: Option<DhcpOptions>,
+        /// Connect routers to this network
+        pub routers: Option<Vec<RouterAttachment>>,
+        /// Type of network
+        ///
+        /// Allowed values:
+        /// - Ovn (default)
+        /// - Evpn
+        pub network_type: Option<NetworkType>,
+        /// Id of the network.
+        ///
+        /// Meaning depends on the network type, like VLAN ID, EVPN VNI, etc.
+        pub network_id: Option<usize>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+    pub struct NetworkStatus {
+        pub is_created: bool,
+    }
 }
 
 #[instrument(skip(client))]
@@ -79,3 +89,6 @@ pub async fn create(client: Client) -> Result<(), Error> {
     wait_crd_ready(&crds, NETWORK_CRD_NAME).await?;
     Ok(())
 }
+
+pub(crate) type Network = latest::Network;
+pub(crate) type NetworkStatus = latest::NetworkStatus;
