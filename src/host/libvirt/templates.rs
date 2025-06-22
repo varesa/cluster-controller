@@ -25,6 +25,8 @@ pub struct NetworkInterfaceTemplate {
     pub ovn_id: Option<String>,
     pub model: String,
     pub queues: u8,
+    pub untagged_vlan: Option<u16>,
+    pub tagged_vlans: Option<Vec<u16>>,
 }
 
 #[derive(Debug)]

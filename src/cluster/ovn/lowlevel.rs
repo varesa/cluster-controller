@@ -6,7 +6,7 @@ use crate::utils::traits::kube::ApiExt;
 use crate::utils::traits::node::NodeExt;
 use crate::utils::traits::node::OvnCentralManagement::{Managed, Unmanaged};
 use k8s_openapi::api::core::v1::Node;
-use kube::{Api, Client, ResourceExt};
+use kube::{Api, Client};
 use serde_json::{Map, Value, json};
 use std::sync::Mutex;
 

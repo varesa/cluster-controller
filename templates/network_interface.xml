@@ -1,17 +1,35 @@
 <interface type='bridge'>
     {% match ovn_id %}
-        {% when Some with (id) %}
-            <source bridge='{{bridge}}' network='ovs' />
-            <virtualport type='openvswitch'>
-              <parameters interfaceid='{{id}}'/>
-            </virtualport>
-        {% when None %}
-            <source bridge='{{bridge}}'/>
+    {% when Some with (id) %}
+    <source bridge='{{bridge}}' network='ovs'/>
+    <virtualport type='openvswitch'>
+        <parameters interfaceid='{{id}}'/>
+    </virtualport>
+    {% when None %}
+    <source bridge='{{bridge}}'/>
     {% endmatch %}
     {% if queues > 1 %}
-        <driver name="vhost" queues="{{queues}}"/>
+    <driver name="vhost" queues="{{queues}}"/>
     {% endif %}
-    
+
     <mac address="{{mac}}"/>
     <model type="{{model}}"/>
+
+    {% match untagged_vlan %}
+    {% when Some with (vlan) %}
+    <vlan>
+        <tag id='{{vlan}}'/>
+    </vlan>
+    {% when None %}
+    {% endmatch %}
+
+    {% match tagged_vlans %}
+    {% when Some with (vlans) %}
+    <vlan trunk='yes'>
+        {% for vlan in vlans %}
+        <tag id='{{vlan}}'/>
+        {% endfor %}
+    </vlan>
+    {% when None %}
+    {% endmatch %}
 </interface>

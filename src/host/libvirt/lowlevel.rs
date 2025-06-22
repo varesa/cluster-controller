@@ -1,6 +1,6 @@
+use crate::Error::Volumelocked;
 use crate::crd::cluster::Cluster;
 use crate::crd::virtualmachine::{VirtualMachine, VolumeAttachment};
-use crate::Error::Volumelocked;
 use askama::Template;
 use kube::ResourceExt;
 use tracing::debug;
@@ -14,7 +14,7 @@ use crate::host::libvirt::templates::{
 };
 use crate::host::libvirt::utils::{get_domain_name, parse_memory};
 use crate::shared::ceph;
-use crate::utils::libvirt_storage::{parse_storage_location, StorageType};
+use crate::utils::libvirt_storage::{StorageType, parse_storage_location};
 use crate::utils::traits::kube::TryStatus;
 
 pub struct Libvirt {
@@ -109,6 +109,8 @@ impl Libvirt {
                 ovn_id: nic.ovn_id.clone(),
                 model: network_model.to_string(),
                 queues: nic.queues.unwrap_or(1),
+                untagged_vlan: nic.untagged_vlan,
+                tagged_vlans: nic.tagged_vlans.clone(),
             })
         }
         debug!("{:?}", &vm);
@@ -132,7 +134,7 @@ impl Libvirt {
             network_interfaces: nics,
             storage_devices: volumes,
         }
-            .render()?;
+        .render()?;
 
         debug!("{}", xml);
         Domain::create_xml(&self.connection, &xml, 0)?;

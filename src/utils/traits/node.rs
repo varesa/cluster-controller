@@ -3,7 +3,6 @@ use crate::labels_and_annotations::{
     OVN_CENTRAL_MANAGED_LABEL,
 };
 use k8s_openapi::api::core::v1::Node;
-use kube::Resource;
 
 #[derive(Debug, PartialEq)]
 pub enum OvnCentralManagement {

@@ -40,6 +40,12 @@ pub struct NetworkAttachment {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ovn_id: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub untagged_vlan: Option<u16>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tagged_vlans: Option<Vec<u16>>,
 }
 
 mod latest {

@@ -1,7 +1,10 @@
-use crate::crd::virtualmachine::{set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus};
+use crate::crd::network::{Network, NetworkType};
+use crate::crd::virtualmachine::{
+    NetworkAttachment, VirtualMachine, VirtualMachineStatus, set_vm_status,
+};
 use crate::errors::Error;
 use crate::utils::traits::kube::{ExtendResource, TryStatus};
-use kube::Client;
+use kube::{Api, Client};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use tracing::instrument;
@@ -45,6 +48,7 @@ fn find_matching_network<'a>(
 /// specified. Save the extra information in the status subresource
 #[instrument(skip(client))]
 pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Error> {
+    let network_api: Api<Network> = Api::namespaced(client.clone(), &vm.namespace_unchecked());
     let vm_name = vm.name_prefixed_with_namespace();
 
     let status_networks = vm.try_status()?.networks.clone();
@@ -69,19 +73,36 @@ pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Er
             nic_status.mac_address = Some(generate_mac_address(&vm_name, nic_spec, index));
         }
 
-        // Generate a new OVN port ID if not set and using OVN network
-        if nic_spec.name.is_some() {
-            if nic_spec.ovn_id.is_some() {
-                nic_status.ovn_id.clone_from(&nic_spec.ovn_id);
-            } else if nic_status.ovn_id.is_none() {
-                nic_status.ovn_id = Some(
-                    Uuid::new_v4()
-                        .hyphenated()
-                        .encode_lower(&mut Uuid::encode_buffer())
-                        .into(),
-                );
+        // Update VLANs if using non-OVN networks
+        // Using a named/managed network
+        if let Some(name) = &nic_spec.name {
+            let network = network_api.get(name).await?;
+
+            match network.spec.network_type {
+                // Generate a new OVN port ID if not set and using OVN network
+                None | Some(NetworkType::Ovn) => {
+                    if nic_spec.ovn_id.is_some() {
+                        nic_status.ovn_id.clone_from(&nic_spec.ovn_id);
+                    } else if nic_status.ovn_id.is_none() {
+                        nic_status.ovn_id = Some(
+                            Uuid::new_v4()
+                                .hyphenated()
+                                .encode_lower(&mut Uuid::encode_buffer())
+                                .into(),
+                        );
+                    }
+                }
+
+                // Read VLANs into status for use in the templates later
+                Some(NetworkType::Evpn) => {
+                    if network.spec.network_type == Some(NetworkType::Evpn) {
+                        nic_status.untagged_vlan =
+                            network.spec.network_id.map(|id_usize| id_usize as u16);
+                    }
+                }
             }
-        }
+        };
+
         new_status_networks.push(nic_status);
     }
     if json!(status_networks) != json!(new_status_networks) {
