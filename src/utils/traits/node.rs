@@ -59,7 +59,7 @@ impl NodeExt for Node {
             .annotations
             .as_ref()
             .and_then(|annotations| annotations.get(OVN_CENTRAL_IP_ANNOTATION))
-            .map(|v| v.clone())
+            .cloned()
     }
 
     fn internal_ip(&self) -> Option<String> {
