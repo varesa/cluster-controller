@@ -94,6 +94,7 @@ pub async fn fill_nics(vm: &mut VirtualMachine, client: Client) -> Result<(), Er
 
                 // Read VLANs into status for use in the templates later
                 Some(NetworkType::Evpn) => {
+                    nic_status.bridge = network.spec.bridge;
                     if network.spec.network_type == Some(NetworkType::Evpn) {
                         nic_status.untagged_vlan =
                             network.spec.network_id.map(|id_usize| id_usize as u16);

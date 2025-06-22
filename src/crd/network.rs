@@ -70,6 +70,8 @@ pub mod v1beta1 {
         ///
         /// Meaning depends on the network type, like VLAN ID, EVPN VNI, etc.
         pub network_id: Option<usize>,
+        ///  Bridge that the network exists on
+        pub bridge: Option<String>,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
