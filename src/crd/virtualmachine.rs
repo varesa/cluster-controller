@@ -122,8 +122,16 @@ pub mod v1beta3 {
         pub compatibility_mode: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub node: Option<String>,
+
+        /// Define the power control behaviour for the VM
+        /// Options:
+        /// - PowerOn: Power on the VM instantly and restart it if it stops (default)
+        //  - Shutdown: Send an ACPI shutdown signal to the VM and do not restart it (implemented?),
+        //  - PowerOff: Power off the VM immediately and do not restart it (implemented?)
+        //  - Manual: Do not start or stop the VM
         #[serde(skip_serializing_if = "Option::is_none")]
         pub power_action: Option<PowerAction>,
+
         #[serde(skip_serializing_if = "Option::is_none")]
         pub machine_type: Option<String>,
     }
