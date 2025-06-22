@@ -34,7 +34,7 @@ pub enum NetworkType {
 }
 
 mod latest {
-    pub const VERSION: &str = "v1beta1";
+    //pub const VERSION: &str = "v1beta1";
 
     pub type Network = super::v1beta1::Network;
     pub type NetworkStatus = super::v1beta1::NetworkStatus;

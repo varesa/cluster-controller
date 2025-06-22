@@ -48,21 +48,21 @@ pub fn ensure_vni_mapping(vm: &VirtualMachine) -> Result<(), Error> {
         if !add_to_vxlan.status.success() {
             return Err(Error::VniMapping(format!(
                 "add_to_vxlan: {}",
-                String::from_utf8_lossy(&add_to_bridge.stderr)
+                String::from_utf8_lossy(&add_to_vxlan.stderr)
             )));
         }
 
         #[rustfmt::skip]
         let set_tunnel_info = Command::new("/usr/sbin/bridge")
-            .args(["vlan", "add", "dev", "vxlan0", "vid", &vlan.to_string(), "tunnel_info", &vlan.to_string()])
+            .args(["vlan", "add", "dev", "vxlan0", "vid", &vlan.to_string(), "tunnel_info", "id", &vlan.to_string()])
             .output()?;
 
         if !set_tunnel_info.status.success()
-            && String::from_utf8_lossy(&add_to_bridge.stderr) != *"RTNETLINK answers: File exists"
+            && String::from_utf8_lossy(&set_tunnel_info.stderr) != *"RTNETLINK answers: File exists"
         {
             return Err(Error::VniMapping(format!(
                 "set_tunnel_info: {}",
-                String::from_utf8_lossy(&add_to_bridge.stderr)
+                String::from_utf8_lossy(&set_tunnel_info.stderr)
             )));
         }
     }
