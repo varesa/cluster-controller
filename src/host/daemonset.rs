@@ -30,6 +30,7 @@ pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
             }
           },
           "spec": {
+            "hostNetwork": true,
             "containers": [
               {
                 "name": "libvirt-host-controller",
