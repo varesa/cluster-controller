@@ -131,6 +131,10 @@ pub enum Error {
     #[error("ConfigMap {0} invalid: {1}")]
     ConfigMapInvalid(String, String),
 
+    // Host network configuration
+    #[error("Error mapping VNI: {0}")]
+    VniMapping(String),
+
     // Custom/generic
     #[error("Timed out waiting for operation: {0}")]
     Timeout(String),

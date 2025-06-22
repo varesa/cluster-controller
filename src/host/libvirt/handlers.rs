@@ -1,10 +1,11 @@
+use crate::Error;
 use crate::crd::virtualmachine::v1beta3::PowerAction;
-use crate::crd::virtualmachine::{set_vm_status, VirtualMachine, VirtualMachineStatus};
+use crate::crd::virtualmachine::{VirtualMachine, VirtualMachineStatus, set_vm_status};
 use crate::host::libvirt::controller::State;
+use crate::host::libvirt::evpn::ensure_vni_mapping;
 use crate::host::libvirt::utils::{get_cluster, get_domain_name};
 use crate::utils::strings::field_manager;
 use crate::utils::traits::kube::{ExtendResource, TryStatus};
-use crate::Error;
 use crate::{ok_and_requeue, ok_no_requeue};
 use kube::runtime::controller::Action;
 use lazy_static::lazy_static;
@@ -47,6 +48,8 @@ pub async fn handle_delete(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Actio
 /// Called when a VM has been assigned to us. Registers a finalizer and adds a libvirt VM
 /// locally
 pub async fn handle_add(vm: &VirtualMachine, ctx: Arc<State>) -> Result<Action, Error> {
+    ensure_vni_mapping(vm)?;
+
     let mut vm = (*vm).clone();
     let vm_name = get_domain_name(&vm).expect("VM has a libvirt domain name");
     vm.ensure_finalizer(FINALIZER, ctx.kube.clone(), &FIELD_MANAGER)
@@ -100,6 +103,8 @@ pub async fn handle_inbound_migration(
     vm: &VirtualMachine,
     ctx: Arc<State>,
 ) -> Result<Action, Error> {
+    ensure_vni_mapping(vm)?;
+
     let libvirt_domain_name = get_domain_name(vm).expect("failed to get domain name");
     let vm_runs_on_us = ctx.libvirt.has_domain(&libvirt_domain_name)?;
     if !vm_runs_on_us {
