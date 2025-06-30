@@ -1,7 +1,7 @@
+use crate::NAMESPACE;
 use crate::cluster::get_running_image;
 use crate::errors::Error;
 use crate::labels_and_annotations::OVN_CONTROLLER_MANAGEMENT_LABEL;
-use crate::NAMESPACE;
 use k8s_openapi::api::apps::v1::DaemonSet;
 use k8s_openapi::api::core::v1::{
     Container, EmptyDirVolumeSource, EnvVar, PodSpec, PodTemplateSpec, SecurityContext, Volume,
@@ -9,16 +9,16 @@ use k8s_openapi::api::core::v1::{
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kube::{
-    api::{Api, Patch, PatchParams},
     Client,
+    api::{Api, Patch, PatchParams},
 };
 use std::collections::BTreeMap;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tracing::{info, instrument};
 
 const OVN_CONTROLLER_NAME: &str = "ovn-controller";
 
-fn make_ovn_daemonset(image: String) -> Result<DaemonSet, Error> {
+fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_string(), OVN_CONTROLLER_NAME.to_string());
 
@@ -127,12 +127,12 @@ pub async fn create(client: Client) -> Result<(), Error> {
 
     let daemonsets: Api<DaemonSet> = Api::namespaced(client.clone(), NAMESPACE);
 
-    let ovn_ds = make_ovn_daemonset(get_running_image(client.clone()).await?)?;
+    let ovn_ds = make_daemonset(get_running_image(client.clone()).await?)?;
 
     daemonsets
         .patch(
             OVN_CONTROLLER_NAME,
-            &PatchParams::apply("ovn-controller"),
+            &PatchParams::apply("ovn-services"),
             &Patch::Apply(&ovn_ds),
         )
         .await?;
