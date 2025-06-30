@@ -5,12 +5,12 @@ use ipnet::IpNet;
 use serde_json::{Value, json};
 
 use crate::Error;
-use crate::cluster::ovn::common::{OvnCommon, OvnGetters};
-use crate::cluster::ovn::deserialization::{
+use crate::crd::network::DhcpOptions as DhcpOptionsCrd;
+use crate::interfaces::ovn::common::{OvnCommon, OvnGetters};
+use crate::interfaces::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
 };
-use crate::cluster::ovn::lowlevel::{Ovn, TYPE_DHCP_OPTIONS};
-use crate::crd::network::DhcpOptions as DhcpOptionsCrd;
+use crate::interfaces::ovn::lowlevel::{Ovn, TYPE_DHCP_OPTIONS};
 
 pub struct DhcpOptions {
     ovn: Arc<Ovn>,

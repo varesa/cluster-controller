@@ -4,13 +4,13 @@ use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 use tracing::{error, info};
 
-use crate::cluster::ovn::common::OvnNamed;
-use crate::cluster::ovn::lowlevel::Ovn;
-use crate::cluster::ovn::types::logicalswitchport::LogicalSwitchPort;
+use crate::Error;
 use crate::crd::virtualmachine::VirtualMachine;
+use crate::interfaces::ovn::common::OvnNamed;
+use crate::interfaces::ovn::lowlevel::Ovn;
+use crate::interfaces::ovn::types::logicalswitchport::LogicalSwitchPort;
 use crate::metadataservice::protocol::{MetadataPayload, MetadataRequest, MetadataResponse};
 use crate::utils::traits::kube::ApiExt;
-use crate::Error;
 
 pub struct MetadataBackend {
     channel_endpoint: Receiver<MetadataRequest>,

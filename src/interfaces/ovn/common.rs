@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde_json::{Map, Value};
 use tracing::{info, instrument};
 
-use crate::cluster::ovn::lowlevel::Ovn;
 use crate::Error;
+use crate::interfaces::ovn::lowlevel::Ovn;
 
 /// Base properties that are required by most OVN methods
 pub trait OvnCommon: Sized {

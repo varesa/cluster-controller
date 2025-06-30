@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use tracing::info;
 
-use crate::cluster::ovn::common::{OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters};
-use crate::cluster::ovn::deserialization::{
-    deserialize_object, deserialize_string, deserialize_uuid,
-};
-use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH, TYPE_LOGICAL_SWITCH_PORT};
-use crate::cluster::ovn::types::dhcpoptions::DhcpOptions;
-use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::Error;
 use crate::Error::OvnConflict;
+use crate::interfaces::ovn::common::{OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters};
+use crate::interfaces::ovn::deserialization::{
+    deserialize_object, deserialize_string, deserialize_uuid,
+};
+use crate::interfaces::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH, TYPE_LOGICAL_SWITCH_PORT};
+use crate::interfaces::ovn::types::dhcpoptions::DhcpOptions;
+use crate::interfaces::ovn::types::logicalswitch::LogicalSwitch;
 
 pub struct LogicalSwitchPortBuilder<'a> {
     pub ovn: Arc<Ovn>,

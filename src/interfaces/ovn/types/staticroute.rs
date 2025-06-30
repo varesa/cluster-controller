@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::cluster::ovn::common::OvnCommon;
-use crate::cluster::ovn::deserialization::{
+use crate::Error;
+use crate::interfaces::ovn::common::OvnCommon;
+use crate::interfaces::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
 };
-use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_ROUTER_STATIC_ROUTE};
-use crate::Error;
+use crate::interfaces::ovn::lowlevel::{Ovn, TYPE_LOGICAL_ROUTER_STATIC_ROUTE};
 
 #[derive(Clone)]
 pub struct StaticRoute {

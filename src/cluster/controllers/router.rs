@@ -9,14 +9,14 @@ use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{info, instrument};
 
-use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
-use crate::cluster::ovn::utils::connect_router_to_ls;
-use crate::cluster::ovn::{
+use crate::crd::router::{Router, RouterStatus};
+use crate::errors::Error;
+use crate::interfaces::ovn::types::logicalswitch::LogicalSwitch;
+use crate::interfaces::ovn::utils::connect_router_to_ls;
+use crate::interfaces::ovn::{
     common::OvnBasicActions, common::OvnNamed, common::OvnNamedGetters, lowlevel::Ovn,
     types::logicalrouter::LogicalRouter,
 };
-use crate::crd::router::{Router, RouterStatus};
-use crate::errors::Error;
 use crate::metadataservice::deployment::deploy as deploy_mds;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;

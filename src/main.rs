@@ -12,6 +12,7 @@ mod host;
 #[macro_use]
 mod utils;
 mod crd;
+mod interfaces;
 mod labels_and_annotations;
 mod logging;
 mod metadataservice;

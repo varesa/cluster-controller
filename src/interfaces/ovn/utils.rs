@@ -1,7 +1,7 @@
-use crate::cluster::ovn::common::OvnNamed;
-use crate::cluster::ovn::types::logicalrouter::LogicalRouter;
-use crate::cluster::ovn::types::logicalswitch::LogicalSwitch;
 use crate::errors::Error;
+use crate::interfaces::ovn::common::OvnNamed;
+use crate::interfaces::ovn::types::logicalrouter::LogicalRouter;
+use crate::interfaces::ovn::types::logicalswitch::LogicalSwitch;
 use serde_json::json;
 
 pub fn connect_router_to_ls(

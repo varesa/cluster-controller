@@ -1,17 +1,15 @@
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment};
 use kube::{
-    api::{Patch, PatchParams}, Api,
-    Client,
+    Api, Client,
+    api::{Patch, PatchParams},
 };
 use tracing::error;
 
 use crate::errors::Error;
 use crate::host::daemonset;
-use crate::{crd, NAMESPACE};
+use crate::{NAMESPACE, crd};
 
 mod controllers;
-mod libvirt;
-pub mod ovn;
 
 const DEPLOYMENT_NAME: &str = "cluster-controller";
 

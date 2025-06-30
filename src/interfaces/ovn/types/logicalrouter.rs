@@ -3,14 +3,16 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use crate::Error;
-use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnGetters, OvnNamed};
-use crate::cluster::ovn::deserialization::{
+use crate::crd::router::Route as RouteCrd;
+use crate::interfaces::ovn::common::{OvnBasicType, OvnCommon, OvnGetters, OvnNamed};
+use crate::interfaces::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
 };
-use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_ROUTER, TYPE_LOGICAL_ROUTER_STATIC_ROUTE};
-use crate::cluster::ovn::types::logicalrouterport::LogicalRouterPortBuilder;
-use crate::cluster::ovn::types::staticroute::StaticRoute;
-use crate::crd::router::Route as RouteCrd;
+use crate::interfaces::ovn::lowlevel::{
+    Ovn, TYPE_LOGICAL_ROUTER, TYPE_LOGICAL_ROUTER_STATIC_ROUTE,
+};
+use crate::interfaces::ovn::types::logicalrouterport::LogicalRouterPortBuilder;
+use crate::interfaces::ovn::types::staticroute::StaticRoute;
 
 #[derive(Debug)]
 pub struct LogicalRouter {

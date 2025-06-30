@@ -1,7 +1,7 @@
 use super::jsonrpc::{JsonRpcConnection, Message};
-use crate::cluster::ovn::jsonrpc::Params;
 use crate::errors::Error;
 use crate::errors::Error::{OvnCentralNodesNotFound, OvnConnection};
+use crate::interfaces::ovn::jsonrpc::Params;
 use crate::utils::traits::kube::ApiExt;
 use crate::utils::traits::node::NodeExt;
 use crate::utils::traits::node::OvnCentralManagement::{Managed, Unmanaged};

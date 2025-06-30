@@ -1,21 +1,21 @@
-use crate::cluster::libvirt::scheduling;
-use crate::cluster::libvirt::scheduling::{
+use crate::cluster::controllers::virtualmachine::scheduling;
+use crate::cluster::controllers::virtualmachine::scheduling::{
     clear_successful_migration, is_uncompliant, migration_requested,
 };
-use crate::cluster::libvirt::utils::{fill_nics, fill_uuid};
-use crate::crd::virtualmachine::{set_vm_status, VirtualMachine, VirtualMachineStatus};
+use crate::cluster::controllers::virtualmachine::utils::{fill_nics, fill_uuid};
+use crate::crd::virtualmachine::{VirtualMachine, VirtualMachineStatus, set_vm_status};
 use crate::errors::Error;
 use crate::ok_and_requeue;
 use crate::utils::resource_controller::{DefaultState, ResourceControllerBuilder};
 use crate::utils::strings::field_manager;
 use crate::utils::traits::kube::{ExtendResource, TryStatus};
-use kube::runtime::controller::Action;
 use kube::Client;
+use kube::runtime::controller::Action;
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
-use tracing::{info, info_span, instrument, Instrument};
+use tracing::{Instrument, info, info_span, instrument};
 
 lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("vm");
@@ -66,7 +66,7 @@ async fn initialize_status(
             },
             client.clone(),
         )
-            .await?;
+        .await?;
     }
     Ok(())
 }

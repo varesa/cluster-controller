@@ -1,14 +1,18 @@
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use crate::cluster::ovn::common::{OvnBasicType, OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters};
-use crate::cluster::ovn::deserialization::{
+use crate::Error;
+use crate::interfaces::ovn::common::{
+    OvnBasicType, OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters,
+};
+use crate::interfaces::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid, deserialize_uuid_set,
 };
-use crate::cluster::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH};
-use crate::cluster::ovn::types::logicalswitchport::{LogicalSwitchPort, LogicalSwitchPortBuilder};
-use crate::Error;
+use crate::interfaces::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH};
+use crate::interfaces::ovn::types::logicalswitchport::{
+    LogicalSwitchPort, LogicalSwitchPortBuilder,
+};
 
 pub struct LogicalSwitch {
     ovn: Arc<Ovn>,
