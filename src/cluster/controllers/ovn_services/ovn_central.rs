@@ -37,7 +37,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
             name: path[1..].replace("/", "-"),
             host_path: Some(k8s_openapi::api::core::v1::HostPathVolumeSource {
                 path: path.to_string(),
-                type_: Some("Directory".to_string()),
+                type_: Some("DirectoryOrCreate".to_string()),
             }),
             ..Volume::default()
         })
