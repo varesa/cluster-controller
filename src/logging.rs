@@ -1,10 +1,10 @@
 use crate::errors::Error;
 use futures::future::BoxFuture;
-use opentelemetry::trace::TracerProvider as _;
 use opentelemetry::KeyValue;
+use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_sdk::export::trace::{ExportResult, SpanData, SpanExporter};
 use opentelemetry_sdk::trace::{Tracer, TracerProvider};
-use opentelemetry_sdk::{trace, Resource};
+use opentelemetry_sdk::{Resource, trace};
 use std::borrow::Cow;
 use std::fmt::Debug;
 use tracing_opentelemetry::OpenTelemetryLayer;
@@ -100,12 +100,12 @@ pub fn setup_tracing() -> Result<Option<TracerProvider>, Error> {
     let mut layers = Vec::new();
 
     println!("Adding OTLP export");
-    let (tracer_provider, exporter_layer) = setup_otlp_layer()?;
-    layers.push(
+    let (tracer_provider, _exporter_layer) = setup_otlp_layer()?;
+    /*layers.push(
         exporter_layer
             .with_filter(tracing_subscriber::EnvFilter::from_default_env())
             .boxed(),
-    );
+    );*/
     let provider = Some(tracer_provider);
 
     layers.push(console_layer.boxed());
