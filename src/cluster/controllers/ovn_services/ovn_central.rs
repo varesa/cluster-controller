@@ -43,7 +43,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
         })
         .collect();
 
-    let volume_mounts = host_volume_paths
+    let volume_mounts: Vec<VolumeMount> = host_volume_paths
         .iter()
         .map(|path| VolumeMount {
             name: path[1..].replace("/", "-"),
@@ -51,6 +51,59 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
             ..VolumeMount::default()
         })
         .collect();
+
+    fn ovsdb_container(
+        image: String,
+        volume_mounts: Vec<VolumeMount>,
+        db_name: String,
+        file_prefix: String,
+        client_port: u16,
+        cluster_port: u16,
+    ) -> Container {
+        Container {
+            name: OVN_CENTRAL_NAME.to_string(),
+            image: Some(image),
+            command: Some(vec!["bash".into()]),
+            args: Some(vec![
+                "-c".into(),
+                format!("set -euo pipefail
+                            local_ip=\"$(ip -j address show lo | jq -r '.[0].addr_info[] | select(.scope == \"global\").local')\"
+                            if [[ \"$local_ip\" != 10.* ]]; then
+                                exit 1;
+                            fi
+
+                            test -f $DB || \
+                                ovsdb-tool join-cluster /var/lib/ovn/{file_prefix}.db {db_name} \
+                                    tcp:$local_ip:{cluster_port} tcp:10.4.0.31:{cluster_port} #temporary remote during migration
+
+                            ovsdb-server \
+                                -vconsole:info \
+                                --pidfile=/var/run/ovn/{file_prefix}.pid \
+                                --unixctl=/var/run/ovn/{file_prefix}.ctl \
+                                --monitor \
+                                --remote=punix:/var/run/ovn/{file_prefix}.sock \
+                                --remote=ptcp:{client_port}:$local_ip /var/lib/ovn/{file_prefix}.db"),
+            ]),
+            env: Some(vec![
+                EnvVar {
+                    name: "OVN_RUNDIR".to_string(),
+                    value: Some("/var/run/ovn".to_string()),
+                    ..EnvVar::default()
+                },
+                EnvVar {
+                    name: "OVS_RUNDIR".to_string(),
+                    value: Some("/var/run/openvswitch".to_string()),
+                    ..EnvVar::default()
+                },
+            ]),
+            volume_mounts: Some(volume_mounts),
+            security_context: Some(SecurityContext {
+                privileged: Some(true),
+                ..SecurityContext::default()
+            }),
+            ..Container::default()
+        }
+    }
 
     let ds = DaemonSet {
         metadata: ObjectMeta {
@@ -70,52 +123,24 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                     ..Default::default()
                 }),
                 spec: Some(PodSpec {
-                    containers: vec![Container {
-                        name: OVN_CENTRAL_NAME.to_string(),
-                        image: Some(image),
-                        command: Some(vec!["bash".into()]),
-                        args: Some(vec![
-                            "-c".into(),
-                            "set -euo pipefail
-                            local_ip=\"$(ip -j address show lo | jq -r '.[0].addr_info[] | select(.scope == \"global\").local')\"
-                            if [[ \"$local_ip\" != 10.* ]]; then
-                                exit 1;
-                            fi
-
-                            DB=\"/var/lib/ovn/ovnnb_db.db\"
-                            NAME=\"OVN_Northbound\"
-                            test -f $DB || \
-                                ovsdb-tool join-cluster $DB $NAME tcp:$local_ip:6643 tcp:10.4.0.31:6643 #temporary remote during migration
-
-                            ovsdb-server \
-                                -vconsole:info \
-                                --pidfile=/var/run/ovn/ovnnb_db.pid \
-                                --unixctl=/var/run/ovn/ovnnb_db.ctl \
-                                --monitor \
-                                --remote=punix:/var/run/ovn/ovnnb_db.sock \
-                                --remote=db:$NAME,NB_Global,connections \
-                                --remote=ptcp:6641:$local_ip $DB \
-                            ".into(),
-                        ]),
-                        env: Some(vec![
-                            EnvVar {
-                                name: "OVN_RUNDIR".to_string(),
-                                value: Some("/var/run/ovn".to_string()),
-                                ..EnvVar::default()
-                            },
-                            EnvVar {
-                                name: "OVS_RUNDIR".to_string(),
-                                value: Some("/var/run/openvswitch".to_string()),
-                                ..EnvVar::default()
-                            },
-                        ]),
-                        volume_mounts: Some(volume_mounts),
-                        security_context: Some(SecurityContext {
-                            privileged: Some(true),
-                            ..SecurityContext::default()
-                        }),
-                        ..Container::default()
-                    }],
+                    containers: vec![
+                        ovsdb_container(
+                            image.clone(),
+                            volume_mounts.clone(),
+                            "OVN_Northbound".into(),
+                            "ovnnb_db".into(),
+                            6641,
+                            6643,
+                        ),
+                        ovsdb_container(
+                            image.clone(),
+                            volume_mounts.clone(),
+                            "OVN_Southbound".into(),
+                            "ovnsb_db".into(),
+                            6642,
+                            6644,
+                        ),
+                    ],
                     node_selector: Some(node_selector),
                     volumes: Some(volumes),
                     host_network: Some(true),
