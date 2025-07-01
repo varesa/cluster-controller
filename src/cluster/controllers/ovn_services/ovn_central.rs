@@ -85,7 +85,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                             DB=\"/var/lib/ovn/ovnnb_db.db\"
                             NAME=\"OVN_Northbound\"
                             test -f $DB || \
-                                ovsdb-tool join-cluster $DB $NAME tcp:$local_ip:6641 tcp:10.4.3.1:6641
+                                ovsdb-tool join-cluster $DB $NAME tcp:$local_ip:6643 tcp:10.4.0.31:6643 #temporary remote during migration
 
                             ovsdb-server \
                                 -vconsole:info \
