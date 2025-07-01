@@ -73,7 +73,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                                 exit 1;
                             fi
 
-                            test -f $DB || \
+                            test -f /var/lib/ovn/{file_prefix}.db || \
                                 ovsdb-tool join-cluster /var/lib/ovn/{file_prefix}.db {db_name} \
                                     tcp:$local_ip:{cluster_port} tcp:10.4.0.31:{cluster_port} #temporary remote during migration
 
