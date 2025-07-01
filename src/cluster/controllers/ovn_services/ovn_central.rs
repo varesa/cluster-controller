@@ -76,15 +76,16 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                         command: Some(vec!["bash".into()]),
                         args: Some(vec![
                             "-c".into(),
-                            "local_ip=\"$(ip -j address show lo | jq -r '.[0].addr_info[] | select(.scope == \"global\").local')\"
+                            "set -euo pipefail
+                            local_ip=\"$(ip -j address show lo | jq -r '.[0].addr_info[] | select(.scope == \"global\").local')\"
                             if [[ \"$local_ip\" != 10.* ]]; then
                                 exit 1;
                             fi
 
-                            DB=\"/var/lib/ovn/ovnnb_db.db\"\
+                            DB=\"/var/lib/ovn/ovnnb_db.db\"
                             NAME=\"OVN_Northbound\"
                             ovsdb-tool db-cid $DB || \
-                                ovdb-tool join-cluster $DB $NAME tcp:$local_ip:6641 tcp:10.4.3.1:6641
+                                ovsdb-tool join-cluster $DB $NAME tcp:$local_ip:6641 tcp:10.4.3.1:6641
 
                             ovsdb-server \
                                 -vconsole:info \
