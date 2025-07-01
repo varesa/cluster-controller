@@ -34,7 +34,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
     let volumes = host_volume_paths
         .iter()
         .map(|path| Volume {
-            name: path.replace("/", "_"),
+            name: path[1..].replace("/", "-"),
             host_path: Some(k8s_openapi::api::core::v1::HostPathVolumeSource {
                 path: path.to_string(),
                 type_: Some("Directory".to_string()),
@@ -46,7 +46,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
     let volume_mounts = host_volume_paths
         .iter()
         .map(|path| VolumeMount {
-            name: path.replace("/", "_"),
+            name: path[1..].replace("/", "-"),
             mount_path: path.to_string(),
             ..VolumeMount::default()
         })
