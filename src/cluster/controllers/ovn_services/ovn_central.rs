@@ -76,7 +76,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                         command: Some(vec!["bash".into()]),
                         args: Some(vec![
                             "-c".into(),
-                            "local_ip=\"$(ip -j addr show dummy0 | jq -r '.[0].addr_info[0].local')\"
+                            "local_ip=\"$(ip -j address show lo | jq -r '.[0].addr_info[] | select(.scope == \"global\").local')\"
                             if [[ \"$local_ip\" != 10.* ]]; then
                                 exit 1;
                             fi
