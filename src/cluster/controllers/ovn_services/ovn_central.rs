@@ -17,6 +17,94 @@ use tracing::{info, instrument};
 
 const OVN_CENTRAL_NAME: &str = "ovn-central";
 
+fn container_base(image: String) -> Container {
+    Container {
+        image: Some(image),
+        command: Some(vec!["bash".into()]),
+        env: Some(vec![
+            EnvVar {
+                name: "OVN_RUNDIR".to_string(),
+                value: Some("/var/run/ovn".to_string()),
+                ..EnvVar::default()
+            },
+            EnvVar {
+                name: "OVS_RUNDIR".to_string(),
+                value: Some("/var/run/openvswitch".to_string()),
+                ..EnvVar::default()
+            },
+        ]),
+        security_context: Some(SecurityContext {
+            privileged: Some(true),
+            ..SecurityContext::default()
+        }),
+        ..Container::default()
+    }
+}
+
+fn ovsdb_container(
+    name: String,
+    image: String,
+    volume_mounts: Vec<VolumeMount>,
+    db_name: String,
+    file_prefix: String,
+    client_port: u16,
+    cluster_port: u16,
+) -> Container {
+    Container {
+        name,
+        args: Some(vec![
+            "-c".into(),
+            format!("set -euo pipefail
+                            local_ip=\"$(ip -j address show lo | jq -r '.[0].addr_info[] | select(.scope == \"global\").local')\"
+                            if [[ \"$local_ip\" != 10.* ]]; then
+                                exit 1;
+                            fi
+
+                            test -f /var/lib/ovn/{file_prefix}.db || \
+                                ovsdb-tool join-cluster /var/lib/ovn/{file_prefix}.db {db_name} \
+                                    tcp:$local_ip:{cluster_port} tcp:10.4.0.31:{cluster_port} #temporary remote during migration
+
+                            ovsdb-server \
+                                -vconsole:info \
+                                --pidfile=/var/run/ovn/{file_prefix}.pid \
+                                --unixctl=/var/run/ovn/{file_prefix}.ctl \
+                                --monitor \
+                                --remote=punix:/var/run/ovn/{file_prefix}.sock \
+                                --remote=ptcp:{client_port}:$local_ip /var/lib/ovn/{file_prefix}.db"),
+        ]),
+        volume_mounts: Some(volume_mounts),
+        ..container_base(image)
+    }
+}
+
+fn ovn_northd_container(
+    image: String,
+    volume_mounts: Vec<VolumeMount>,
+    _ip_addresses: Vec<String>,
+) -> Container {
+    // TODO: Generate these lists automatically
+    let nbdb_addresses =
+        "tcp:10.4.3.1:6641,tcp:10.4.3.2:6641,tcp:10.4.3.4:6641,tcp:10.4.3.5:6641,tcp:10.4.3.6:6641";
+    let sbdb_addresses =
+        "tcp:10.4.3.1:6642,tcp:10.4.3.2:6642,tcp:10.4.3.4:6642,tcp:10.4.3.5:6642,tcp:10.4.3.6:6642";
+
+    Container {
+        name: "northd".into(),
+        args: Some(vec![
+            "-c".into(),
+            format!(
+                "set -euo pipefail
+                         ovn-northd \
+                                -vconsole:info \
+                                --pidfile=/var/run/ovn/northd.pid \
+                                --ovnnb-db={nbdb_addresses} \
+                                --ovnsb-db={sbdb_addresses}"
+            ),
+        ]),
+        volume_mounts: Some(volume_mounts),
+        ..container_base(image)
+    }
+}
 fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_string(), OVN_CENTRAL_NAME.to_string());
@@ -51,60 +139,6 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
             ..VolumeMount::default()
         })
         .collect();
-
-    fn ovsdb_container(
-        name: String,
-        image: String,
-        volume_mounts: Vec<VolumeMount>,
-        db_name: String,
-        file_prefix: String,
-        client_port: u16,
-        cluster_port: u16,
-    ) -> Container {
-        Container {
-            name,
-            image: Some(image),
-            command: Some(vec!["bash".into()]),
-            args: Some(vec![
-                "-c".into(),
-                format!("set -euo pipefail
-                            local_ip=\"$(ip -j address show lo | jq -r '.[0].addr_info[] | select(.scope == \"global\").local')\"
-                            if [[ \"$local_ip\" != 10.* ]]; then
-                                exit 1;
-                            fi
-
-                            test -f /var/lib/ovn/{file_prefix}.db || \
-                                ovsdb-tool join-cluster /var/lib/ovn/{file_prefix}.db {db_name} \
-                                    tcp:$local_ip:{cluster_port} tcp:10.4.0.31:{cluster_port} #temporary remote during migration
-
-                            ovsdb-server \
-                                -vconsole:info \
-                                --pidfile=/var/run/ovn/{file_prefix}.pid \
-                                --unixctl=/var/run/ovn/{file_prefix}.ctl \
-                                --monitor \
-                                --remote=punix:/var/run/ovn/{file_prefix}.sock \
-                                --remote=ptcp:{client_port}:$local_ip /var/lib/ovn/{file_prefix}.db"),
-            ]),
-            env: Some(vec![
-                EnvVar {
-                    name: "OVN_RUNDIR".to_string(),
-                    value: Some("/var/run/ovn".to_string()),
-                    ..EnvVar::default()
-                },
-                EnvVar {
-                    name: "OVS_RUNDIR".to_string(),
-                    value: Some("/var/run/openvswitch".to_string()),
-                    ..EnvVar::default()
-                },
-            ]),
-            volume_mounts: Some(volume_mounts),
-            security_context: Some(SecurityContext {
-                privileged: Some(true),
-                ..SecurityContext::default()
-            }),
-            ..Container::default()
-        }
-    }
 
     let ds = DaemonSet {
         metadata: ObjectMeta {
@@ -143,6 +177,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                             6642,
                             6644,
                         ),
+                        ovn_northd_container(image, volume_mounts, vec![]),
                     ],
                     node_selector: Some(node_selector),
                     volumes: Some(volumes),
