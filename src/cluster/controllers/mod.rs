@@ -2,6 +2,7 @@ use crate::crd;
 use crate::errors::Error;
 use futures::try_join;
 use kube::Client;
+use log::info;
 use ovn_services::{ovn_central, ovn_controller};
 
 mod images;
@@ -13,12 +14,14 @@ mod virtualmachine;
 mod volumes;
 
 pub async fn run(client: Client) -> Result<(), Error> {
+    info!("Creating CRDs");
     crd::libvirtnode::create(client.clone()).await?;
     crd::virtualmachine::create(client.clone()).await?;
     crd::ceph::create(client.clone()).await?;
     crd::network::create(client.clone()).await?;
     crd::router::create(client.clone()).await?;
 
+    info!("Creating tasks");
     let volumes_task = tokio::spawn(volumes::create(client.clone()));
     let images_task = tokio::spawn(images::create(client.clone()));
     let ovn_controller_task = tokio::spawn(ovn_controller::create(client.clone()));
@@ -32,37 +35,19 @@ pub async fn run(client: Client) -> Result<(), Error> {
 
     let node_task = tokio::spawn(node::create(client.clone()));
 
-    let results = try_join!(
-        volumes_task,
-        images_task,
-        ovn_controller_task,
-        ovn_central_task,
-        network_task,
-        router_task,
-        vm_task1,
-        vm_task2,
-        node_task
+    try_join!(
+        async { volumes_task.await.unwrap() },
+        async { images_task.await.unwrap() },
+        async { ovn_controller_task.await.unwrap() },
+        async { ovn_central_task.await.unwrap() },
+        async { network_task.await.unwrap() },
+        async { router_task.await.unwrap() },
+        async { vm_task1.await.unwrap() },
+        async { vm_task2.await.unwrap() },
+        async { node_task.await.unwrap() },
     )?;
-    let (
-        result_volumes,
-        result_images,
-        result_ovn_controller,
-        result_ovn_central,
-        result_network,
-        result_router,
-        result_vm1,
-        result_vm2,
-        result_node,
-    ) = results;
 
-    result_volumes?;
-    result_images?;
-    result_ovn_controller?;
-    result_ovn_central?;
-    result_network?;
-    result_router?;
-    result_vm1?;
-    result_vm2?;
-    result_node?;
-    Ok(())
+    Err(Error::UnexpectedExit(
+        "Cluster controllers should not exit".into(),
+    ))
 }

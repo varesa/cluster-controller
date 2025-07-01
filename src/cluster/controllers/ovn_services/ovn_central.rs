@@ -142,6 +142,8 @@ pub async fn create(client: Client) -> Result<(), Error> {
 
     let ovn_ds = make_daemonset(get_running_image(client.clone()).await?)?;
 
+    info!("daemonset definition formed");
+
     daemonsets
         .patch(
             OVN_CENTRAL_NAME,
