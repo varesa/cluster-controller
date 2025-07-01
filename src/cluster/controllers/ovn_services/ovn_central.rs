@@ -53,6 +53,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
         .collect();
 
     fn ovsdb_container(
+        name: String,
         image: String,
         volume_mounts: Vec<VolumeMount>,
         db_name: String,
@@ -61,7 +62,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
         cluster_port: u16,
     ) -> Container {
         Container {
-            name: OVN_CENTRAL_NAME.to_string(),
+            name,
             image: Some(image),
             command: Some(vec!["bash".into()]),
             args: Some(vec![
@@ -125,6 +126,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                 spec: Some(PodSpec {
                     containers: vec![
                         ovsdb_container(
+                            "nbdb".into(),
                             image.clone(),
                             volume_mounts.clone(),
                             "OVN_Northbound".into(),
@@ -133,6 +135,7 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                             6643,
                         ),
                         ovsdb_container(
+                            "sbdb".into(),
                             image.clone(),
                             volume_mounts.clone(),
                             "OVN_Southbound".into(),
