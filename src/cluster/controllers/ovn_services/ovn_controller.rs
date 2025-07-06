@@ -1,4 +1,5 @@
 use crate::NAMESPACE;
+use crate::cluster::controllers::ovn_services;
 use crate::cluster::get_running_image;
 use crate::errors::Error;
 use crate::labels_and_annotations::OVN_CONTROLLER_MANAGEMENT_LABEL;
@@ -135,7 +136,7 @@ pub async fn create(client: Client) -> Result<(), Error> {
 
     let daemonsets: Api<DaemonSet> = Api::namespaced(client.clone(), NAMESPACE);
 
-    let ovn_ds = make_daemonset(get_running_image(client.clone()).await?)?;
+    let ovn_ds = make_daemonset(ovn_services::IMAGE.to_string())?;
 
     daemonsets
         .patch(
