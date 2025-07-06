@@ -1,19 +1,20 @@
+use crate::NAMESPACE;
 use crate::cluster::get_running_image;
 use crate::errors::Error;
 use crate::labels_and_annotations::OVN_CONTROLLER_MANAGEMENT_LABEL;
-use crate::NAMESPACE;
 use k8s_openapi::api::apps::v1::DaemonSet;
 use k8s_openapi::api::core::v1::{
     Container, EmptyDirVolumeSource, EnvVar, PodSpec, PodTemplateSpec, ResourceRequirements,
     SecurityContext, Volume, VolumeMount,
 };
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kube::{
-    api::{Api, Patch, PatchParams},
     Client,
+    api::{Api, Patch, PatchParams},
 };
 use std::collections::BTreeMap;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tracing::{info, instrument};
 
 const OVN_CONTROLLER_NAME: &str = "ovn-controller";
@@ -71,7 +72,10 @@ fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                             },
                         ]),
                         resources: Some(ResourceRequirements {
-                            requests: Some(BTreeMap::from(["ephemeral-storage", "128Mi"])),
+                            requests: Some(BTreeMap::from([(
+                                "ephemeral-storage".to_string(),
+                                Quantity("128Mi".to_string()),
+                            )])),
                             ..Default::default()
                         }),
                         volume_mounts: Some(vec![
