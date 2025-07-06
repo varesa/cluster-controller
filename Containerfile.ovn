@@ -1,0 +1,13 @@
+FROM quay.io/centos/centos:stream9
+
+ARG OVN_INSTALL_VERSION
+
+RUN dnf update -y && \
+    dnf install -y centos-release-nfv-openvswitch && \
+    OVN_INSTALL_BRANCH="$(echo "$OVN_INSTALL_VERSION" | cut -d '.' -f 1-2)" && \
+    dnf install -y \
+        iproute openvswitch2.17 tcpdump jq \
+        ovn${OVN_INSTALL_BRANCH}-${OVN_INSTALL_VERSION} ovn${OVN_INSTALL_BRANCH}-host-${OVN_INSTALL_VERSION} ovn${OVN_INSTALL_BRANCH}-central-${OVN_INSTALL_VERSION} && \
+    dnf clean all
+
+
