@@ -1,4 +1,4 @@
-use serde_json::{Map, Value};
+use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 
 use crate::Error;
@@ -17,12 +17,32 @@ pub fn deserialize_uuid(object: &Map<String, Value>) -> Result<String, Error> {
         .ok_or(Error::OvnDeserializationFailed)
 }
 
+#[cfg(test)]
+#[test]
+fn test_deserialize_uuid() {
+    let data = json!({"_uuid": ["uuid", "1-2-3"]});
+    assert_eq!(
+        deserialize_uuid(deserialize_object(&data).unwrap()).unwrap(),
+        "1-2-3".to_string()
+    );
+}
+
 pub fn deserialize_string(object: &Map<String, Value>, field: &str) -> Result<String, Error> {
     object
         .get(field)
         .and_then(|u| u.as_str())
         .map(|s| s.to_owned())
         .ok_or(Error::OvnDeserializationFailed)
+}
+
+#[cfg(test)]
+#[test]
+fn test_deserialize_string() {
+    let data = json!({"property": "value"});
+    assert_eq!(
+        deserialize_string(deserialize_object(&data).unwrap(), "property").unwrap(),
+        "value".to_string()
+    );
 }
 
 pub fn deserialize_map(
@@ -57,6 +77,16 @@ pub fn deserialize_map(
         })
         .map(|x| x.collect())
         .ok_or(Error::OvnDeserializationFailed)
+}
+
+#[cfg(test)]
+#[test]
+fn test_deserialize_map() {
+    let data = json!({"config": ["map", [["k1", "v1"], ["k2", "v2"]]]});
+    assert_eq!(
+        deserialize_map(deserialize_object(&data).unwrap(), "config").unwrap(),
+        HashMap::from([("k1".into(), "v1".into()), ("k2".into(), "v2".into())])
+    );
 }
 
 pub fn deserialize_uuid_set(
@@ -98,4 +128,19 @@ pub fn deserialize_uuid_set(
             uuids.iter().map(|s| s.to_string()).collect()
         })
         .ok_or(Error::OvnDeserializationFailed)
+}
+
+#[cfg(test)]
+#[test]
+fn test_deserialize_uuid_set() {
+    let data1 = json!({"uuids": ["uuid", "1-2-3"]});
+    let data2 = json!({"uuids": ["set", [["uuid", "1-2-3"]]]});
+    assert_eq!(
+        deserialize_uuid_set(deserialize_object(&data1).unwrap(), "uuids").unwrap(),
+        Vec::from(["1-2-3"])
+    );
+    assert_eq!(
+        deserialize_uuid_set(deserialize_object(&data2).unwrap(), "uuids").unwrap(),
+        Vec::from(["1-2-3"])
+    );
 }
