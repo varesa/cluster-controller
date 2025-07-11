@@ -1,6 +1,5 @@
 use crate::NAMESPACE;
 use crate::cluster::controllers::ovn_services;
-use crate::cluster::get_running_image;
 use crate::errors::Error;
 use crate::labels_and_annotations::OVN_CENTRAL_MANAGED_LABEL;
 use k8s_openapi::api::apps::v1::DaemonSet;

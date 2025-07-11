@@ -121,7 +121,7 @@ impl LogicalSwitchPort {
         let address = match ip_address {
             IpConfiguration::Address(ip) => format!("{mac_address} {ip}"),
             IpConfiguration::Dynamic => format!("{mac_address} dynamic"),
-            IpConfiguration::None => format!("{mac_address}"),
+            IpConfiguration::None => mac_address.to_string(),
         };
 
         // Otherwise set

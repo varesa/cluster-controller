@@ -42,7 +42,7 @@ pub fn deserialize_map(
         .and_then(|k_v_array_val| k_v_array_val.as_array())
         .map(|map_entries| {
             // [ [k,v], [k,v] ]
-            map_entries.into_iter().map(|entry| {
+            map_entries.iter().map(|entry| {
                 // [k,v]
                 let k_v_array = entry
                     .as_array()
