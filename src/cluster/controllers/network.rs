@@ -1,7 +1,7 @@
 use kube::runtime::controller::Action;
 use kube::{
-    Client, Resource, ResourceExt,
-    api::{Api, PostParams},
+    api::{Api, PostParams}, Client, Resource,
+    ResourceExt,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -134,7 +134,13 @@ async fn remove_network(network: Arc<Network>, ctx: Arc<DefaultState>) -> Result
     let name = network.name_prefixed_with_namespace();
 
     info!("ovn: Network {} waiting for deletion", name);
-    LogicalSwitch::get_by_name(ovn, &name)?.delete()?;
+    let ls = LogicalSwitch::get_by_name(ovn, &name);
+    match ls {
+        Ok(ls) => ls.delete()?,
+        Err(Error::OvnNotFound(_, _)) => { /* nothing to delete */ }
+        Err(e) => return Err(e),
+    };
+
     network
         .remove_finalizer("ovn", client, &FIELD_MANAGER)
         .await?;
