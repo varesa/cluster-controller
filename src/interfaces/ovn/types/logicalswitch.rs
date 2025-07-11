@@ -1,24 +1,26 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
-use crate::Error;
 use crate::interfaces::ovn::common::{
     OvnBasicType, OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters,
 };
 use crate::interfaces::ovn::deserialization::{
-    deserialize_object, deserialize_string, deserialize_uuid, deserialize_uuid_set,
+    deserialize_map, deserialize_object, deserialize_string, deserialize_uuid, deserialize_uuid_set,
 };
 use crate::interfaces::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH};
 use crate::interfaces::ovn::types::logicalswitchport::{
     LogicalSwitchPort, LogicalSwitchPortBuilder,
 };
+use crate::Error;
 
 pub struct LogicalSwitch {
     ovn: Arc<Ovn>,
     uuid: String,
     name: String,
     port_ids: Vec<String>,
+    other_config: HashMap<String, String>,
 }
 
 impl LogicalSwitch {
@@ -31,6 +33,10 @@ impl LogicalSwitch {
         });
         self.ovn.transact(&[set_cidr]);
         Ok(())
+    }
+
+    pub fn get_cidr(&self) -> Option<String> {
+        self.other_config.get("subnet").map(|s| s.to_owned())
     }
 
     pub fn del_lsp(&mut self, lsp_id: &str) -> Result<(), Error> {
@@ -100,6 +106,7 @@ impl OvnCommon for LogicalSwitch {
             uuid: deserialize_uuid(object)?,
             name: deserialize_string(object, "name")?,
             port_ids: deserialize_uuid_set(object, "ports")?,
+            other_config: deserialize_map(object, "other_config")?,
         })
     }
 }

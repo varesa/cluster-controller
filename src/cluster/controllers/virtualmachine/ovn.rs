@@ -1,17 +1,18 @@
 use std::sync::Arc;
 
 use kube::runtime::controller::Action;
-use kube::{Client, ResourceExt, api::Api};
+use kube::{api::Api, Client, ResourceExt};
 use lazy_static::lazy_static;
 use tokio::time::Duration;
 use tracing::{info, instrument};
 
 use crate::crd::network::Network;
 use crate::crd::virtualmachine::{
-    NetworkAttachment, VirtualMachine, VirtualMachineStatus, set_vm_status,
+    set_vm_status, NetworkAttachment, VirtualMachine, VirtualMachineStatus,
 };
 use crate::errors::Error;
 use crate::interfaces::ovn::types::logicalswitch::LogicalSwitch;
+use crate::interfaces::ovn::types::logicalswitchport::IpConfiguration;
 use crate::interfaces::ovn::{
     common::OvnNamedGetters, lowlevel::Ovn, types::logicalswitchport::LogicalSwitchPort,
 };
@@ -41,7 +42,12 @@ async fn connect_vm_nic(
     let lsp_id = nic.ovn_id.as_ref().unwrap();
     let mut lsp = ls.lsp().create_if_missing(lsp_id, None)?;
 
-    lsp.set_address(mac_address)?;
+    let ip = if ls.get_cidr().is_some() {
+        IpConfiguration::Dynamic
+    } else {
+        IpConfiguration::None
+    };
+    lsp.set_address(mac_address, ip)?;
 
     let api: Api<Network> = Api::namespaced(client.clone(), &namespace);
     let network = api.get(network_name).await?;

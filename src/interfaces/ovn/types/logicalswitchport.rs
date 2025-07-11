@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 use tracing::info;
 
-use crate::Error;
-use crate::Error::OvnConflict;
 use crate::interfaces::ovn::common::{OvnCommon, OvnGetters, OvnNamed, OvnNamedGetters};
 use crate::interfaces::ovn::deserialization::{
     deserialize_object, deserialize_string, deserialize_uuid,
@@ -12,6 +10,8 @@ use crate::interfaces::ovn::deserialization::{
 use crate::interfaces::ovn::lowlevel::{Ovn, TYPE_LOGICAL_SWITCH, TYPE_LOGICAL_SWITCH_PORT};
 use crate::interfaces::ovn::types::dhcpoptions::DhcpOptions;
 use crate::interfaces::ovn::types::logicalswitch::LogicalSwitch;
+use crate::Error;
+use crate::Error::OvnConflict;
 
 pub struct LogicalSwitchPortBuilder<'a> {
     pub ovn: Arc<Ovn>,
@@ -95,8 +95,18 @@ pub struct LogicalSwitchPort {
     dynamic_addresses: String,
 }
 
+pub enum IpConfiguration {
+    Address(String),
+    Dynamic,
+    None,
+}
+
 impl LogicalSwitchPort {
-    pub fn set_address(&mut self, mac_address: &str) -> Result<(), Error> {
+    pub fn set_address(
+        &mut self,
+        mac_address: &str,
+        ip_address: IpConfiguration,
+    ) -> Result<(), Error> {
         // Ignore if already set
         if self.addresses.contains(mac_address) {
             return Ok(());
@@ -108,6 +118,12 @@ impl LogicalSwitchPort {
             return Err(OvnConflict(mac_address.to_string()));
         }
 
+        let address = match ip_address {
+            IpConfiguration::Address(ip) => format!("{mac_address} {ip}"),
+            IpConfiguration::Dynamic => format!("{mac_address} dynamic"),
+            IpConfiguration::None => format!("{mac_address}"),
+        };
+
         // Otherwise set
         let set_address = json!({
             "op": "update",
@@ -115,7 +131,7 @@ impl LogicalSwitchPort {
             "where": [
                 [ "_uuid", "==", [ "uuid", self.uuid() ] ]
             ],
-            "row": { "addresses": format!("{mac_address} dynamic") }
+            "row": { "addresses": address }
         });
         self.ovn.transact(&[set_address]);
         Ok(())

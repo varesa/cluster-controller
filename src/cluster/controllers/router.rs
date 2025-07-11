@@ -1,7 +1,7 @@
 use kube::runtime::controller::Action;
 use kube::{
-    Client, Resource, ResourceExt,
-    api::{Api, PostParams},
+    api::{Api, PostParams}, Client, Resource,
+    ResourceExt,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -12,6 +12,7 @@ use tracing::{info, instrument};
 use crate::crd::router::{Router, RouterStatus};
 use crate::errors::Error;
 use crate::interfaces::ovn::types::logicalswitch::LogicalSwitch;
+use crate::interfaces::ovn::types::logicalswitchport::IpConfiguration;
 use crate::interfaces::ovn::utils::connect_router_to_ls;
 use crate::interfaces::ovn::{
     common::OvnBasicActions, common::OvnNamed, common::OvnNamedGetters, lowlevel::Ovn,
@@ -38,9 +39,10 @@ async fn connect_metadataservice(lr: &mut LogicalRouter, ovn: Arc<Ovn>) -> Resul
     let mut ls = LogicalSwitch::create_if_missing(ovn, &mds_name)?;
     connect_router_to_ls(lr, &mut ls, "169.254.169.253/30")?;
 
-    ls.lsp()
-        .create_if_missing(&mds_name, None)?
-        .set_address("02:00:00:00:00:02")?;
+    ls.lsp().create_if_missing(&mds_name, None)?.set_address(
+        "02:00:00:00:00:02",
+        IpConfiguration::Address("169.254.169.254".into()),
+    )?;
     Ok(())
 }
 
