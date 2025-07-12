@@ -2,8 +2,8 @@ use crate::errors::Error;
 use crate::utils::wait_crd_ready;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
-    Api, Client, CustomResource, CustomResourceExt,
-    api::{Patch, PatchParams},
+    api::{Patch, PatchParams}, Api, Client, CustomResource,
+    CustomResourceExt,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -65,12 +65,15 @@ pub mod v1beta1 {
         /// Allowed values:
         /// - Ovn (default)
         /// - Evpn
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub network_type: Option<NetworkType>,
         /// Id of the network.
         ///
         /// Meaning depends on the network type, like VLAN ID, EVPN VNI, etc.
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub network_id: Option<usize>,
         ///  Bridge that the network exists on
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub bridge: Option<String>,
     }
 
