@@ -93,11 +93,11 @@ async fn scheduling_and_migrations(
         info!("libvirt: Acquired mutex to schedule: {}", name);
 
         // Schedule normally
-        let schedule_result = scheduling::schedule(vm, false, client.clone(), false).await;
+        let schedule_result = scheduling::schedule(vm, false, client.clone()).await;
         // If scheduling failed and we have requested a migration, allow bypassing of affinity
         // so that we can temporarily remove a hypervisor when N(affinity group) == N(hypervisors)
         let node = if migration_required && schedule_result.is_err() {
-            scheduling::schedule(vm, true, client.clone(), false).await?
+            scheduling::schedule(vm, true, client.clone()).await?
         } else {
             schedule_result?
         };

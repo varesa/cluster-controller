@@ -91,10 +91,17 @@ fn setup_otlp_layer() -> Result<(TracerProvider, OpenTelemetryLayer<Registry, Tr
     Ok((provider, layer))
 }
 
-pub fn setup_tracing() -> Result<Option<TracerProvider>, Error> {
+pub fn setup_tracing(force_debug: bool) -> Result<Option<TracerProvider>, Error> {
+    let filter = if force_debug {
+        tracing_subscriber::EnvFilter::from_default_env()
+            .add_directive(tracing_subscriber::filter::LevelFilter::DEBUG.into())
+    } else {
+        tracing_subscriber::EnvFilter::from_default_env()
+    };
+
     let console_layer = tracing_subscriber::fmt::layer()
         .compact()
-        .with_filter(tracing_subscriber::EnvFilter::from_default_env());
+        .with_filter(filter);
 
     let subscriber = Registry::default();
     let mut layers = Vec::new();
