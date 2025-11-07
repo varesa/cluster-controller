@@ -1,6 +1,6 @@
 use crate::labels_and_annotations::{
-    MAINTENANCE_ANNOTATION, NO_SCHEDULE_ANNOTATION, OVN_CENTRAL_IP_ANNOTATION,
-    OVN_CENTRAL_MANAGED_LABEL, NETWORK_MODEL_LABEL,
+    MAINTENANCE_ANNOTATION, NETWORK_MODEL_LABEL, NO_SCHEDULE_ANNOTATION, OVN_CENTRAL_IP_ANNOTATION,
+    OVN_CENTRAL_MANAGED_LABEL,
 };
 use k8s_openapi::api::core::v1::Node;
 
@@ -11,10 +11,17 @@ pub enum OvnCentralManagement {
     NotPresent,
 }
 
+/// Host network model
+///
+/// Older hosts use a fixed bridge per VXLAN, while newer hosts
+/// have a single VLAN-aware bridge with multiple VNIs available.
+///
+/// Ovn based VMs work on both so OVN support is included in all three.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum NetworkModel {
     Legacy,
     SingleBridge,
+    OvnOnly,
 }
 
 pub trait NodeExt {

@@ -118,8 +118,7 @@ impl VirtualMachineExt for VirtualMachine {
         } else if saw_legacy {
             NetworkModel::Legacy
         } else {
-            // Default to new model when nothing conclusive
-            NetworkModel::SingleBridge
+            NetworkModel::OvnOnly
         }
     }
 }

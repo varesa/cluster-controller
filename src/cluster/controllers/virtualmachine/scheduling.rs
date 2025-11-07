@@ -1,7 +1,7 @@
 use k8s_openapi::api::core::v1::Node;
 use kube::{
-    api::{Api, ListParams, ResourceExt},
     Client,
+    api::{Api, ListParams, ResourceExt},
 };
 use rand::seq::SliceRandom;
 use tracing::instrument;
@@ -9,7 +9,7 @@ use tracing::instrument;
 use crate::crd::virtualmachine::VirtualMachine;
 use crate::errors::Error;
 use crate::utils::traits::kube::{ApiExt, ExtendResource, TryStatus};
-use crate::utils::traits::node::NodeExt;
+use crate::utils::traits::node::{NetworkModel, NodeExt};
 use crate::utils::traits::virtualmachine::VirtualMachineExt;
 
 /// Find all VMs registered to the k8s apiserver with the given label set to the given value
@@ -179,9 +179,11 @@ pub(crate) async fn schedule(
 
     // Network model aware scheduling: only keep nodes whose network model matches the VM's
     let vm_model = vm.network_model_used(client.clone()).await;
-    candidates
-        .items
-        .retain(|candidate| candidate.network_model() == vm_model);
+    if vm_model != NetworkModel::OvnOnly {
+        candidates
+            .items
+            .retain(|candidate| candidate.network_model() == vm_model);
+    }
 
     if !ignore_affinity {
         // Remove nodes that already have VMs in the same anti-affinity group
@@ -193,7 +195,7 @@ pub(crate) async fn schedule(
                 ANTI_AFFINITY_LABEL,
                 anti_affinity_group,
             )
-                .await?;
+            .await?;
             remove_candidate_nodes(&mut candidates.items, &blocked_nodes);
         }
     }
