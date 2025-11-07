@@ -17,15 +17,6 @@ Features:
 -- if multiple VMs are scheduled at once, this may lead to oversubscription
 -- make some sort of ephemeral reservations against hosts when scheduling VMs to avoid this issue
 
-# Scheduling debug tool
-
-New CLI command that will print information on scheduling.
-
-- Usage: `<main binary> test-schedule <vm name>`
-- Create a new kube API client using the default authentication.
-- Add a new flag to the scheduling function to print the results of every step when running from the CLI
-- Only dry-run, do not actually schedule
-
 # Image import
 - controller for image CRD
 -- create new volume for image
