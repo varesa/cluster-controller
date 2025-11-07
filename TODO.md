@@ -12,6 +12,11 @@ Features:
 -- require enough RAM
 -- then look for host with lowest CPU load
 
+- resource reservations
+-- resources consumed by VMs will not be immediately reflected in the metrics
+-- if multiple VMs are scheduled at once, this may lead to oversubscription
+-- make some sort of ephemeral reservations against hosts when scheduling VMs to avoid this issue
+
 # Image import
 - controller for image CRD
 -- create new volume for image
