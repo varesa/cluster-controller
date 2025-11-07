@@ -1,6 +1,6 @@
 use crate::labels_and_annotations::{
     MAINTENANCE_ANNOTATION, NO_SCHEDULE_ANNOTATION, OVN_CENTRAL_IP_ANNOTATION,
-    OVN_CENTRAL_MANAGED_LABEL,
+    OVN_CENTRAL_MANAGED_LABEL, NETWORK_MODEL_LABEL,
 };
 use k8s_openapi::api::core::v1::Node;
 
@@ -11,6 +11,12 @@ pub enum OvnCentralManagement {
     NotPresent,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum NetworkModel {
+    Legacy,
+    SingleBridge,
+}
+
 pub trait NodeExt {
     fn in_maintenance_mode(&self) -> bool;
     fn allows_scheduling(&self) -> bool;
@@ -18,6 +24,10 @@ pub trait NodeExt {
     fn ovn_central_status(&self) -> OvnCentralManagement;
     fn ovn_central_annotated_ip(&self) -> Option<String>;
     fn internal_ip(&self) -> Option<String>;
+
+    /// Return node's configured network model based on label.
+    /// Defaults to SingleBridge if not present or invalid.
+    fn network_model(&self) -> NetworkModel;
 }
 
 impl NodeExt for Node {
@@ -68,5 +78,21 @@ impl NodeExt for Node {
             .and_then(|status| status.addresses.as_ref())
             .and_then(|addresses| addresses.iter().find(|addr| addr.type_ == "InternalIP"))
             .map(|address| address.address.clone())
+    }
+
+    fn network_model(&self) -> NetworkModel {
+        let value = self
+            .metadata
+            .labels
+            .as_ref()
+            .and_then(|labels| labels.get(NETWORK_MODEL_LABEL))
+            .map(|s| s.to_lowercase());
+        match value.as_deref() {
+            Some("legacy") => NetworkModel::Legacy,
+            Some("singlebridge") => NetworkModel::SingleBridge,
+            // Be lenient with kebab-case
+            Some("single-bridge") => NetworkModel::SingleBridge,
+            _ => NetworkModel::SingleBridge,
+        }
     }
 }

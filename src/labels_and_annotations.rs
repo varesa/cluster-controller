@@ -1,6 +1,8 @@
 // Node labels
 pub const OVN_CONTROLLER_MANAGEMENT_LABEL: &str = "cluster-virt.acl.fi/ovn-controller-installation";
 pub const OVN_CENTRAL_MANAGED_LABEL: &str = "cluster-virt.acl.fi/ovn-central-installation";
+/// Node network model label. Allowed values: "Legacy" | "SingleBridge" (case-insensitive)
+pub const NETWORK_MODEL_LABEL: &str = "cluster-virt.acl.fi/network-model";
 pub const OVN_CENTRAL_IP_ANNOTATION: &str = "cluster-virt.acl.fi/ovn-central-ip";
 
 // Node annotations
