@@ -4,7 +4,7 @@ use kube::{
     api::{Api, ListParams, ResourceExt},
 };
 use rand::seq::SliceRandom;
-use tracing::{debug, instrument};
+use tracing::{info, instrument};
 
 use crate::crd::virtualmachine::VirtualMachine;
 use crate::errors::Error;
@@ -145,22 +145,48 @@ pub(crate) async fn schedule(
     vm: &VirtualMachine,
     ignore_affinity: bool,
     client: Client,
+    debug_logs: bool,
 ) -> Result<Node, Error> {
     let node_api: Api<Node> = Api::all(client.clone());
 
     // Get all nodes
     let mut candidates = node_api.list_default().await?;
+    if debug_logs {
+        let names: Vec<String> = candidates
+            .items
+            .iter()
+            .map(|n| n.name_unchecked())
+            .collect();
+        info!("scheduler: initial candidates: {} => {:?}", names.len(), names);
+    }
 
     // Remove nodes in maintenance
     remove_nodes_in_maintenance(&mut candidates.items);
+    if debug_logs {
+        let names: Vec<String> = candidates
+            .items
+            .iter()
+            .map(|n| n.name_unchecked())
+            .collect();
+        info!("scheduler: after removing maintenance: {} => {:?}", names.len(), names);
+    }
 
     // Node specified in VM spec, try to use that or fail if not found
     if let Some(requested_node) = &vm.spec.node {
         if let Some(node) = candidates.iter().find(|candidate| {
             candidate.metadata.name.as_ref().unwrap_or(&String::new()) == requested_node
         }) {
+            if debug_logs {
+                info!("scheduler: spec.node requested => selecting {}", requested_node);
+            }
             return Ok(node.clone());
         } else {
+            if debug_logs {
+                info!(
+                    "scheduler: spec.node requested, but node {} not in candidates",
+                    requested_node
+                );
+            }
             return Err(Error::ScheduleFailed(format!(
                 "{} requested node {} which is not available",
                 vm.name_unchecked(),
@@ -171,18 +197,51 @@ pub(crate) async fn schedule(
 
     // Do not automatically schedule to nodes with no-schedule annotation
     remove_nodes_with_no_schedule(&mut candidates.items);
+    if debug_logs {
+        let names: Vec<String> = candidates
+            .items
+            .iter()
+            .map(|n| n.name_unchecked())
+            .collect();
+        info!("scheduler: after removing noschedule: {} => {:?}", names.len(), names);
+    }
 
     // Remove a node we are migrating away from (most of the time same as a node in maintenance)
     if let Some(source_node) = vm.migration_requested_from() {
+        if debug_logs {
+            info!(
+                "scheduler: migration requested from {}, removing it from candidates",
+                source_node
+            );
+        }
         remove_candidate_nodes(&mut candidates.items, &vec![source_node.clone()])
+    }
+    if debug_logs {
+        let names: Vec<String> = candidates
+            .items
+            .iter()
+            .map(|n| n.name_unchecked())
+            .collect();
+        info!("scheduler: after migration filter: {} => {:?}", names.len(), names);
     }
 
     // Network model aware scheduling: only keep nodes whose network model matches the VM's
     let vm_model = vm.network_model_used(client.clone()).await;
     if vm_model != NetworkModel::OvnOnly {
+        if debug_logs {
+            info!("scheduler: VM network model {:?}, filtering candidates", vm_model);
+        }
         candidates
             .items
             .retain(|candidate| candidate.network_model() == vm_model);
+    }
+    if debug_logs {
+        let names: Vec<String> = candidates
+            .items
+            .iter()
+            .map(|n| n.name_unchecked())
+            .collect();
+        info!("scheduler: after network model filter: {} => {:?}", names.len(), names);
     }
 
     if !ignore_affinity {
@@ -190,17 +249,43 @@ pub(crate) async fn schedule(
         let labels = vm.labels();
         let anti_affinity_group = labels.get(ANTI_AFFINITY_LABEL);
         if let Some(anti_affinity_group) = anti_affinity_group {
+            if debug_logs {
+                info!(
+                    "scheduler: anti-affinity group '{}': filtering nodes with existing members",
+                    anti_affinity_group
+                );
+            }
             let blocked_nodes = get_nodes_with_label_scheduled(
                 client.clone(),
                 ANTI_AFFINITY_LABEL,
                 anti_affinity_group,
             )
             .await?;
+            if debug_logs {
+                info!(
+                    "scheduler: anti-affinity blocked nodes => {:?}",
+                    blocked_nodes
+                );
+            }
             remove_candidate_nodes(&mut candidates.items, &blocked_nodes);
         }
+    } else if debug_logs {
+        info!("scheduler: ignore_affinity flag set => skipping anti-affinity filtering");
+    }
+
+    if debug_logs {
+        let names: Vec<String> = candidates
+            .items
+            .iter()
+            .map(|n| n.name_unchecked())
+            .collect();
+        info!("scheduler: final candidates: {} => {:?}", names.len(), names);
     }
 
     if let Some(node) = candidates.items.choose(&mut rand::thread_rng()) {
+        if debug_logs {
+            info!("scheduler: selected node => {}", node.name_unchecked());
+        }
         Ok(node.clone())
     } else {
         Err(Error::ScheduleFailed(vm.metadata.name.clone().unwrap()))

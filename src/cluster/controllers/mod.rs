@@ -10,7 +10,7 @@ mod network;
 pub mod node;
 mod ovn_services;
 mod router;
-mod virtualmachine;
+pub mod virtualmachine;
 mod volumes;
 
 pub async fn run(client: Client) -> Result<(), Error> {

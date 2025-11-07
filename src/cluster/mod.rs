@@ -9,7 +9,7 @@ use crate::errors::Error;
 use crate::host::daemonset;
 use crate::{NAMESPACE, crd};
 
-mod controllers;
+pub mod controllers;
 
 const DEPLOYMENT_NAME: &str = "cluster-controller";
 

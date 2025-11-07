@@ -39,7 +39,35 @@ async fn main() -> Result<(), Error> {
 
     let client = Client::try_default().await?;
 
-    if args.contains(&String::from("--host")) {
+    if args.len() >= 3 && args[1] == "test-schedule" {
+        use crate::cluster::controllers::virtualmachine::scheduling;
+        use crate::crd::virtualmachine::VirtualMachine;
+        
+        use kube::api::Api;
+        
+
+        let vm_arg = args[2].clone();
+        let ignore_affinity = args.contains(&String::from("--ignore-affinity"));
+
+        let (namespace, name) = vm_arg.split_once('/').expect("VM name must be in the form namespace/name");
+
+        println!("Running test-schedule for VM: {}/{} (ignore_affinity={})", namespace, name, ignore_affinity);
+
+        let vms: Api<VirtualMachine> = Api::namespaced(client.clone(), namespace);
+        let vm = vms.get(name).await?;
+
+        // Call scheduler in debug mode; this is a dry-run (no status updates happen here)
+        match scheduling::schedule(&vm, ignore_affinity, client.clone(), true).await {
+            Ok(node) => {
+                let node_name = node.metadata.name.unwrap_or_else(|| "<unknown>".into());
+                println!("Result: selected node -> {}", node_name);
+            }
+            Err(e) => {
+                eprintln!("Scheduling failed: {}", e);
+                return Err(e);
+            }
+        }
+    } else if args.contains(&String::from("--host")) {
         info!("Starting host-mode");
         host::libvirt::run(client).await?;
     } else if args.contains(&String::from("--metadata-service")) {
