@@ -26,4 +26,9 @@ Features:
 -- which fields the node controller owns, which fields the cluster controller owns
 - design a proper lifecycle graph for the VMs
 
+# CLI revamp
+
+The command line usage is getting more complex and it probably makes sense 
+to replace the hand-crafted argument parsing with 'clap'.
+
 # Web UI? :D

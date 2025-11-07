@@ -4,7 +4,7 @@ use kube::{
     api::{Api, ListParams, ResourceExt},
 };
 use rand::seq::SliceRandom;
-use tracing::instrument;
+use tracing::{debug, instrument};
 
 use crate::crd::virtualmachine::VirtualMachine;
 use crate::errors::Error;
