@@ -10,7 +10,12 @@ Features:
 - only try to schedule on matching pairs
 
 # Load aware scheduling
-- prometheus installation
+- prometheus infrastructure installation
+-- convert deployment to a helm chart
+--- as a dependency add two prometheus replicas for HA
+---- use local-path storageclass
+--- add a thanos querier (2 replicas) to deduplicate the queries 
+
 - new scheduler rules:
 -- require enough RAM
 -- then look for host with lowest CPU load
