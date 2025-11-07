@@ -1,14 +1,6 @@
 
 Features:
 
-# Network model aware scheduling
-- during the host remodel, there are two types of network configurations
--- hosts with bridge per VXLAN
--- hosts with a single bridge with all V(X)LANS
-- group hosts by model
-- detect which model a VM uses
-- only try to schedule on matching pairs
-
 # Load aware scheduling
 - prometheus infrastructure installation
 -- convert deployment to a helm chart
