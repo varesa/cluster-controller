@@ -135,6 +135,13 @@ fn remove_nodes_with_no_schedule(candidates: &mut Vec<Node>) {
 
 const ANTI_AFFINITY_LABEL: &str = "antiAffinity";
 
+fn log_nodes_if(debug: bool, stage: &str, nodes: &Vec<Node>) {
+    if debug {
+        let names: Vec<String> = nodes.iter().map(|n| n.name_unchecked()).collect();
+        info!("scheduler: {}: {} => {:?}", stage, names.len(), names);
+    }
+}
+
 /// Try to schedule the VM to some node according to rules. Returns either a node-object, or an
 /// Error if no node meets the requirements.
 ///
@@ -151,25 +158,11 @@ pub(crate) async fn schedule(
 
     // Get all nodes
     let mut candidates = node_api.list_default().await?;
-    if debug_logs {
-        let names: Vec<String> = candidates
-            .items
-            .iter()
-            .map(|n| n.name_unchecked())
-            .collect();
-        info!("scheduler: initial candidates: {} => {:?}", names.len(), names);
-    }
+    log_nodes_if(debug_logs, "initial candidates", &candidates.items);
 
     // Remove nodes in maintenance
     remove_nodes_in_maintenance(&mut candidates.items);
-    if debug_logs {
-        let names: Vec<String> = candidates
-            .items
-            .iter()
-            .map(|n| n.name_unchecked())
-            .collect();
-        info!("scheduler: after removing maintenance: {} => {:?}", names.len(), names);
-    }
+    log_nodes_if(debug_logs, "after removing maintenance", &candidates.items);
 
     // Node specified in VM spec, try to use that or fail if not found
     if let Some(requested_node) = &vm.spec.node {
@@ -197,14 +190,7 @@ pub(crate) async fn schedule(
 
     // Do not automatically schedule to nodes with no-schedule annotation
     remove_nodes_with_no_schedule(&mut candidates.items);
-    if debug_logs {
-        let names: Vec<String> = candidates
-            .items
-            .iter()
-            .map(|n| n.name_unchecked())
-            .collect();
-        info!("scheduler: after removing noschedule: {} => {:?}", names.len(), names);
-    }
+    log_nodes_if(debug_logs, "after removing noschedule", &candidates.items);
 
     // Remove a node we are migrating away from (most of the time same as a node in maintenance)
     if let Some(source_node) = vm.migration_requested_from() {
@@ -216,14 +202,7 @@ pub(crate) async fn schedule(
         }
         remove_candidate_nodes(&mut candidates.items, &vec![source_node.clone()])
     }
-    if debug_logs {
-        let names: Vec<String> = candidates
-            .items
-            .iter()
-            .map(|n| n.name_unchecked())
-            .collect();
-        info!("scheduler: after migration filter: {} => {:?}", names.len(), names);
-    }
+    log_nodes_if(debug_logs, "after migration filter", &candidates.items);
 
     // Network model aware scheduling: only keep nodes whose network model matches the VM's
     let vm_model = vm.network_model_used(client.clone()).await;
@@ -235,14 +214,7 @@ pub(crate) async fn schedule(
             .items
             .retain(|candidate| candidate.network_model() == vm_model);
     }
-    if debug_logs {
-        let names: Vec<String> = candidates
-            .items
-            .iter()
-            .map(|n| n.name_unchecked())
-            .collect();
-        info!("scheduler: after network model filter: {} => {:?}", names.len(), names);
-    }
+    log_nodes_if(debug_logs, "after network model filter", &candidates.items);
 
     if !ignore_affinity {
         // Remove nodes that already have VMs in the same anti-affinity group
@@ -273,14 +245,7 @@ pub(crate) async fn schedule(
         info!("scheduler: ignore_affinity flag set => skipping anti-affinity filtering");
     }
 
-    if debug_logs {
-        let names: Vec<String> = candidates
-            .items
-            .iter()
-            .map(|n| n.name_unchecked())
-            .collect();
-        info!("scheduler: final candidates: {} => {:?}", names.len(), names);
-    }
+    log_nodes_if(debug_logs, "final candidates", &candidates.items);
 
     if let Some(node) = candidates.items.choose(&mut rand::thread_rng()) {
         if debug_logs {
