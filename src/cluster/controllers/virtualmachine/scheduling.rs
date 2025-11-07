@@ -177,6 +177,12 @@ pub(crate) async fn schedule(
         remove_candidate_nodes(&mut candidates.items, &vec![source_node.clone()])
     }
 
+    // Network model aware scheduling: only keep nodes whose network model matches the VM's
+    let vm_model = vm.network_model_used(client.clone()).await;
+    candidates
+        .items
+        .retain(|candidate| candidate.network_model() == vm_model);
+
     if !ignore_affinity {
         // Remove nodes that already have VMs in the same anti-affinity group
         let labels = vm.labels();
