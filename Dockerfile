@@ -24,7 +24,7 @@ FROM quay.io/centos/centos:stream9
 
 RUN dnf update -y && \
     dnf install -y epel-release centos-release-ceph-squid centos-release-nfv-openvswitch && \
-    dnf install -y libvirt-libs librbd1 librados2 iproute compat-openssl11
+    dnf install -y libvirt-libs librbd1 librados2 iproute compat-openssl11 openvswitch2.17
 
 COPY --from=builder /usr/local/cargo/bin/cluster-controller /usr/local/bin/cluster-controller
 
