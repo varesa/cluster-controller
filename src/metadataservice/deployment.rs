@@ -7,8 +7,8 @@ use kube::{Api, Client, ResourceExt};
 use serde_json::json;
 use tracing::instrument;
 
-use crate::cluster::get_running_image;
 use crate::Error;
+use crate::cluster::get_running_image;
 
 fn make_service_account(namespace: &str) -> ServiceAccount {
     ServiceAccount {
@@ -38,6 +38,12 @@ fn make_cluster_role() -> ClusterRole {
                 api_groups: Some(vec![String::from("")]),
                 resources: Some(vec![String::from("configmaps")]),
                 verbs: vec![String::from("get")],
+                ..PolicyRule::default()
+            },
+            PolicyRule {
+                api_groups: Some(vec![String::from("")]),
+                resources: Some(vec![String::from("nodes")]),
+                verbs: vec![String::from("list")],
                 ..PolicyRule::default()
             },
         ]),
