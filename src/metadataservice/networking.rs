@@ -23,7 +23,7 @@ fn command(executable: &str, args: Vec<&str>) -> Result<(), Error> {
 }
 
 fn ip_command(args: Vec<&str>) -> Result<(), Error> {
-    println!("proxy: Running /usr/sbin/ip with {:#?}", &args);
+    println!("proxy: Running /usr/sbin/ip with {:?}", &args);
     command("/usr/sbin/ip", args)
 }
 
