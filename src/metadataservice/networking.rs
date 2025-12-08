@@ -23,11 +23,12 @@ fn command(executable: &str, args: Vec<&str>) -> Result<(), Error> {
 }
 
 fn ip_command(args: Vec<&str>) -> Result<(), Error> {
+    println!("proxy: Running /usr/sbin/ip with {:#?}", &args);
     command("/usr/sbin/ip", args)
 }
 
 fn ip_command_netns(netns: &str, args: Vec<&str>) -> Result<(), Error> {
-    let mut command = vec!["netns", "exec", netns, "ip"];
+    let mut command = vec!["netns", "exec", netns, "/usr/sbin/ip"];
     command.append(&mut args.clone());
     ip_command(command)
 }
