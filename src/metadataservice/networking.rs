@@ -8,6 +8,8 @@ use std::process::Command;
 use crate::Error;
 
 fn command(executable: &str, args: Vec<&str>) -> Result<(), Error> {
+    println!("proxy: Running {} with {:?}", executable, &args);
+
     let output = Command::new(executable)
         .args(&args)
         .output()
@@ -23,7 +25,6 @@ fn command(executable: &str, args: Vec<&str>) -> Result<(), Error> {
 }
 
 fn ip_command(args: Vec<&str>) -> Result<(), Error> {
-    println!("proxy: Running /usr/sbin/ip with {:?}", &args);
     command("/usr/sbin/ip", args)
 }
 
