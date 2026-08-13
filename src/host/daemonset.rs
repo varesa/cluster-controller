@@ -39,6 +39,15 @@ pub fn make_daemonset(image: String) -> Result<DaemonSet, Error> {
                 "securityContext": {
                   "privileged": true
                 },
+                "resources": {
+                  "requests": {
+                    "cpu": "50m",
+                    "memory": "128Mi"
+                  },
+                  "limits": {
+                    "memory": "1Gi"
+                  }
+                },
                 "env": [
                   {
                     "name": "NODE_NAME",
