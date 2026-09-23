@@ -5,6 +5,10 @@ authors = ["Esa Varemo <esa@kuivanto.fi>"]
 edition = "2024"
 build = "build.rs"
 
+[features]
+default = ["control-plane-tests"]
+control-plane-tests = []
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]

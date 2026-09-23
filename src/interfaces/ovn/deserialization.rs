@@ -1,3 +1,5 @@
+#[cfg(test)]
+use serde_json::json;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 

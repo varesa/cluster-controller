@@ -7,6 +7,8 @@ use crate::logging::setup_tracing;
 use crate::utils::strings::get_version_string;
 
 mod cluster;
+#[cfg(test)]
+mod control_plane_tests;
 mod errors;
 mod host;
 #[macro_use]
