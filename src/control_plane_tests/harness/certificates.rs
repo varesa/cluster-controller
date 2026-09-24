@@ -1,4 +1,5 @@
 use std::fs;
+use std::fs::OpenOptions;
 use std::path::Path;
 use std::process::Command;
 
@@ -96,10 +97,19 @@ pub fn generate(path: &Path) -> Result<(), String> {
         ],
         &["genrsa", "-out", "service-account.key", "2048"],
     ];
-    for args in commands {
+    for (idx, args) in commands.iter().enumerate() {
+        let log_path = path.join(format!("openssl-{idx}.log"));
+        let log = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_path)
+            .expect("Failed to open log file");
+
         let mut process = Command::new("openssl")
             .current_dir(path)
             .args(*args)
+            .stdout(log.try_clone().expect("Failed to clone log file handle"))
+            .stderr(log)
             .spawn()
             .map_err(|e| {
                 format!(
