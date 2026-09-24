@@ -139,8 +139,9 @@ if [[ $osd_id != 0 ]]; then
     false
 fi
 mkdir "$state/osd.0"
-ceph-osd --id 0 --mkfs --mkkey --osd-uuid "$osd_uuid"
+ceph-authtool --create-keyring "$state/osd.0/keyring" --gen-key --name osd.0
 ceph auth add osd.0 mon 'allow rwx' osd 'allow *' -i "$state/osd.0/keyring"
+ceph-osd --id 0 --mkfs --osd-uuid "$osd_uuid"
 ceph osd crush add osd.0 1 root=default host=ceph-test
 ceph-osd --id 0 --daemonize
 wait_for 'Ceph OSD' bash -c '[[ $(ceph osd stat) == *"1 up"* ]]'
