@@ -6,10 +6,10 @@ use log::info;
 use ovn_services::{ovn_central, ovn_controller};
 
 mod images;
-mod network;
+pub(crate) mod network;
 pub mod node;
-pub mod ovn_services;
-mod router;
+pub(crate) mod ovn_services;
+pub(crate) mod router;
 pub mod virtualmachine;
 mod volumes;
 

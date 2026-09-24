@@ -3,6 +3,7 @@ mod certificates;
 mod crds;
 mod etcd;
 mod misc;
+pub(super) mod ovn;
 mod seed;
 
 use crate::integration_tests::harness::misc::{ServerProcess, allocate_port};
