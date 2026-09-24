@@ -7,7 +7,7 @@ RUN <<EOF
     apt-get install -y --no-install-recommends \
       build-essential git clang llvm libclang-dev librados-dev \
       librbd-dev libvirt-dev pkg-config libssl-dev openssl ca-certificates curl \
-      ovn-central openvswitch-common
+      ovn-central openvswitch-common ceph-mon ceph-osd ceph-mgr ceph-common
 
     cargo install cargo-binstall --locked
     cargo binstall cargo-nextest --secure

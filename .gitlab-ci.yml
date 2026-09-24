@@ -12,15 +12,24 @@ integration-tests:
     CARGO_BUILD_BUILD_DIR: /cache/build
     CARGO_TARGET_DIR: /cache/target
   before_script:
+    - apt-get update
+    - >-
+      apt-get install -y --no-install-recommends
+      build-essential git clang llvm libclang-dev librados-dev librbd-dev libvirt-dev
+      pkg-config libssl-dev openssl ca-certificates curl ovn-central openvswitch-common
+
     - export CONTROL_PLANE_BIN="$CI_PROJECT_DIR/control-plane-bin"
     - export CONTROL_PLANE_LOG_DIR="$CI_PROJECT_DIR/control-plane-logs"
     - mkdir -p "$CONTROL_PLANE_LOG_DIR"
 
     - bash ci/fetch-control-plane.sh "$CONTROL_PLANE_BIN" v1.24.2
     - test -x "$CONTROL_PLANE_BIN/etcd" && test -x "$CONTROL_PLANE_BIN/kube-apiserver"
+    - bash ci/ceph-test.sh start "$CONTROL_PLANE_LOG_DIR/ceph"
   script:
-    # Include the tests which have been #[ignore]d due to requiring the control plane
-    - 'cargo nextest run --profile ci --locked --bin cluster-controller integration_tests:: -- --ignored --nocapture'
+    # Include the test which have been #[ignore]d due to requiring the control plane
+    - 'cargo test --locked --bin cluster-controller integration_tests:: -- --ignored --nocapture'
+  after_script:
+    - bash ci/ceph-test.sh stop "$CI_PROJECT_DIR/control-plane-logs/ceph"
   artifacts:
     when: always
     expire_in: 7 days

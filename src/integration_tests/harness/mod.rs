@@ -1,4 +1,5 @@
 mod apiserver;
+pub(super) mod ceph;
 mod certificates;
 mod crds;
 mod etcd;

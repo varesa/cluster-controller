@@ -3,4 +3,5 @@
 mod control_plane;
 mod harness;
 mod networking;
+mod storage;
 mod vm;

@@ -7,6 +7,8 @@ pub(super) async fn install(plane: &mut ControlPlane) -> Result<(), Error> {
     crate::crd::libvirtnode::create(client.clone()).await?;
     crate::crd::virtualmachine::create(client.clone()).await?;
     crate::crd::network::create(client.clone()).await?;
+    crate::crd::network::create(client.clone()).await?;
     crate::crd::router::create(client.clone()).await?;
+    crate::crd::ceph::create(client.clone()).await?;
     Ok(())
 }

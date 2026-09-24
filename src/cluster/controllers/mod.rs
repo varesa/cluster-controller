@@ -5,13 +5,13 @@ use kube::Client;
 use log::info;
 use ovn_services::{ovn_central, ovn_controller};
 
-mod images;
+pub(crate) mod images;
 pub(crate) mod network;
 pub mod node;
 pub(crate) mod ovn_services;
 pub(crate) mod router;
 pub mod virtualmachine;
-mod volumes;
+pub(crate) mod volumes;
 
 pub async fn run(client: Client) -> Result<(), Error> {
     info!("Creating CRDs");
