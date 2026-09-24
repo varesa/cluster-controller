@@ -24,12 +24,8 @@ pub async fn get_running_image(kube: Client) -> Result<String, Error> {
     Ok(image)
 }
 
-pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
-    tracing::info!("Running in cluster mode");
+pub async fn run_daemonset(client: Client, namespace: &str) -> Result<(), Error> {
     let daemonsets: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
-
-    // Create cluster CRD
-    crd::cluster::create(client.clone()).await?;
 
     // Create libvirt host controllers
     let image = get_running_image(client.clone()).await?;
@@ -41,7 +37,16 @@ pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
             &Patch::Apply(&libvirt_ds),
         )
         .await?;
+    Ok(())
+}
 
+pub async fn run(client: Client, namespace: &str) -> Result<(), Error> {
+    tracing::info!("Running in cluster mode");
+
+    // Create cluster CRD
+    crd::cluster::create(client.clone()).await?;
+
+    run_daemonset(client.clone(), namespace).await?;
     let result = controllers::run(client).await;
     error!(
         "supervisor: ERROR: One of the controllers died, killing the rest of the application: {result:#?}"

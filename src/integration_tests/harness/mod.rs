@@ -5,9 +5,8 @@ mod etcd;
 mod misc;
 mod seed;
 
-use crate::control_plane_tests::harness::misc::{ServerProcess, allocate_port};
-use k8s_openapi::api::core::v1::Namespace;
-use kube::{Api, Client, api::PostParams};
+use crate::integration_tests::harness::misc::{ServerProcess, allocate_port};
+use kube::Client;
 use std::{
     env,
     fs::{self},
@@ -18,6 +17,8 @@ use std::{
 use tempfile::TempDir;
 use tokio::{sync::Mutex, time};
 use uuid::Uuid;
+
+pub(super) const IMAGE: &str = "registry.example.com/cluster-controller:testing";
 
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -114,12 +115,7 @@ impl ControlPlane {
             drop(startup_lock);
 
             crds::install(&mut plane).await?;
-            seed::cluster_resources(
-                &plane.client(),
-                plane.namespace(),
-                "registry.example.com/cluster-controller:testing",
-            )
-            .await?;
+            seed::cluster_resources(&plane.client(), plane.namespace(), IMAGE).await?;
             Ok(plane)
         }
         .await;

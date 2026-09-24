@@ -1,4 +1,4 @@
-use crate::control_plane_tests::harness::TestResult;
+use crate::integration_tests::harness::TestResult;
 use std::fs::OpenOptions;
 use std::net::{SocketAddr, TcpListener};
 use std::path::Path;

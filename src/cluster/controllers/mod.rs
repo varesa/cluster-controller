@@ -8,7 +8,7 @@ use ovn_services::{ovn_central, ovn_controller};
 mod images;
 mod network;
 pub mod node;
-mod ovn_services;
+pub mod ovn_services;
 mod router;
 pub mod virtualmachine;
 mod volumes;
