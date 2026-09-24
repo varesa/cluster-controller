@@ -120,17 +120,6 @@ impl ControlPlane {
                 "registry.example.com/cluster-controller:testing",
             )
             .await?;
-            let client = plane.client();
-            let namespace = plane.namespace.clone();
-            plane
-                .checked("creating test namespace", async {
-                    let namespaces: Api<Namespace> = Api::all(client);
-                    let mut object = Namespace::default();
-                    object.metadata.name = Some(namespace);
-                    namespaces.create(&PostParams::default(), &object).await?;
-                    Ok(())
-                })
-                .await?;
             Ok(plane)
         }
         .await;
