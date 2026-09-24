@@ -23,7 +23,7 @@ pub struct LogicalRouter {
 }
 
 impl LogicalRouter {
-    pub fn lrp(&mut self) -> LogicalRouterPortBuilder {
+    pub fn lrp(&mut self) -> LogicalRouterPortBuilder<'_> {
         LogicalRouterPortBuilder {
             ovn: self.ovn.clone(),
             lr: self,

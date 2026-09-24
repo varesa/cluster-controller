@@ -89,12 +89,11 @@ pub async fn clear_successful_migration(
     field_manager: &str,
 ) -> Result<(), Error> {
     let current_node = get_vm_node(vm);
-    if let Some(node_to_leave) = vm.migration_requested_from() {
-        if current_node != Some(node_to_leave.clone()) {
+    if let Some(node_to_leave) = vm.migration_requested_from()
+        && current_node != Some(node_to_leave.clone()) {
             vm.clear_migration_request(field_manager, client.clone())
                 .await?;
         }
-    }
     Ok(())
 }
 

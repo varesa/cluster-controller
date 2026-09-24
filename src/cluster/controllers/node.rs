@@ -26,8 +26,8 @@ async fn request_reschedule_node_vms(node: &Node, client: Client) -> Result<(), 
     let vms: Api<VirtualMachine> = Api::all(client.clone());
     if let Ok(mut list) = vms.list(&ListParams::default()).await {
         for vm in list.iter_mut() {
-            if let Some(scheduled_node) = &vm.try_status()?.node {
-                if scheduled_node == &node.name_unchecked() {
+            if let Some(scheduled_node) = &vm.try_status()?.node
+                && scheduled_node == &node.name_unchecked() {
                     vm.request_migration_away_from(
                         node,
                         "cluster-manager.libvirt.node",
@@ -35,7 +35,6 @@ async fn request_reschedule_node_vms(node: &Node, client: Client) -> Result<(), 
                     )
                         .await?;
                 }
-            }
         }
     }
     Ok(())

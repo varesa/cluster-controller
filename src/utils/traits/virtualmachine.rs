@@ -82,8 +82,8 @@ impl VirtualMachineExt for VirtualMachine {
 
         for nic in &self.spec.networks {
             // If a managed Network is referenced by name, resolve it inline
-            if let Some(name) = &nic.name {
-                if let Ok(net) = networks_api.get(name).await {
+            if let Some(name) = &nic.name
+                && let Ok(net) = networks_api.get(name).await {
                     let has_id = net.spec.network_id.is_some();
                     let has_bridge = net.spec.bridge.is_some();
                     if has_bridge && has_id {
@@ -93,7 +93,6 @@ impl VirtualMachineExt for VirtualMachine {
                         saw_legacy = true;
                     }
                 }
-            }
 
             if nic.bridge.is_some() {
                 // Bridge path

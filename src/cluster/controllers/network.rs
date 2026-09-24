@@ -70,7 +70,7 @@ fn ensure_router_attachment(
         _ => panic!("Malformed router name (todo: error)"),
     };
 
-    let lr_name = format!("{}-{}", &namespace, &name);
+    let lr_name = format!("{}-{}", namespace, name);
     let mut lr = LogicalRouter::get_by_name(ovn.clone(), &lr_name)?;
 
     let ls_name = network.name_prefixed_with_namespace();

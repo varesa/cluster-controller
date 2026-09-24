@@ -69,25 +69,21 @@ impl Libvirt {
     pub fn create_domain(&self, vm: &VirtualMachine, cluster: &Cluster) -> Result<(), Error> {
         let namespace = ResourceExt::namespace(vm).expect("VM without namespace?");
 
-        let storage_device_prefix;
-        let storage_bus;
-        let network_model;
-        if vm.spec.compatibility_mode.unwrap_or(false) {
-            storage_device_prefix = "sd";
-            storage_bus = "sata";
-            network_model = "e1000";
+        
+        
+        
+        let (storage_device_prefix, storage_bus, network_model) = if vm.spec.compatibility_mode.unwrap_or(false) {
+            ("sd", "sata", "e1000")
         } else {
-            storage_device_prefix = "vd";
-            storage_bus = "virtio";
-            network_model = "virtio";
-        }
+            ("vd", "virtio", "virtio")
+        };
 
         let mut volumes = Vec::new();
         for (index, volume) in vm.spec.volumes.iter().enumerate() {
             let drive_index: u8 = index.try_into().expect("Volume index overflows u8");
             volumes.push(StorageTemplate {
                 source: to_storage_source(volume, &namespace)?,
-                device: format!("{}{}", &storage_device_prefix, (b'a' + drive_index) as char),
+                device: format!("{}{}", storage_device_prefix, (b'a' + drive_index) as char),
                 bootdevice: volumes.is_empty(), // First device is the boot device
                 bus: storage_bus.to_string(),
             });
@@ -151,11 +147,10 @@ impl Libvirt {
 
 fn volumes_locked(volumes: &Vec<StorageTemplate>) -> Result<bool, Error> {
     for volume in volumes {
-        if let StorageSource::Ceph(ceph_source) = &volume.source {
-            if ceph::has_locks(&ceph_source.pool, &ceph_source.image)? {
+        if let StorageSource::Ceph(ceph_source) = &volume.source
+            && ceph::has_locks(&ceph_source.pool, &ceph_source.image)? {
                 return Ok(true);
             }
-        }
     }
     Ok(false)
 }

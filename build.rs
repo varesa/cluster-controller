@@ -7,13 +7,13 @@ fn main() {
         .args(["rev-parse", "HEAD"])
         .output()
         .unwrap();
-    let git_hash = String::from_utf8(output.stdout).map_or("undetermined".into(), |o| o);
+    let git_hash = String::from_utf8(output.stdout).unwrap_or("undetermined".into());
 
     let output = Command::new("git")
         .args(["rev-list", "--count", "HEAD"])
         .output()
         .unwrap();
-    let git_count = String::from_utf8(output.stdout).map_or("undetermined".into(), |o| o);
+    let git_count = String::from_utf8(output.stdout).unwrap_or("undetermined".into());
 
     println!("cargo:rustc-env=GIT_HASH={git_hash}");
     println!("cargo:rustc-env=GIT_COUNT={git_count}");

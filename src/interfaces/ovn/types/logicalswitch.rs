@@ -60,7 +60,7 @@ impl LogicalSwitch {
         Ok(())
     }
 
-    pub fn lsp(&mut self) -> LogicalSwitchPortBuilder {
+    pub fn lsp(&mut self) -> LogicalSwitchPortBuilder<'_> {
         LogicalSwitchPortBuilder {
             ovn: self.ovn.clone(),
             ls: self,

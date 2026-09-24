@@ -36,7 +36,7 @@ async fn connect_vm_nic(
     let network_name = nic.name.as_ref().expect("No network name set");
     let mac_address = nic.mac_address.as_ref().expect("MAC address missing");
 
-    let ls_name = format!("{}-{}", &namespace, &network_name);
+    let ls_name = format!("{}-{}", namespace, network_name);
     let mut ls = LogicalSwitch::get_by_name(ovn.clone(), &ls_name)?;
 
     let lsp_id = nic.ovn_id.as_ref().unwrap();

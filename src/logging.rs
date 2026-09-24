@@ -12,11 +12,11 @@ use tracing_subscriber::prelude::*;
 use tracing_subscriber::{Layer, Registry};
 
 trait GetAttribute {
-    fn get_attribute(&self, name: &str) -> Option<Cow<str>>;
+    fn get_attribute(&self, name: &str) -> Option<Cow<'_, str>>;
 }
 
 impl GetAttribute for SpanData {
-    fn get_attribute(&self, name: &str) -> Option<Cow<str>> {
+    fn get_attribute(&self, name: &str) -> Option<Cow<'_, str>> {
         self.attributes
             .iter()
             .filter_map(|kv: &KeyValue| {

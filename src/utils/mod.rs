@@ -30,16 +30,13 @@ pub async fn wait_crd_ready(crds: &Api<CustomResourceDefinition>, name: &str) ->
     while let Some(status) = stream.try_next().await? {
         if let WatchEvent::Modified(crd) = status {
             debug!("Modify event for {}", name);
-            if let Some(status) = crd.status {
-                if let Some(conditions) = status.conditions {
-                    if let Some(pcond) = conditions.iter().find(|c| c.type_ == "NamesAccepted") {
-                        if pcond.status == "True" {
+            if let Some(status) = crd.status
+                && let Some(conditions) = status.conditions
+                    && let Some(pcond) = conditions.iter().find(|c| c.type_ == "NamesAccepted")
+                        && pcond.status == "True" {
                             info!("CRD accepted: {}", name);
                             return Ok(());
                         }
-                    }
-                }
-            }
         }
     }
     Err(Error::Timeout(format!("Apply CRD {name}")))

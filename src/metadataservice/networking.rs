@@ -8,7 +8,7 @@ use std::process::Command;
 use crate::Error;
 
 fn command(executable: &str, args: Vec<&str>) -> Result<(), Error> {
-    println!("proxy: Running {} with {:?}", executable, &args);
+    println!("proxy: Running {} with {:?}", executable, args);
 
     let output = Command::new(executable)
         .args(&args)
@@ -38,7 +38,7 @@ pub fn create_ns(ns_name: &str) -> Result<File, Error> {
     let ns_path_str = format!("/var/run/netns/{ns_name}");
     let ns_path = Path::new(&ns_path_str);
 
-    println!("proxy: Trying to open {}", &ns_path_str);
+    println!("proxy: Trying to open {}", ns_path_str);
 
     ip_command(vec!["netns", "add", ns_name]).map_err(|e| match e {
         Error::CommandFailed(_cmd, msg) => Error::NetnsCreateFailed(msg),
@@ -82,11 +82,10 @@ pub fn create_interface(ns_name: &str, router_name: &str) -> Result<(), Error> {
     ip_command(vec!["link", "set", &if_host, "up"])?;
 
     command("/usr/bin/ovs-vsctl", vec!["add-port", "br-int", &if_host]).or_else(|err| {
-        if let Error::CommandFailed(_cmd, msg) = &err {
-            if msg == &format!("ovs-vsctl: cannot create a port named {if_host} because a port named {if_host} already exists on bridge br-int\n") {
+        if let Error::CommandFailed(_cmd, msg) = &err
+            && msg == &format!("ovs-vsctl: cannot create a port named {if_host} because a port named {if_host} already exists on bridge br-int\n") {
                 return Ok(())
             }
-        }
         Err(err)
     })?;
     command(
