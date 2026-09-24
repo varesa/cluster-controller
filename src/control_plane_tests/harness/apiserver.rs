@@ -27,6 +27,7 @@ pub(super) fn start(
         .arg("--client-ca-file=ca.crt")
         .arg("--anonymous-auth=false")
         .arg("--authorization-mode=RBAC")
+        .arg("--allow-privileged=true")
         .arg("--service-cluster-ip-range=10.0.0.0/24")
         .arg("--disable-admission-plugins=ServiceAccount")
         .arg(format!("--service-account-issuer={api_url}"))

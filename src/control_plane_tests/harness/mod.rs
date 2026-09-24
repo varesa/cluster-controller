@@ -2,16 +2,17 @@ mod apiserver;
 mod certificates;
 mod crds;
 mod etcd;
+mod misc;
+mod seed;
 
+use crate::control_plane_tests::harness::misc::{ServerProcess, allocate_port};
 use k8s_openapi::api::core::v1::Namespace;
 use kube::{Api, Client, api::PostParams};
 use std::{
     env,
-    fs::{self, OpenOptions},
+    fs::{self},
     future::Future,
-    net::{SocketAddr, TcpListener},
-    path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
+    path::PathBuf,
     time::Duration,
 };
 use tempfile::TempDir;
@@ -35,36 +36,6 @@ pub(super) struct ControlPlane {
     apiserver: Option<ServerProcess>,
     etcd: Option<ServerProcess>,
     state: TempDir,
-}
-
-struct ServerProcess {
-    name: &'static str,
-    child: Child,
-}
-
-impl ServerProcess {
-    fn spawn(name: &'static str, command: &mut Command, logs: &Path) -> TestResult<Self> {
-        let log_path = logs.join(format!("{name}.log"));
-        let log = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)?;
-        let child = command
-            .stdin(Stdio::null())
-            .stdout(log.try_clone()?)
-            .stderr(log)
-            .spawn()
-            .map_err(|error| format!("starting {name}: {error}; log: {}", log_path.display()))?;
-        Ok(Self { name, child })
-    }
-}
-
-impl Drop for ServerProcess {
-    fn drop(&mut self) {
-        // kill is harmless if try_wait already reaped an exited child.
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
 }
 
 impl ControlPlane {
@@ -104,7 +75,7 @@ impl ControlPlane {
                 .prefix("cluster-controller-plane-")
                 .tempdir()?;
             certificates::generate(state.path())?;
-            let namespace = format!("control-plane-{id}");
+            let namespace = String::from(crate::NAMESPACE);
             let startup_lock = START_LOCK.lock().await;
             let etcd_address = allocate_port();
             let peer_address = allocate_port();
@@ -143,6 +114,12 @@ impl ControlPlane {
             drop(startup_lock);
 
             crds::install(&mut plane).await?;
+            seed::cluster_resources(
+                &plane.client(),
+                plane.namespace(),
+                "registry.example.com/cluster-controller:testing",
+            )
+            .await?;
             let client = plane.client();
             let namespace = plane.namespace.clone();
             plane
@@ -200,9 +177,4 @@ impl ControlPlane {
         .map_err(|_| format!("{stage}: timed out after {} seconds", START_TIMEOUT.as_secs()))?;
         result.map_err(|error| format!("{stage}: {error}").into())
     }
-}
-
-fn allocate_port() -> SocketAddr {
-    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
-    listener.local_addr().unwrap()
 }
