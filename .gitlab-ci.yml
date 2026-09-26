@@ -29,3 +29,26 @@ integration-tests:
       - target/nextest/ci/junit.xml
     reports:
       junit: target/nextest/ci/junit.xml
+
+unit-tests:
+  image: registry.acl.fi/public/virt-controller-ci:rust-1.98.1-bookworm
+  stage: test
+  timeout: 45 minutes
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "master"'
+  variables:
+    RUST_BACKTRACE: "1"
+    DEBIAN_FRONTEND: noninteractive
+    CARGO_HOME: /cache/cargo-home
+    CARGO_BUILD_BUILD_DIR: /cache/build
+    CARGO_TARGET_DIR: /cache/target
+  script:
+    - 'cargo nextest run --profile ci --locked --bin cluster-controller -- --nocapture'
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - target/nextest/ci/junit.xml
+    reports:
+      junit: target/nextest/ci/junit.xml
