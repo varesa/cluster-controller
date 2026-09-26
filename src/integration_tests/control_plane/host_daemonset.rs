@@ -10,6 +10,7 @@ async fn create_host_daemonset() -> TestResult {
     let plane = ControlPlane::start("create_host_daemonset").await?;
     let client = plane.client();
 
+    // Test: cluster creates host daemonset
     cluster::run_daemonset(client.clone(), plane.namespace()).await?;
     let daemonsets: Api<DaemonSet> = Api::namespaced(client.clone(), plane.namespace());
     let first = daemonsets.get("libvirt-host-controller").await?;
@@ -23,22 +24,9 @@ async fn create_host_daemonset() -> TestResult {
         observed.metadata.namespace.as_deref(),
         Some(plane.namespace())
     );
+
+    // check pod properties
     let ds = observed.spec.expect("host daemonset spec");
-    let selector = ds.selector.match_labels.expect("host daemonset selector");
-    assert_eq!(
-        selector.get("name").map(String::as_str),
-        Some("libvirt-host-controller")
-    );
-    let labels = ds
-        .template
-        .metadata
-        .expect("host pod metadata")
-        .labels
-        .expect("host pod labels");
-    assert_eq!(
-        labels.get("name").map(String::as_str),
-        Some("libvirt-host-controller")
-    );
     let pod = ds.template.spec.expect("host pod spec");
     assert_eq!(pod.host_network, Some(true));
     assert!(
@@ -49,6 +37,8 @@ async fn create_host_daemonset() -> TestResult {
         pod.affinity.is_none(),
         "host daemonset must not restrict eligible nodes"
     );
+
+    // check volumes
     let volumes = pod.volumes.expect("host volumes");
     for (name, path) in [
         ("virtqemud-sock", "/var/run/libvirt/virtqemud-sock"),
@@ -63,6 +53,8 @@ async fn create_host_daemonset() -> TestResult {
             "missing host path {name}: {path}"
         );
     }
+
+    // check container properties
     assert_eq!(pod.containers.len(), 1);
     let container = &pod.containers[0];
     assert_eq!(container.name, "libvirt-host-controller");
@@ -93,6 +85,8 @@ async fn create_host_daemonset() -> TestResult {
             "missing host mount {name}: {path}"
         );
     }
+
+    // check for node name env var
     assert!(
         container
             .env

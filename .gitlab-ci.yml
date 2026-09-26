@@ -1,5 +1,5 @@
 integration-tests:
-  image: rust:1.90.0-bookworm
+  image: registry.acl.fi/public/virt-controller-ci:rust-1.98.1-bookworm
   stage: test
   timeout: 45 minutes
   rules:
@@ -12,12 +12,6 @@ integration-tests:
     CARGO_BUILD_BUILD_DIR: /cache/build
     CARGO_TARGET_DIR: /cache/target
   before_script:
-    - apt-get update
-    - >-
-      apt-get install -y --no-install-recommends
-      build-essential git clang llvm libclang-dev librados-dev librbd-dev libvirt-dev
-      pkg-config libssl-dev openssl ca-certificates curl
-
     - export CONTROL_PLANE_BIN="$CI_PROJECT_DIR/control-plane-bin"
     - export CONTROL_PLANE_LOG_DIR="$CI_PROJECT_DIR/control-plane-logs"
     - mkdir -p "$CONTROL_PLANE_LOG_DIR"
