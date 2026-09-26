@@ -8,6 +8,9 @@ integration-tests:
   variables:
     RUST_BACKTRACE: "1"
     DEBIAN_FRONTEND: noninteractive
+    CARGO_HOME: /cache/cargo-home
+    CARGO_BUILD_BUILD_DIR: /cache/build
+    CARGO_TARGET_DIR: /cache/target
   before_script:
     - apt-get update
     - >-
