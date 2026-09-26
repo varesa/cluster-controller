@@ -1,4 +1,4 @@
-use super::harness::{ControlPlane, TestResult, ovn::OvnNorthbound};
+use crate::integration_tests::harness::{ControlPlane, TestResult, ovn::OvnNorthbound};
 
 use std::{sync::Arc, time::Duration};
 
@@ -38,7 +38,6 @@ impl Drop for AbortOnDrop {
 }
 
 #[tokio::test]
-#[cfg(feature = "control-plane-tests")]
 #[ignore = "requires control plane"]
 async fn ovn_vm_connects_nic_updates_status_and_disconnects_before_deletion() -> TestResult {
     let plane =

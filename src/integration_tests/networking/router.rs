@@ -1,4 +1,4 @@
-use super::harness::{ControlPlane, TestResult, ovn::OvnNorthbound};
+use crate::integration_tests::harness::{ControlPlane, TestResult, ovn::OvnNorthbound};
 
 use std::{sync::Arc, time::Duration};
 
@@ -30,7 +30,6 @@ impl Drop for AbortOnDrop {
 }
 
 #[tokio::test]
-#[cfg(feature = "control-plane-tests")]
 #[ignore = "requires control plane"]
 async fn ovn_router_reconciles_routes_and_deletes_router() -> TestResult {
     let plane = ControlPlane::start("ovn_router_reconciles_routes_and_deletes_router").await?;

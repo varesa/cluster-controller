@@ -30,14 +30,14 @@ const POLL_INTERVAL: Duration = Duration::from_millis(100);
 // stopped and been reaped, not merely until it starts accepting connections.
 static NORTHBOUND_LOCK: Mutex<()> = Mutex::const_new(());
 
-pub(in crate::control_plane_tests) struct OvnNorthbound {
+pub(in crate::integration_tests) struct OvnNorthbound {
     child: Child,
     _state: TempDir,
     _lock: MutexGuard<'static, ()>,
 }
 
 impl OvnNorthbound {
-    pub(in crate::control_plane_tests) async fn start(client: Client) -> TestResult<Self> {
+    pub(in crate::integration_tests) async fn start(client: Client) -> TestResult<Self> {
         let lock = NORTHBOUND_LOCK.lock().await;
         let state = tempfile::Builder::new()
             .prefix("cluster-controller-ovn-nb-")

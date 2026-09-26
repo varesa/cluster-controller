@@ -1,4 +1,4 @@
-use super::harness::{ControlPlane, TestResult, ovn::OvnNorthbound};
+use crate::integration_tests::harness::{ControlPlane, TestResult, ovn::OvnNorthbound};
 
 use std::{sync::Arc, time::Duration};
 
@@ -55,7 +55,6 @@ fn dhcp_options_configured(ovn: &Ovn) -> bool {
 }
 
 #[tokio::test]
-#[cfg(feature = "control-plane-tests")]
 #[ignore = "requires control plane"]
 async fn ovn_network_creates_switch_configures_dhcp_and_removes_switch_before_deletion()
 -> TestResult {
