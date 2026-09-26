@@ -1,54 +1,18 @@
+# Lint
+
+clippy:
+  extends: .base
+  script:
+    - 'cargo clippy --tests'
+
+# Unit test
+
 unit-tests:
-  image: registry.acl.fi/public/virt-controller-ci:rust-1.98.1-bookworm
-  stage: test
-  timeout: 45 minutes
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "master"'
-  variables:
-    RUST_BACKTRACE: "1"
-    DEBIAN_FRONTEND: noninteractive
-    CARGO_HOME: /cache/cargo-home
-    CARGO_BUILD_BUILD_DIR: /cache/build
-    CARGO_TARGET_DIR: /cache/target
+  extends: .tests
   script:
     - 'cargo nextest run --profile ci --locked --bin cluster-controller -- --nocapture'
-  artifacts:
-    when: always
-    expire_in: 7 days
-    paths:
-      - target/nextest/ci/junit.xml
-    reports:
-      junit: target/nextest/ci/junit.xml
 
-.integration-tests:
-  image: registry.acl.fi/public/virt-controller-ci:rust-1.98.1-bookworm
-  stage: test
-  timeout: 45 minutes
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "master"'
-  variables:
-    RUST_BACKTRACE: "1"
-    DEBIAN_FRONTEND: noninteractive
-    CARGO_HOME: /cache/cargo-home
-    CARGO_BUILD_BUILD_DIR: /cache/build
-    CARGO_TARGET_DIR: /cache/target
-  before_script:
-    - export CONTROL_PLANE_BIN="$CI_PROJECT_DIR/control-plane-bin"
-    - export CONTROL_PLANE_LOG_DIR="$CI_PROJECT_DIR/control-plane-logs"
-    - mkdir -p "$CONTROL_PLANE_LOG_DIR"
-
-    - bash ci/fetch-control-plane.sh "$CONTROL_PLANE_BIN" v1.24.2
-    - test -x "$CONTROL_PLANE_BIN/etcd" && test -x "$CONTROL_PLANE_BIN/kube-apiserver"
-  artifacts:
-    when: always
-    expire_in: 7 days
-    paths:
-      - control-plane-logs/**/*.log
-      - target/nextest/ci/junit.xml
-    reports:
-      junit: target/nextest/ci/junit.xml
+# Integration test
 
 integration-tests-cluster:
   extends: .integration-tests
@@ -74,3 +38,46 @@ integration-tests-storage:
     - 'cargo nextest run --profile ci --locked --bin cluster-controller integration_tests::storage -- --ignored --nocapture'
   after_script:
     - bash ci/ceph-test.sh stop "$CI_PROJECT_DIR/control-plane-logs/ceph"
+
+# Templates
+
+.base:
+  image: registry.acl.fi/public/virt-controller-ci:rust-1.98.1-bookworm
+  stage: test
+  timeout: 45 minutes
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "master"'
+  variables:
+    RUST_BACKTRACE: "1"
+    CARGO_HOME: /cache/cargo-home
+    CARGO_BUILD_BUILD_DIR: /cache/build
+    CARGO_TARGET_DIR: /cache/target
+
+.tests:
+  extends: .base
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - target/nextest/ci/junit.xml
+    reports:
+      junit: target/nextest/ci/junit.xml
+
+.integration-tests:
+  extends: .tests
+  before_script:
+    - export CONTROL_PLANE_BIN="$CI_PROJECT_DIR/control-plane-bin"
+    - export CONTROL_PLANE_LOG_DIR="$CI_PROJECT_DIR/control-plane-logs"
+    - mkdir -p "$CONTROL_PLANE_LOG_DIR"
+
+    - bash ci/fetch-control-plane.sh "$CONTROL_PLANE_BIN" v1.24.2
+    - test -x "$CONTROL_PLANE_BIN/etcd" && test -x "$CONTROL_PLANE_BIN/kube-apiserver"
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - control-plane-logs/**/*.log
+      - target/nextest/ci/junit.xml
+    reports:
+      junit: target/nextest/ci/junit.xml
