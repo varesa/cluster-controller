@@ -2,10 +2,7 @@ use crate::cluster::controllers::{images, volumes};
 use crate::crd::ceph::{Image, ImageSpec, Volume, VolumeSpec};
 use crate::integration_tests::harness::{ControlPlane, TestResult, ceph::Ceph};
 use crate::{GROUP_NAME, KEYRING_SECRET, NAMESPACE};
-use k8s_openapi::{
-    api::core::v1::{Namespace, Secret},
-    apimachinery::pkg::apis::meta::v1::ObjectMeta,
-};
+use k8s_openapi::api::core::v1::Secret;
 use kube::{Api, api::PostParams};
 use std::{future::Future, time::Duration};
 use tokio::{
@@ -56,19 +53,6 @@ async fn ceph_controllers_reconcile_keyring_volumes_clones_and_images() -> TestR
     let plane =
         ControlPlane::start("ceph_controllers_reconcile_keyring_volumes_clones_and_images").await?;
     let client = plane.client();
-    let namespaces: Api<Namespace> = Api::all(client.clone());
-    namespaces
-        .create(
-            &PostParams::default(),
-            &Namespace {
-                metadata: ObjectMeta {
-                    name: Some(NAMESPACE.into()),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        )
-        .await?;
 
     let secrets: Api<Secret> = Api::namespaced(client.clone(), NAMESPACE);
     let mut volume_controller = AbortOnDrop(tokio::spawn(volumes::create(client.clone())));
