@@ -1,10 +1,10 @@
-control-plane-samples:
+integration-tests:
   image: rust:1.90.0-bookworm
   stage: test
   timeout: 45 minutes
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "master"'
   variables:
     RUST_BACKTRACE: "1"
     DEBIAN_FRONTEND: noninteractive
