@@ -2,9 +2,9 @@ use humanize_rs::bytes::Bytes;
 use k8s_openapi::api::core::v1::Secret;
 use kube::runtime::controller::Action;
 use kube::{
+    Client,
     api::{Api, Patch, PatchParams},
     error::ErrorResponse,
-    Client,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -28,38 +28,40 @@ lazy_static! {
     static ref FIELD_MANAGER: String = field_manager("ceph");
 }
 
-/// Check if an volume already exists in the cluster and
-/// create if it doesn't.
+/// Create the volume if it is missing and enforce its requested size.
 #[instrument]
-fn ensure_exists(name: &str, size: u64, template: Option<String>) -> Result<(), Error> {
+fn ensure_exists(name: &str, size: u64, template: Option<&str>) -> Result<(), Error> {
     let cluster = lowlevel::connect()?;
-    let volume_pool = lowlevel::get_pool(cluster, POOL_VOLUMES.into())?;
-    let template_pool = lowlevel::get_pool(cluster, POOL_TEMPLATES.into())?;
+    let volume_pool = match lowlevel::get_pool(cluster, POOL_VOLUMES.into()) {
+        Ok(pool) => pool,
+        Err(error) => {
+            lowlevel::disconnect(cluster);
+            return Err(error);
+        }
+    };
 
-    lowlevel::get_images(volume_pool)?
-        .iter()
-        .find(|&existing| existing == name)
-        .map(|_| Ok(()))
-        .or_else(|| {
+    let result = (|| -> Result<(), Error> {
+        if !lowlevel::get_images(volume_pool)?
+            .iter()
+            .any(|existing| existing == name)
+        {
             info!("ceph: Volume {} does not exist", name);
             if let Some(template_name) = template {
-                Some(lowlevel::clone_image(
-                    volume_pool,
-                    name,
-                    size,
-                    template_pool,
-                    &template_name,
-                ))
+                let template_pool = lowlevel::get_pool(cluster, POOL_TEMPLATES.into())?;
+                let clone_result =
+                    lowlevel::clone_image(volume_pool, name, template_pool, template_name);
+                lowlevel::close_pool(template_pool);
+                clone_result?;
             } else {
-                Some(lowlevel::create_image(volume_pool, name, size))
+                lowlevel::create_image(volume_pool, name, size)?;
             }
-        })
-        .unwrap()?;
+        }
+        lowlevel::resize_image(volume_pool, name, size)
+    })();
 
     lowlevel::close_pool(volume_pool);
-    lowlevel::close_pool(template_pool);
     lowlevel::disconnect(cluster);
-    Ok(())
+    result
 }
 
 #[instrument]
@@ -138,12 +140,12 @@ async fn update_fn(volume: Arc<Volume>, ctx: Arc<DefaultState>) -> Result<Action
     let mut volume = (*volume).clone();
     let name = volume.name_prefixed_with_namespace();
     let bytes = volume.spec.size.parse::<Bytes<u64>>()?.size();
-    let template = volume.spec.template.clone();
 
     info!("ceph: Volume {name} updated");
     volume
         .ensure_finalizer("ceph", ctx.client.clone(), &FIELD_MANAGER)
         .await?;
+    let template = volume.spec.template.as_deref();
     ensure_exists(&name, bytes, template)?;
     info!("ceph: Volume {name} update success");
 

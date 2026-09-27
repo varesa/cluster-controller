@@ -1,4 +1,4 @@
-use libc::{c_char, c_int, ERANGE};
+use libc::{ERANGE, c_char, c_int};
 use serde_json::json;
 use std::{ffi::CString, ptr, str};
 
@@ -9,8 +9,8 @@ use librados_sys::{
 };
 
 use librbd_sys::{
-    rbd_clone, rbd_close, rbd_create, rbd_get_features, rbd_image_t, rbd_list, rbd_list_lockers,
-    rbd_open, rbd_open_read_only, rbd_remove,
+    rbd_clone, rbd_close, rbd_create, rbd_get_features, rbd_get_size, rbd_image_t, rbd_list,
+    rbd_list_lockers, rbd_open, rbd_open_read_only, rbd_remove, rbd_resize,
 };
 use tracing::{instrument, warn};
 
@@ -168,6 +168,36 @@ pub fn create_image(pool: rados_ioctx_t, name: &str, size: u64) -> Result<(), Er
     Ok(())
 }
 
+pub fn resize_image(pool: rados_ioctx_t, name: &str, size: u64) -> Result<(), Error> {
+    unsafe {
+        let name_c = CString::new(name).expect("failed to convert to cstring");
+        let mut image: rbd_image_t = ptr::null_mut();
+        call!(
+            "rbd_open",
+            rbd_open(pool, name_c.as_ptr(), &mut image, ptr::null())
+        );
+
+        let result = (|| -> Result<(), Error> {
+            let mut current_size = 0;
+            call!("rbd_get_size", rbd_get_size(image, &mut current_size));
+            if current_size < size {
+                call!("rbd_resize", rbd_resize(image, size));
+            } else if current_size > size {
+                warn!(
+                    "Requested size {} is smaller than current size {}, refusing to resize {}",
+                    size, current_size, name
+                );
+            }
+            Ok(())
+        })();
+        let close_code = rbd_close(image);
+
+        result?;
+        call!("rbd_close", close_code);
+    }
+    Ok(())
+}
+
 pub fn get_features(pool: rados_ioctx_t, name: &str, snapshot: &str) -> Result<u64, Error> {
     let mut features: u64 = 0;
     unsafe {
@@ -188,7 +218,6 @@ pub fn get_features(pool: rados_ioctx_t, name: &str, snapshot: &str) -> Result<u
 pub fn clone_image(
     pool: rados_ioctx_t,
     name: &str,
-    _size: u64,
     template_pool: rados_ioctx_t,
     template_name: &str,
 ) -> Result<(), Error> {
