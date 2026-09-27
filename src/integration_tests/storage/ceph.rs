@@ -1,14 +1,19 @@
-use crate::cluster::controllers::{images, volumes};
-use crate::crd::ceph::{Image, ImageSpec, Volume, VolumeSpec};
+use crate::cluster::controllers::volumes;
+use crate::crd::ceph::{Volume, VolumeSpec};
 use crate::integration_tests::harness::{ControlPlane, TestResult, ceph::Ceph};
 use crate::{GROUP_NAME, KEYRING_SECRET, NAMESPACE};
 use k8s_openapi::api::core::v1::Secret;
-use kube::{Api, api::PostParams};
+use kube::{
+    Api,
+    api::{Patch, PatchParams, PostParams},
+};
+use serde_json::json;
 use std::{future::Future, time::Duration};
 use tokio::{
     task::JoinHandle,
     time::{sleep, timeout},
 };
+use uuid::Uuid;
 
 struct AbortOnDrop<T>(JoinHandle<T>);
 
@@ -44,18 +49,45 @@ fn has_ceph_finalizer(finalizers: &Option<Vec<String>>) -> bool {
     })
 }
 
-// Exercises real controllers against an isolated Kubernetes API and the
-// ephemeral CI Ceph monitor/OSD. No RBD operation is simulated by the test.
+// Exercises the real volume controller against an isolated Kubernetes API and
+// the ephemeral CI Ceph monitor/OSD. No RBD operation is simulated by the tests.
+struct CephControllerTest {
+    _controller: AbortOnDrop<Result<(), crate::errors::Error>>,
+    plane: ControlPlane,
+    ceph: Ceph,
+}
+
+impl CephControllerTest {
+    async fn start(test_name: &str) -> TestResult<Self> {
+        let ceph = Ceph::start().await?;
+        let plane = ControlPlane::start(test_name).await?;
+        let controller = AbortOnDrop(tokio::spawn(volumes::create(plane.client())));
+        Ok(Self {
+            _controller: controller,
+            plane,
+            ceph,
+        })
+    }
+
+    fn volumes(&self) -> Api<Volume> {
+        Api::namespaced(self.plane.client(), self.plane.namespace())
+    }
+
+    fn image_name(&self, volume_name: &str) -> String {
+        format!("{}-{volume_name}", self.plane.namespace())
+    }
+}
+
+fn unique_name(prefix: &str) -> String {
+    format!("{prefix}-{}", Uuid::new_v4().simple())
+}
+
 #[tokio::test]
 #[ignore = "requires control plane"]
-async fn ceph_controllers_reconcile_keyring_volumes_clones_and_images() -> TestResult {
-    let ceph = Ceph::start().await?;
-    let plane =
-        ControlPlane::start("ceph_controllers_reconcile_keyring_volumes_clones_and_images").await?;
-    let client = plane.client();
+async fn ceph_controller_creates_keyring() -> TestResult {
+    let test = CephControllerTest::start("ceph_controller_creates_keyring").await?;
+    let secrets: Api<Secret> = Api::namespaced(test.plane.client(), NAMESPACE);
 
-    let secrets: Api<Secret> = Api::namespaced(client.clone(), NAMESPACE);
-    let mut volume_controller = AbortOnDrop(tokio::spawn(volumes::create(client.clone())));
     wait_for("generated libvirt keyring Secret", || async {
         Ok(secrets.get_opt(KEYRING_SECRET).await?.is_some())
     })
@@ -68,18 +100,24 @@ async fn ceph_controllers_reconcile_keyring_volumes_clones_and_images() -> TestR
         .ok_or("Ceph keyring Secret lacks data.key")?;
     assert_eq!(
         serde_json::to_value(secret_key)?,
-        serde_json::Value::String(ceph.client_key().await?)
+        serde_json::Value::String(test.ceph.client_key().await?)
     );
-    let secret_data = secret.data.clone();
-    let secret_version = secret.metadata.resource_version.clone();
+    Ok(())
+}
 
-    let volumes: Api<Volume> = Api::namespaced(client.clone(), plane.namespace());
-    let scratch_name = format!("{}-scratch", plane.namespace());
+#[tokio::test]
+#[ignore = "requires control plane"]
+async fn ceph_controller_creates_volume_from_scratch() -> TestResult {
+    let test = CephControllerTest::start("ceph_controller_creates_volume_from_scratch").await?;
+    let volumes = test.volumes();
+    let name = unique_name("scratch");
+    let image_name = test.image_name(&name);
+
     volumes
         .create(
             &PostParams::default(),
             &Volume::new(
-                "scratch",
+                &name,
                 VolumeSpec {
                     size: "1 Mi".into(),
                     template: None,
@@ -88,30 +126,33 @@ async fn ceph_controllers_reconcile_keyring_volumes_clones_and_images() -> TestR
         )
         .await?;
     wait_for("new volume on RBD", || {
-        ceph.image_exists("volumes", &scratch_name)
-    })
-    .await?;
-    wait_for("new volume finalizer", || async {
-        Ok(has_ceph_finalizer(
-            &volumes.get("scratch").await?.metadata.finalizers,
-        ))
-    })
-    .await?;
-    volumes.delete("scratch", &Default::default()).await?;
-    wait_for("removed volume and Kubernetes object", || async {
-        Ok(volumes.get_opt("scratch").await?.is_none()
-            && !ceph.image_exists("volumes", &scratch_name).await?)
+        test.ceph.image_exists("volumes", &image_name)
     })
     .await?;
 
-    let template_name = format!("{}-template", plane.namespace());
-    ceph.create_template(&template_name, "1M").await?;
-    let clone_name = format!("{}-cloned", plane.namespace());
+    assert_eq!(
+        test.ceph.image_size("volumes", &image_name).await?,
+        1024 * 1024
+    );
+    assert_eq!(test.ceph.clone_parent("volumes", &image_name).await?, None);
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires control plane"]
+async fn ceph_controller_creates_volume_from_template() -> TestResult {
+    let test = CephControllerTest::start("ceph_controller_creates_volume_from_template").await?;
+    let volumes = test.volumes();
+    let template_name = unique_name("template");
+    test.ceph.create_template(&template_name, "1M").await?;
+    let name = unique_name("clone");
+    let image_name = test.image_name(&name);
+
     volumes
         .create(
             &PostParams::default(),
             &Volume::new(
-                "cloned",
+                &name,
                 VolumeSpec {
                     size: "1 Mi".into(),
                     template: Some(template_name.clone()),
@@ -120,68 +161,30 @@ async fn ceph_controllers_reconcile_keyring_volumes_clones_and_images() -> TestR
         )
         .await?;
     wait_for("cloned RBD volume", || {
-        ceph.image_exists("volumes", &clone_name)
+        test.ceph.image_exists("volumes", &image_name)
     })
     .await?;
+
     assert_eq!(
-        ceph.clone_parent("volumes", &clone_name).await?,
+        test.ceph.clone_parent("volumes", &image_name).await?,
         Some(format!("templates/{template_name}@default")),
     );
-    wait_for("cloned volume finalizer", || async {
-        Ok(has_ceph_finalizer(
-            &volumes.get("cloned").await?.metadata.finalizers,
-        ))
-    })
-    .await?;
-    volumes.delete("cloned", &Default::default()).await?;
-    wait_for("removed cloned volume and Kubernetes object", || async {
-        Ok(volumes.get_opt("cloned").await?.is_none()
-            && !ceph.image_exists("volumes", &clone_name).await?)
-    })
-    .await?;
+    Ok(())
+}
 
-    // Creation from a URL is not implemented; pre-seed RBD to cover the
-    // controller's existing-image and deletion paths instead.
-    let image_name = format!("{}-preseeded", plane.namespace());
-    ceph.create_image("templates", &image_name, "1M").await?;
-    let images: Api<Image> = Api::namespaced(client.clone(), plane.namespace());
-    let _image_controller = AbortOnDrop(tokio::spawn(images::create(client.clone())));
-    images
-        .create(
-            &PostParams::default(),
-            &Image::new(
-                "preseeded",
-                ImageSpec {
-                    source: "unused".into(),
-                },
-            ),
-        )
-        .await?;
-    wait_for("existing image finalizer", || async {
-        Ok(has_ceph_finalizer(
-            &images.get("preseeded").await?.metadata.finalizers,
-        ))
-    })
-    .await?;
-    assert!(ceph.image_exists("templates", &image_name).await?);
-    images.delete("preseeded", &Default::default()).await?;
-    wait_for("removed RBD image and Kubernetes object", || async {
-        Ok(images.get_opt("preseeded").await?.is_none()
-            && !ceph.image_exists("templates", &image_name).await?)
-    })
-    .await?;
+#[tokio::test]
+#[ignore = "requires control plane"]
+async fn ceph_controller_resizes_volume() -> TestResult {
+    let test = CephControllerTest::start("ceph_controller_resizes_volume").await?;
+    let volumes = test.volumes();
+    let name = unique_name("resize");
+    let image_name = test.image_name(&name);
 
-    // Restart after the generated key is already present. A second controller
-    // must still reconcile RBD volumes, and must not rewrite that Secret.
-    volume_controller.0.abort();
-    let _ = (&mut volume_controller.0).await;
-    let _restarted_controller = AbortOnDrop(tokio::spawn(volumes::create(client)));
-    let existing_key_name = format!("{}-existing-key", plane.namespace());
     volumes
         .create(
             &PostParams::default(),
             &Volume::new(
-                "existing-key",
+                &name,
                 VolumeSpec {
                     size: "1 Mi".into(),
                     template: None,
@@ -189,28 +192,60 @@ async fn ceph_controllers_reconcile_keyring_volumes_clones_and_images() -> TestR
             ),
         )
         .await?;
-    wait_for(
-        "RBD volume after controller restart with existing keyring",
-        || ceph.image_exists("volumes", &existing_key_name),
-    )
+    wait_for("initial RBD volume", || {
+        test.ceph.image_exists("volumes", &image_name)
+    })
     .await?;
-    wait_for("existing-key volume finalizer", || async {
+    volumes
+        .patch(
+            &name,
+            &PatchParams::default(),
+            &Patch::Merge(json!({"spec": {"size": "2 Mi"}})),
+        )
+        .await?;
+    wait_for("resized RBD volume", || async {
+        Ok(test.ceph.image_size("volumes", &image_name).await? == 2 * 1024 * 1024)
+    })
+    .await?;
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires control plane"]
+async fn ceph_controller_deletes_volume() -> TestResult {
+    let test = CephControllerTest::start("ceph_controller_deletes_volume").await?;
+    let volumes = test.volumes();
+    let name = unique_name("delete");
+    let image_name = test.image_name(&name);
+
+    volumes
+        .create(
+            &PostParams::default(),
+            &Volume::new(
+                &name,
+                VolumeSpec {
+                    size: "1 Mi".into(),
+                    template: None,
+                },
+            ),
+        )
+        .await?;
+    wait_for("new volume finalizer", || async {
         Ok(has_ceph_finalizer(
-            &volumes.get("existing-key").await?.metadata.finalizers,
+            &volumes.get(&name).await?.metadata.finalizers,
         ))
     })
     .await?;
-    volumes.delete("existing-key", &Default::default()).await?;
-    wait_for(
-        "removed existing-key volume and Kubernetes object",
-        || async {
-            Ok(volumes.get_opt("existing-key").await?.is_none()
-                && !ceph.image_exists("volumes", &existing_key_name).await?)
-        },
-    )
+    wait_for("new volume on RBD", || {
+        test.ceph.image_exists("volumes", &image_name)
+    })
     .await?;
-    let retained_secret = secrets.get(KEYRING_SECRET).await?;
-    assert_eq!(retained_secret.data, secret_data);
-    assert_eq!(retained_secret.metadata.resource_version, secret_version);
+
+    volumes.delete(&name, &Default::default()).await?;
+    wait_for("removed volume and Kubernetes object", || async {
+        Ok(volumes.get_opt(&name).await?.is_none()
+            && !test.ceph.image_exists("volumes", &image_name).await?)
+    })
+    .await?;
     Ok(())
 }

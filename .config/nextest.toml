@@ -1,3 +1,10 @@
+[test-groups]
+ceph = { max-threads = 1 }
+
+[[profile.default.overrides]]
+filter = 'test(integration_tests::storage::ceph)'
+test-group = 'ceph'
+
 [profile.ci.junit]
 path = "junit.xml"
 

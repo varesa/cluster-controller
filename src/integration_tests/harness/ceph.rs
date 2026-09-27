@@ -104,6 +104,23 @@ impl Ceph {
             .any(|image| image == name))
     }
 
+    pub(in crate::integration_tests) async fn image_size(
+        &self,
+        pool: &str,
+        name: &str,
+    ) -> TestResult<u64> {
+        let info = self
+            .command(
+                "rbd",
+                &["info", "--format", "json", &format!("{pool}/{name}")],
+            )
+            .await?;
+        let info: Value = serde_json::from_str(&info)?;
+        info.get("size")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| format!("RBD image size missing: {info}").into())
+    }
+
     pub(in crate::integration_tests) async fn clone_parent(
         &self,
         pool: &str,
