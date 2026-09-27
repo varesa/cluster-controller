@@ -186,6 +186,45 @@ async fn ceph_controller_resizes_volume() -> TestResult {
             &Volume::new(
                 &name,
                 VolumeSpec {
+                    size: "32 Mi".into(),
+                    template: None,
+                },
+            ),
+        )
+        .await?;
+    wait_for("initial RBD volume", || {
+        test.ceph.image_exists("volumes", &image_name)
+    })
+    .await?;
+    volumes
+        .patch(
+            &name,
+            &PatchParams::default(),
+            &Patch::Merge(json!({"spec": {"size": "31 Mi"}})),
+        )
+        .await?;
+    sleep(Duration::from_secs(10)).await; // TODO: Show refusal in volume status and wait for that
+    assert_eq!(
+        test.ceph.image_size("volumes", &image_name).await?,
+        32 * 1024 * 1024
+    );
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires control plane"]
+async fn ceph_controller_refuses_shrinking() -> TestResult {
+    let test = CephControllerTest::start("ceph_controller_refuses_shrinking").await?;
+    let volumes = test.volumes();
+    let name = unique_name("resize");
+    let image_name = test.image_name(&name);
+
+    volumes
+        .create(
+            &PostParams::default(),
+            &Volume::new(
+                &name,
+                VolumeSpec {
                     size: "1 Mi".into(),
                     template: None,
                 },
