@@ -8,11 +8,12 @@ use std::{
 
 use k8s_openapi::api::core::v1::Node;
 use kube::{Api, Client, api::PostParams};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use tempfile::TempDir;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    process::Command as AsyncCommand,
     sync::{Mutex, MutexGuard},
     time,
 };
@@ -128,6 +129,79 @@ impl OvnNorthbound {
             .await
             .map_err(|_| "timed out registering OVN central Node")??;
         Ok(server)
+    }
+
+    async fn nbctl_json(&self, args: &[&str]) -> TestResult<Value> {
+        let mut command = AsyncCommand::new("ovn-nbctl");
+        command
+            .arg(format!("--db=tcp:{ADDRESS}"))
+            .arg("--timeout=5")
+            .arg("--format=json")
+            .arg("--data=json")
+            .args(args)
+            .kill_on_drop(true);
+        let output = time::timeout(START_TIMEOUT, command.output())
+            .await
+            .map_err(|_| format!("ovn-nbctl {args:?}: timed out"))??;
+        if !output.status.success() {
+            return Err(format!(
+                "ovn-nbctl {args:?}: {}; {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr),
+            )
+            .into());
+        }
+        Ok(serde_json::from_slice(&output.stdout)?)
+    }
+
+    pub(in crate::integration_tests) async fn find(
+        &self,
+        table: &str,
+        columns: &[&str],
+        conditions: &[&str],
+    ) -> TestResult<Vec<Map<String, Value>>> {
+        let columns = format!("--columns={}", columns.join(","));
+        let mut args = vec![columns.as_str(), "find", table];
+        args.extend_from_slice(conditions);
+        let result = self.nbctl_json(&args).await?;
+        let headings = result
+            .get("headings")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("ovn-nbctl JSON has no headings: {result}"))?;
+        let rows = result
+            .get("data")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("ovn-nbctl JSON has no data: {result}"))?;
+
+        let headings = headings
+            .iter()
+            .map(|heading| {
+                heading
+                    .as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("ovn-nbctl heading is not a string: {heading}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        rows.iter()
+            .map(|row| {
+                let cells = row
+                    .as_array()
+                    .ok_or_else(|| format!("ovn-nbctl row is not an array: {row}"))?;
+                if cells.len() != headings.len() {
+                    return Err(format!(
+                        "ovn-nbctl row has {} cells for {} headings: {row}",
+                        cells.len(),
+                        headings.len()
+                    )
+                    .into());
+                }
+                Ok(headings
+                    .iter()
+                    .cloned()
+                    .zip(cells.iter().cloned())
+                    .collect())
+            })
+            .collect()
     }
 }
 

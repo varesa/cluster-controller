@@ -1,136 +1,181 @@
-use crate::integration_tests::harness::{ControlPlane, TestResult, ovn::OvnNorthbound};
-
-use std::{sync::Arc, time::Duration};
-
+use super::{AbortOnDrop, ovsdb_column, ovsdb_string_map, wait_for};
+use crate::{
+    cluster::controllers::network,
+    crd::network::{
+        DhcpOptions,
+        v1beta1::{Network, NetworkSpec},
+    },
+    integration_tests::harness::{ControlPlane, TestResult, ovn::OvnNorthbound},
+};
 use kube::{
     Api,
     api::{DeleteParams, PostParams},
 };
-use serde_json::{Value, json};
-use tokio::{
-    task::JoinHandle,
-    time::{sleep, timeout},
-};
+use serde_json::{Map, Value};
+use std::collections::BTreeMap;
 
-use crate::{
-    cluster::controllers::network,
-    crd::network::{
-        DhcpOptions, NetworkType,
-        v1beta1::{Network, NetworkSpec},
-    },
-    errors::Error,
-    interfaces::ovn::{
-        common::OvnNamedGetters, lowlevel::Ovn, types::logicalswitch::LogicalSwitch,
-    },
-};
+const NETWORK_NAME: &str = "tenant";
+const DHCP_CIDR: &str = "10.84.0.0/24";
 
-struct AbortOnDrop(JoinHandle<Result<(), Error>>);
-
-impl Drop for AbortOnDrop {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
+struct NetworkControllerTest {
+    _controller: AbortOnDrop<Result<(), crate::errors::Error>>,
+    plane: ControlPlane,
+    ovn: OvnNorthbound,
 }
 
-fn dhcp_options_configured(ovn: &Ovn) -> bool {
-    let result = ovn.transact(&[json!({
-        "op": "select",
-        "table": "DHCP_Options",
-        "where": [["cidr", "==", "10.84.0.0/24"]],
-        "columns": ["options"],
-    })]);
-    let entries = result
-        .first()
-        .and_then(|result| result.get("rows"))
-        .and_then(Value::as_array)
-        .and_then(|rows| rows.first())
-        .and_then(|row| row.get("options"))
-        .and_then(Value::as_array)
-        .and_then(|map| map.get(1))
-        .and_then(Value::as_array);
-    entries.is_some_and(|entries| {
-        entries.contains(&json!(["lease_time", "3600"]))
-            && entries.contains(&json!(["dns_server", "10.84.0.53"]))
-    })
+impl NetworkControllerTest {
+    async fn start(test_name: &str) -> TestResult<Self> {
+        let plane = ControlPlane::start(test_name).await?;
+        let ovn = OvnNorthbound::start(plane.client()).await?;
+        let controller = AbortOnDrop(tokio::spawn(network::create(plane.client())));
+        Ok(Self {
+            _controller: controller,
+            plane,
+            ovn,
+        })
+    }
+
+    fn networks(&self) -> Api<Network> {
+        Api::namespaced(self.plane.client(), self.plane.namespace())
+    }
+
+    fn switch_name(&self) -> String {
+        format!("{}-{NETWORK_NAME}", self.plane.namespace())
+    }
+
+    async fn create_network(&self, dhcp: Option<DhcpOptions>) -> TestResult {
+        self.networks()
+            .create(
+                &PostParams::default(),
+                &Network::new(
+                    NETWORK_NAME,
+                    NetworkSpec {
+                        dhcp,
+                        ..Default::default()
+                    },
+                ),
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn switch_rows(&self, columns: &[&str]) -> TestResult<Vec<Map<String, Value>>> {
+        let condition = format!("name={}", self.switch_name());
+        self.ovn
+            .find("Logical_Switch", columns, &[&condition])
+            .await
+    }
+
+    async fn dhcp_rows(&self) -> TestResult<Vec<Map<String, Value>>> {
+        let condition = format!("cidr={DHCP_CIDR}");
+        self.ovn
+            .find("DHCP_Options", &["cidr", "options"], &[&condition])
+            .await
+    }
+
+    async fn all_dhcp_rows(&self) -> TestResult<Vec<Map<String, Value>>> {
+        self.ovn.find("DHCP_Options", &["cidr"], &[]).await
+    }
 }
 
 #[tokio::test]
 #[ignore = "requires control plane"]
-async fn ovn_network_creates_switch_configures_dhcp_and_removes_switch_before_deletion()
--> TestResult {
-    let plane = ControlPlane::start(
-        "ovn_network_creates_switch_configures_dhcp_and_removes_switch_before_deletion",
-    )
+async fn ovn_network_creates_logical_switch() -> TestResult {
+    let test = NetworkControllerTest::start("ovn_network_creates_logical_switch").await?;
+    test.create_network(None).await?;
+
+    wait_for("logical switch creation", || async {
+        Ok(test.switch_rows(&["name"]).await?.len() == 1)
+    })
     .await?;
-    let _backend = OvnNorthbound::start(plane.client()).await?;
-    let ovn = Arc::new(Ovn::try_new("127.0.0.1", 6641)?);
-    let networks: Api<Network> = Api::namespaced(plane.client(), plane.namespace());
-    let switch_name = format!("{}-tenant", plane.namespace());
-    let _controller = AbortOnDrop(tokio::spawn(network::create(plane.client())));
 
-    networks
-        .create(
-            &PostParams::default(),
-            &Network::new(
-                "tenant",
-                NetworkSpec {
-                    network_type: Some(NetworkType::Ovn),
-                    dhcp: Some(DhcpOptions {
-                        cidr: "10.84.0.0/24".into(),
-                        lease_time: Some(3600),
-                        dns_server: Some("10.84.0.53".into()),
-                        domain_name: None,
-                        router: None,
-                    }),
-                    ..Default::default()
-                },
-            ),
-        )
+    assert_eq!(test.switch_rows(&["name"]).await?.len(), 1);
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires control plane"]
+async fn ovn_network_without_dhcp_leaves_dhcp_unconfigured() -> TestResult {
+    let test =
+        NetworkControllerTest::start("ovn_network_without_dhcp_leaves_dhcp_unconfigured").await?;
+    test.create_network(None).await?;
+    wait_for("logical switch creation", || async {
+        Ok(test.switch_rows(&["name"]).await?.len() == 1)
+    })
+    .await?;
+
+    let switches = test.switch_rows(&["other_config"]).await?;
+    assert_eq!(switches.len(), 1);
+    assert!(!ovsdb_string_map(ovsdb_column(&switches[0], "other_config")?)?.contains_key("subnet"));
+    assert!(test.all_dhcp_rows().await?.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires control plane"]
+async fn ovn_network_configures_dhcp() -> TestResult {
+    let test = NetworkControllerTest::start("ovn_network_configures_dhcp").await?;
+    test.create_network(Some(DhcpOptions {
+        cidr: DHCP_CIDR.into(),
+        lease_time: Some(3600),
+        dns_server: Some("10.84.0.53".into()),
+        domain_name: Some("tenant.example".into()),
+        router: Some("10.84.0.1".into()),
+    }))
+    .await?;
+
+    let expected_options = BTreeMap::from([
+        ("dns_server".into(), "10.84.0.53".into()),
+        ("domain_name".into(), "\"tenant.example\"".into()),
+        ("lease_time".into(), "3600".into()),
+        ("router".into(), "10.84.0.1".into()),
+        ("server_id".into(), "10.84.0.1".into()),
+        ("server_mac".into(), "c0:ff:ee:00:00:01".into()),
+    ]);
+    wait_for("DHCP options configuration", || async {
+        let rows = test.dhcp_rows().await?;
+        if rows.len() != 1 {
+            return Ok(false);
+        }
+        Ok(ovsdb_string_map(ovsdb_column(&rows[0], "options")?)? == expected_options)
+    })
+    .await?;
+
+    let switches = test.switch_rows(&["other_config"]).await?;
+    assert_eq!(switches.len(), 1);
+    assert_eq!(
+        ovsdb_string_map(ovsdb_column(&switches[0], "other_config")?)?
+            .get("subnet")
+            .map(String::as_str),
+        Some(DHCP_CIDR)
+    );
+    let rows = test.dhcp_rows().await?;
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        ovsdb_string_map(ovsdb_column(&rows[0], "options")?)?,
+        expected_options
+    );
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires control plane"]
+async fn ovn_network_deletes_logical_switch() -> TestResult {
+    let test = NetworkControllerTest::start("ovn_network_deletes_logical_switch").await?;
+    test.create_network(None).await?;
+    wait_for("logical switch creation", || async {
+        Ok(test.switch_rows(&["name"]).await?.len() == 1)
+    })
+    .await?;
+
+    test.networks()
+        .delete(NETWORK_NAME, &DeleteParams::default())
         .await?;
-
-    timeout(Duration::from_secs(30), async {
-        loop {
-            let current = networks.get("tenant").await?;
-            let switch = LogicalSwitch::get_by_name(ovn.clone(), &switch_name);
-            if current
-                .status
-                .as_ref()
-                .is_some_and(|status| status.is_created)
-                && current
-                    .metadata
-                    .finalizers
-                    .as_ref()
-                    .is_some_and(|finalizers| {
-                        finalizers
-                            .iter()
-                            .any(|name| name == "cluster-virt.acl.fi/ovn")
-                    })
-                && switch
-                    .as_ref()
-                    .is_ok_and(|switch| switch.get_cidr().as_deref() == Some("10.84.0.0/24"))
-                && dhcp_options_configured(&ovn)
-            {
-                break Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
-            }
-            sleep(Duration::from_millis(100)).await;
-        }
+    wait_for("logical switch deletion", || async {
+        Ok(test.switch_rows(&["name"]).await?.is_empty())
     })
-    .await??;
+    .await?;
 
-    networks.delete("tenant", &DeleteParams::default()).await?;
-    timeout(Duration::from_secs(30), async {
-        loop {
-            if networks.get_opt("tenant").await?.is_none()
-                && matches!(
-                    LogicalSwitch::get_by_name(ovn.clone(), &switch_name),
-                    Err(Error::OvnNotFound(_, _))
-                )
-            {
-                break Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
-            }
-            sleep(Duration::from_millis(100)).await;
-        }
-    })
-    .await??;
+    assert!(test.switch_rows(&["name"]).await?.is_empty());
     Ok(())
 }
